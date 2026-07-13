@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { getHomeSummary } from '../features/home/homeService';
 import { ErrorState, LoadingState } from '../shared/components/PageState';
+import { formatDateRange } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
 
 export function HomePage() {
@@ -49,7 +50,7 @@ export function HomePage() {
                   <div>
                     <p className="list-item__title">{trip.title}</p>
                     <div className="list-item__meta">
-                      {trip.startDate} - {trip.endDate}
+                      {formatDateRange(trip.startDate, trip.endDate)}
                     </div>
                   </div>
                   <span className="muted">{trip.tripType === 'dayTrip' ? '日帰り' : '宿泊'}</span>

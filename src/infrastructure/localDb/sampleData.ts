@@ -1,7 +1,7 @@
 import type { Collection, CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
-import { putMany, readAll } from './db';
+import { putMany, putOne, readById } from './db';
 
 const USER_ID = 'local-user';
 const now = '2026-07-12T12:00:00.000Z';
@@ -161,8 +161,8 @@ const collectionVisits: CollectionVisit[] = [
 ];
 
 export async function seedSampleData(): Promise<void> {
-  const existingTrips = await readAll<Trip>('trips');
-  if (existingTrips.length > 0) return;
+  const seeded = await readById<{ id: string; seededAt: string }>('meta', 'sample-data-seeded');
+  if (seeded) return;
 
   await Promise.all([
     putMany('trips', trips),
@@ -172,4 +172,5 @@ export async function seedSampleData(): Promise<void> {
     putMany('collectionItems', collectionItems),
     putMany('collectionVisits', collectionVisits),
   ]);
+  await putOne('meta', { id: 'sample-data-seeded', seededAt: new Date().toISOString() });
 }

@@ -4,6 +4,7 @@ import { CollectionPage } from '../pages/CollectionPage';
 import { HomePage } from '../pages/HomePage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TripDetailPage } from '../pages/TripDetailPage';
+import { TripEditPage } from '../pages/TripEditPage';
 import { TripsPage } from '../pages/TripsPage';
 import { WishlistPage } from '../pages/WishlistPage';
 
@@ -15,6 +16,8 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <HomePage /> },
         { path: 'trips', element: <TripsPage /> },
+        { path: 'trips/new', element: <TripEditPage mode="create" /> },
+        { path: 'trips/:tripId/edit', element: <TripEditPage mode="edit" /> },
         { path: 'trips/:tripId', element: <TripDetailPage /> },
         { path: 'collections', element: <CollectionPage /> },
         { path: 'wishlist', element: <WishlistPage /> },
