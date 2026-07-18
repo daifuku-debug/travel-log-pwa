@@ -419,6 +419,17 @@ a {
   stroke-width: 0.9;
 }
 
+.okinawa-inset__hit-area {
+  cursor: pointer;
+  fill: transparent;
+}
+
+.okinawa-inset__hit-area:focus {
+  outline: none;
+  stroke: #253b40;
+  stroke-width: 1.4;
+}
+
 .okinawa-inset__label {
   fill: #526466;
   font-size: 14px;

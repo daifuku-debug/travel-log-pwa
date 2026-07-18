@@ -31,7 +31,7 @@ const PADDING = 24;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
-const DEFAULT_VIEWPORT = { scale: 1.6, x: -150, y: -150 };
+const DEFAULT_VIEWPORT = { scale: 1.44, x: -118, y: -118 };
 const OKINAWA_CODE = '47';
 const MAINLAND_MAX_LON = 146;
 const OKINAWA_INSET = { x: 432, y: 590, width: 176, height: 116, padding: 14 };
@@ -325,6 +325,21 @@ function renderOkinawaInset(
         width={OKINAWA_INSET.width}
         height={OKINAWA_INSET.height}
         rx="14"
+      />
+      <rect
+        className="okinawa-inset__hit-area"
+        x={OKINAWA_INSET.x}
+        y={OKINAWA_INSET.y}
+        width={OKINAWA_INSET.width}
+        height={OKINAWA_INSET.height}
+        rx="14"
+        tabIndex={0}
+        role="button"
+        aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
+        onClick={() => handleShapeClick(OKINAWA_CODE)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);
+        }}
       />
       <text className="okinawa-inset__label" x={OKINAWA_INSET.x + 14} y={OKINAWA_INSET.y + 22}>沖縄</text>
       <path
