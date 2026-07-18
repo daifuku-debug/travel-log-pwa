@@ -29,7 +29,8 @@ const MAP_WIDTH = 640;
 const MAP_HEIGHT = 760;
 const PADDING = 24;
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 6;
+const COORDINATE_PRECISION = 1;
 
 export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
   const [geoJson, setGeoJson] = useState<GeoJson | undefined>();
@@ -198,6 +199,25 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
+        <defs>
+          <pattern id="map-pattern-passed" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+            <rect width="8" height="8" fill="#f6dda2" />
+            <path d="M0 0v8" stroke="#c49244" strokeWidth="2" opacity="0.45" />
+          </pattern>
+          <pattern id="map-pattern-stayed" width="9" height="9" patternUnits="userSpaceOnUse">
+            <rect width="9" height="9" fill="#367d7d" />
+            <circle cx="2" cy="2" r="1.2" fill="#f3fbf8" opacity="0.22" />
+            <circle cx="7" cy="7" r="1.2" fill="#f3fbf8" opacity="0.18" />
+          </pattern>
+          <pattern id="map-pattern-lived" width="10" height="10" patternUnits="userSpaceOnUse">
+            <rect width="10" height="10" fill="#7a618f" />
+            <path d="M0 5h10M5 0v10" stroke="#fff6df" strokeWidth="1.2" opacity="0.22" />
+          </pattern>
+          <filter id="map-soft-shadow" x="-12%" y="-12%" width="124%" height="124%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="1.1" floodColor="#294246" floodOpacity="0.18" />
+          </filter>
+        </defs>
+        <rect className="japan-map-bg" x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} rx="22" />
         <g transform={`translate(${viewport.x.toFixed(2)} ${viewport.y.toFixed(2)}) scale(${viewport.scale.toFixed(3)})`}>
           {geoJson.features.map((feature) => {
             const code = codeFromShapeIso(feature.properties.shapeISO);
@@ -209,6 +229,9 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
                 key={code}
                 className={`prefecture-shape status-${status} ${selectedCode === code ? 'selected' : ''}`}
                 d={geometryToPath(feature.geometry, projection)}
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+                strokeLinecap="round"
                 tabIndex={0}
                 role="button"
                 aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
@@ -248,7 +271,7 @@ function geometryToPath(
           ring
             .map((point, index) => {
               const [x, y] = project(point);
-              return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
+              return `${index === 0 ? 'M' : 'L'}${x.toFixed(COORDINATE_PRECISION)},${y.toFixed(COORDINATE_PRECISION)}`;
             })
             .join(' ') + ' Z',
         )

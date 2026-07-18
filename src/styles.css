@@ -217,8 +217,39 @@ a {
 }
 
 .bottom-nav__icon {
-  font-size: 1.08rem;
+  display: grid;
+  place-items: center;
   line-height: 1;
+}
+
+.nav-illustration {
+  width: 28px;
+  height: 28px;
+  overflow: visible;
+}
+
+.nav-fill-soft {
+  fill: #edf5f0;
+}
+
+.nav-fill-accent {
+  fill: #f4be6c;
+}
+
+.nav-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bottom-nav__item.active .nav-fill-soft {
+  fill: #dff2eb;
+}
+
+.bottom-nav__item.active .nav-fill-accent {
+  fill: #f2a94f;
 }
 
 .bottom-nav__label {
@@ -354,7 +385,7 @@ a {
   overflow: hidden;
   border: 1px solid #ded7cc;
   border-radius: 8px;
-  background: #eef6f6;
+  background: #edf7f4;
   touch-action: none;
   user-select: none;
 }
@@ -371,56 +402,63 @@ a {
   width: 100%;
   max-height: 72vh;
   cursor: grab;
+  shape-rendering: geometricPrecision;
 }
 
 .japan-map.dragging {
   cursor: grabbing;
 }
 
+.japan-map-bg {
+  fill: #eef8f4;
+}
+
 .prefecture-shape {
   cursor: pointer;
-  stroke: #536063;
-  stroke-width: 0.8;
+  filter: url("#map-soft-shadow");
+  stroke: #f8fcf9;
+  stroke-width: 1.15;
   transition: filter 120ms ease, stroke-width 120ms ease;
 }
 
 .prefecture-shape:hover,
 .prefecture-shape:focus {
-  filter: brightness(0.95);
+  filter: brightness(1.03) url("#map-soft-shadow");
   outline: none;
-  stroke: #172f33;
-  stroke-width: 2;
+  stroke: #253b40;
+  stroke-width: 2.2;
 }
 
 .prefecture-shape.selected {
-  stroke: #111;
-  stroke-width: 2.8;
+  filter: brightness(1.06) url("#map-soft-shadow");
+  stroke: #223237;
+  stroke-width: 3;
 }
 
 .status-unvisited {
-  fill: #eef0ec;
-  color: #6b716b;
+  fill: #e7ece7;
+  color: #66716c;
 }
 
 .status-passed {
-  fill: #f2d27c;
-  color: #765319;
+  fill: url("#map-pattern-passed");
+  color: #7a5628;
   stroke-dasharray: 3 2;
 }
 
 .status-visited {
-  fill: #72b7b2;
-  color: #1f5c61;
+  fill: #8ac7bd;
+  color: #275c5d;
 }
 
 .status-stayed {
-  fill: #2f6f73;
+  fill: url("#map-pattern-stayed");
   color: #fff;
   stroke-width: 1.8;
 }
 
 .status-lived {
-  fill: #5b4d99;
+  fill: url("#map-pattern-lived");
   color: #fff;
   stroke-width: 2;
 }

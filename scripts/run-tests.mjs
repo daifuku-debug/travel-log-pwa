@@ -615,11 +615,29 @@ await test('日本制覇マップは地図内だけをズームできる', () =>
   assert.doesNotMatch(mapComponent, />\s*縮小\s*<\/button>/);
 });
 
+await test('日本制覇マップはズーム時に見やすい丸みと模様を持つ', () => {
+  assert.match(mapComponent, /vectorEffect="non-scaling-stroke"/);
+  assert.match(mapComponent, /strokeLinejoin="round"/);
+  assert.match(mapComponent, /map-pattern-passed/);
+  assert.match(mapComponent, /map-pattern-stayed/);
+  assert.match(mapComponent, /map-pattern-lived/);
+});
+
 await test('下部ナビゲーションにタブアイコンがある', async () => {
   const appLayout = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
   assert.match(appLayout, /bottom-nav__icon/);
   assert.match(appLayout, /icon:/);
 });
+
+await test('下部ナビゲーションは意味が伝わるSVGイラストを使う', async () => {
+  const appLayout = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
+  assert.match(appLayout, /function NavSvg/);
+  assert.match(appLayout, /function GachaIcon/);
+  assert.match(appLayout, /function MapIcon/);
+  assert.match(appLayout, /function CastleIcon/);
+  assert.doesNotMatch(appLayout, /icon: '◎'|icon: '◇'/);
+});
+
 
 await test('城マスターはバンドル同梱でPWAオフライン閲覧できる設計', () => {
   assert.match(castleService, /repositories\.castleMaster\.list\(\)/);
