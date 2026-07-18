@@ -478,6 +478,10 @@ a {
   margin-top: 12px;
 }
 
+.collection-actions {
+  margin-top: 12px;
+}
+
 .collection-detail-row {
   display: flex;
   align-items: center;

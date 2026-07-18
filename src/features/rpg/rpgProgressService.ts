@@ -103,6 +103,17 @@ export async function grantPlaceVisitExperience(placeId: string, tripId: string,
   });
 }
 
+export async function grantCollectionItemExperience(itemId: string, itemName: string): Promise<void> {
+  await grantExperienceOnce({
+    amount: experienceRules.collectionItemCompleted,
+    sourceType: 'collection',
+    sourceId: itemId,
+    sourceKey: `collection-completed:${itemId}`,
+    reason: `${itemName} をコレクション達成`,
+    metadata: { collectionItemId: itemId },
+  });
+}
+
 export async function grantPrefectureExperience(
   prefectureCode: string,
   status: 'unvisited' | 'passed' | 'visited' | 'stayed',

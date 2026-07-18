@@ -304,6 +304,17 @@ await test('コレクション内訳を表示するServiceとUIがある', () =>
   assert.match(collectionPage, /collection-detail-list/);
 });
 
+await test('コレクションと項目を追加、編集、削除できるServiceとUIがある', () => {
+  assert.match(collectionService, /createCollection/);
+  assert.match(collectionService, /updateCollection/);
+  assert.match(collectionService, /deleteCollection/);
+  assert.match(collectionService, /createCollectionItem/);
+  assert.match(collectionService, /updateCollectionItem/);
+  assert.match(collectionService, /deleteCollectionItem/);
+  assert.match(collectionPage, /項目を追加/);
+  assert.match(collectionPage, /訪問済みにする/);
+});
+
 await test('サンプル旅行データはRPG経験値の初回集計から除外される', () => {
   assert.match(rpgProgressService, /SAMPLE_TRIP_IDS/);
   assert.match(rpgProgressService, /filter\(\(trip\) => !SAMPLE_TRIP_IDS\.includes\(trip\.id\)\)/);
