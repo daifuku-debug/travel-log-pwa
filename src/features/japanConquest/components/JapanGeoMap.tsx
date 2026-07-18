@@ -31,7 +31,10 @@ const PADDING = 24;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
-const DEFAULT_VIEWPORT = { scale: 1.34, x: -96, y: -91 };
+const DEFAULT_VIEWPORT = { scale: 1.6, x: -150, y: -150 };
+const OKINAWA_CODE = '47';
+const MAINLAND_MAX_LON = 146;
+const OKINAWA_INSET = { x: 432, y: 590, width: 176, height: 116, padding: 14 };
 
 export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
   const [geoJson, setGeoJson] = useState<GeoJson | undefined>();
@@ -67,29 +70,21 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
     };
   }, []);
 
-  const projection = useMemo(() => {
+  const projections = useMemo(() => {
     if (!geoJson) return undefined;
-    const points = geoJson.features.flatMap((feature) => collectPoints(feature.geometry));
-    const lons = points.map(([lon]) => lon);
-    const lats = points.map(([, lat]) => lat);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const scale = Math.min(
-      (MAP_WIDTH - PADDING * 2) / (maxLon - minLon),
-      (MAP_HEIGHT - PADDING * 2) / (maxLat - minLat),
-    );
-    const xOffset = (MAP_WIDTH - (maxLon - minLon) * scale) / 2;
-    const yOffset = (MAP_HEIGHT - (maxLat - minLat) * scale) / 2;
-    return ([lon, lat]: number[]) => [
-      xOffset + (lon - minLon) * scale,
-      yOffset + (maxLat - lat) * scale,
-    ];
+    const mainlandPoints = geoJson.features
+      .filter((feature) => codeFromShapeIso(feature.properties.shapeISO) !== OKINAWA_CODE)
+      .flatMap((feature) => collectPoints(feature.geometry))
+      .filter(([lon]) => lon < MAINLAND_MAX_LON);
+    const okinawaFeature = geoJson.features.find((feature) => codeFromShapeIso(feature.properties.shapeISO) === OKINAWA_CODE);
+    return {
+      mainland: createProjection(mainlandPoints, { x: PADDING, y: PADDING, width: MAP_WIDTH - PADDING * 2, height: MAP_HEIGHT - PADDING * 2 }),
+      okinawa: okinawaFeature ? createProjection(collectPoints(okinawaFeature.geometry), OKINAWA_INSET) : undefined,
+    };
   }, [geoJson]);
 
   if (error) return <div className="status-banner">{error}</div>;
-  if (!geoJson || !projection) return <div className="status-banner">地図データを読み込み中...</div>;
+  if (!geoJson || !projections) return <div className="status-banner">地図データを読み込み中...</div>;
 
   function zoomAt(nextScale: number, centerX = MAP_WIDTH / 2, centerY = MAP_HEIGHT / 2) {
     setViewport((current) => {
@@ -205,6 +200,11 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
             <rect width="8" height="8" fill="#f6dda2" />
             <path d="M0 0v8" stroke="#c49244" strokeWidth="2" opacity="0.45" />
           </pattern>
+          <pattern id="map-pattern-landed" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="#f4c28d" />
+            <circle cx="2" cy="2" r="1" fill="#8f5b31" opacity="0.32" />
+            <circle cx="6" cy="6" r="1" fill="#8f5b31" opacity="0.26" />
+          </pattern>
           <pattern id="map-pattern-stayed" width="9" height="9" patternUnits="userSpaceOnUse">
             <rect width="9" height="9" fill="#367d7d" />
             <circle cx="2" cy="2" r="1.2" fill="#f3fbf8" opacity="0.22" />
@@ -220,7 +220,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
         </defs>
         <rect className="japan-map-bg" x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} rx="22" />
         <g transform={`translate(${viewport.x.toFixed(2)} ${viewport.y.toFixed(2)}) scale(${viewport.scale.toFixed(3)})`}>
-          {geoJson.features.map((feature) => {
+          {geoJson.features.filter((feature) => codeFromShapeIso(feature.properties.shapeISO) !== OKINAWA_CODE).map((feature) => {
             const code = codeFromShapeIso(feature.properties.shapeISO);
             const view = code ? viewByCode.get(code) : undefined;
             if (!code || !view) return null;
@@ -229,7 +229,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
               <path
                 key={code}
                 className={`prefecture-shape status-${status} ${selectedCode === code ? 'selected' : ''}`}
-                d={geometryToPath(feature.geometry, projection)}
+                d={geometryToPath(feature.geometry, projections.mainland)}
                 vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -244,6 +244,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
             );
           })}
         </g>
+        {renderOkinawaInset(geoJson, projections.okinawa, viewByCode, selectedCode, handleShapeClick, onSelect)}
       </svg>
       </div>
     </>
@@ -281,12 +282,76 @@ function geometryToPath(
     .join(' ');
 }
 
+function createProjection(
+  points: number[][],
+  bounds: { x: number; y: number; width: number; height: number; padding?: number },
+): (point: number[]) => number[] {
+  const padding = bounds.padding ?? 0;
+  const lons = points.map(([lon]) => lon);
+  const lats = points.map(([, lat]) => lat);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const drawableWidth = bounds.width - padding * 2;
+  const drawableHeight = bounds.height - padding * 2;
+  const scale = Math.min(drawableWidth / (maxLon - minLon), drawableHeight / (maxLat - minLat));
+  const xOffset = bounds.x + padding + (drawableWidth - (maxLon - minLon) * scale) / 2;
+  const yOffset = bounds.y + padding + (drawableHeight - (maxLat - minLat) * scale) / 2;
+  return ([lon, lat]: number[]) => [
+    xOffset + (lon - minLon) * scale,
+    yOffset + (maxLat - lat) * scale,
+  ];
+}
+
+function renderOkinawaInset(
+  geoJson: GeoJson,
+  projection: ((point: number[]) => number[]) | undefined,
+  viewByCode: Map<string, PrefectureView>,
+  selectedCode: string | undefined,
+  handleShapeClick: (code: string) => void,
+  onSelect: (code: string) => void,
+) {
+  const feature = geoJson.features.find((item) => codeFromShapeIso(item.properties.shapeISO) === OKINAWA_CODE);
+  const view = viewByCode.get(OKINAWA_CODE);
+  if (!feature || !view || !projection) return null;
+  const status = view.visit.status;
+  return (
+    <g className="okinawa-inset">
+      <rect
+        className="okinawa-inset__frame"
+        x={OKINAWA_INSET.x}
+        y={OKINAWA_INSET.y}
+        width={OKINAWA_INSET.width}
+        height={OKINAWA_INSET.height}
+        rx="14"
+      />
+      <text className="okinawa-inset__label" x={OKINAWA_INSET.x + 14} y={OKINAWA_INSET.y + 22}>沖縄</text>
+      <path
+        className={`prefecture-shape status-${status} ${selectedCode === OKINAWA_CODE ? 'selected' : ''}`}
+        d={geometryToPath(feature.geometry, projection)}
+        vectorEffect="non-scaling-stroke"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        tabIndex={0}
+        role="button"
+        aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
+        onClick={() => handleShapeClick(OKINAWA_CODE)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);
+        }}
+      />
+    </g>
+  );
+}
+
 export const STATUS_PATTERN_LABELS: Record<PrefectureVisitStatus, string> = {
   unvisited: '薄い背景',
   passed: '斜線',
+  landed: '点',
   visited: '塗り',
-  stayed: '濃い塗りと太枠',
-  lived: '紫の塗りと太枠',
+  stayed: '濃い塗り',
+  lived: '紫の塗り',
 };
 
 function clamp(value: number, min: number, max: number): number {

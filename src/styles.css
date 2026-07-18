@@ -413,6 +413,20 @@ a {
   fill: #eef8f4;
 }
 
+.okinawa-inset__frame {
+  fill: rgba(255, 253, 249, 0.88);
+  stroke: #b9cbc7;
+  stroke-width: 0.9;
+}
+
+.okinawa-inset__label {
+  fill: #526466;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
 .prefecture-shape {
   cursor: pointer;
   filter: url("#map-soft-shadow");
@@ -444,6 +458,11 @@ a {
   fill: url("#map-pattern-passed");
   color: #7a5628;
   stroke-dasharray: 3 2;
+}
+
+.status-landed {
+  fill: url("#map-pattern-landed");
+  color: #7a4c28;
 }
 
 .status-visited {
@@ -501,6 +520,10 @@ a {
 
 .status-badge.status-visited {
   background: #e4f4f1;
+}
+
+.status-badge.status-landed {
+  background: radial-gradient(circle at 30% 30%, #f4c28d 0 2px, #fff4e8 2px 7px);
 }
 
 .status-badge.status-passed {

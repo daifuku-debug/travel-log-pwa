@@ -116,10 +116,10 @@ export async function grantCollectionItemExperience(itemId: string, itemName: st
 
 export async function grantPrefectureExperience(
   prefectureCode: string,
-  status: 'unvisited' | 'passed' | 'visited' | 'stayed' | 'lived',
+  status: 'unvisited' | 'passed' | 'landed' | 'visited' | 'stayed' | 'lived',
   visitCount: number,
 ): Promise<void> {
-  if (status === 'unvisited' || status === 'passed') return;
+  if (status === 'unvisited' || status === 'passed' || status === 'landed') return;
   await grantExperienceOnce({
     amount: experienceRules.prefectureFirstVisit,
     sourceType: 'prefecture',

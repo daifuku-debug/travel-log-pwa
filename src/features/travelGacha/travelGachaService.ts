@@ -227,7 +227,7 @@ async function buildTravelCandidates(settings: TravelGachaSettings): Promise<Tra
 }
 
 function fromPrefecture(prefecture: PrefectureMaster, visit: PrefectureVisit | undefined, settings: TravelGachaSettings): TravelCandidate {
-  const isVisited = Boolean(visit && visit.status !== 'unvisited');
+  const isVisited = Boolean(visit && ['visited', 'stayed', 'lived'].includes(visit.status));
   return baseCandidate({
     id: `prefecture:${prefecture.code}`,
     sourceType: 'prefecture',

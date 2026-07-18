@@ -49,6 +49,7 @@ export function JapanConquestPage() {
             <SummaryCard label="宿泊済み" value={`${data.summary.stayedCount}`} sub={`${data.summary.stayRate.toFixed(1)}%`} />
             <SummaryCard label="居住経験" value={`${data.summary.livedCount}`} sub={`${data.summary.livedRate.toFixed(1)}%`} />
             <SummaryCard label="通過のみ" value={`${data.summary.passedOnlyCount}`} sub={`到達率 ${data.summary.reachedRate.toFixed(1)}%`} />
+            <SummaryCard label="降り立った" value={`${data.summary.landedOnlyCount}`} sub="通過より一歩先" />
             <SummaryCard label="未訪問" value={`${data.summary.unvisitedCount}`} sub="これから" />
           </div>
 

@@ -10,7 +10,7 @@ export type JapanRegion =
   | 'shikoku'
   | 'kyushuOkinawa';
 
-export type PrefectureVisitStatus = 'unvisited' | 'passed' | 'visited' | 'stayed' | 'lived';
+export type PrefectureVisitStatus = 'unvisited' | 'passed' | 'landed' | 'visited' | 'stayed' | 'lived';
 
 export interface PrefectureMaster {
   code: string;

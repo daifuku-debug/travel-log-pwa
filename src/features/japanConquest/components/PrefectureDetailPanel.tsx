@@ -76,6 +76,7 @@ export function PrefectureDetailPanel({ view, onSaved }: PrefectureDetailPanelPr
           >
             <option value="unvisited">未訪問</option>
             <option value="passed">通過した</option>
+            <option value="landed">降り立った</option>
             <option value="visited">訪問した</option>
             <option value="stayed">宿泊した</option>
             <option value="lived">住んだことがある</option>

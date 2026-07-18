@@ -10,6 +10,7 @@ export const PREFECTURE_TOTAL = 47;
 export const STATUS_LABELS: Record<PrefectureVisitStatus, string> = {
   unvisited: '未訪問',
   passed: '通過',
+  landed: '降り立った',
   visited: '訪問',
   stayed: '宿泊',
   lived: '居住',
@@ -29,9 +30,10 @@ export const REGION_LABELS: Record<JapanRegion, string> = {
 const STATUS_PRIORITY: Record<PrefectureVisitStatus, number> = {
   unvisited: 0,
   passed: 1,
-  visited: 2,
-  stayed: 3,
-  lived: 4,
+  landed: 2,
+  visited: 3,
+  stayed: 4,
+  lived: 5,
 };
 
 export interface PrefectureView {
@@ -44,6 +46,7 @@ export interface JapanConquestSummary {
   stayedCount: number;
   livedCount: number;
   passedOnlyCount: number;
+  landedOnlyCount: number;
   reachedCount: number;
   unvisitedCount: number;
   visitRate: number;
@@ -107,6 +110,7 @@ export function calculateJapanConquestSummary(views: PrefectureView[]): JapanCon
   const stayedCount = views.filter(({ visit }) => visit.status === 'stayed' || visit.status === 'lived').length;
   const livedCount = views.filter(({ visit }) => visit.status === 'lived').length;
   const passedOnlyCount = views.filter(({ visit }) => visit.status === 'passed').length;
+  const landedOnlyCount = views.filter(({ visit }) => visit.status === 'landed').length;
   const reachedCount = views.filter(({ visit }) => visit.status !== 'unvisited').length;
   const unvisitedCount = PREFECTURE_TOTAL - reachedCount;
 
@@ -115,6 +119,7 @@ export function calculateJapanConquestSummary(views: PrefectureView[]): JapanCon
     stayedCount,
     livedCount,
     passedOnlyCount,
+    landedOnlyCount,
     reachedCount,
     unvisitedCount,
     visitRate: roundRate(visitedCount),
