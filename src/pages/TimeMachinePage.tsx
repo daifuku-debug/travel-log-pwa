@@ -36,7 +36,13 @@ export function TimeMachinePage() {
   const [query, setQuery] = useState<TimeMachineQuery>(getDefaultTimeMachineQuery);
   const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState<string>();
   const { data, error, loading } = useAsyncData(() => getTimeMachineResult(query), [query, reloadKey]);
+  const selectedEvent = data?.events.find((event) => event.id === selectedEventId);
+
+  useEffect(() => {
+    setSelectedEventId(undefined);
+  }, [query.date, query.time]);
 
   function moveDate(days: number) {
     setMessage('');
@@ -150,8 +156,14 @@ export function TimeMachinePage() {
 
           <section className="card">
             <h2>地図</h2>
-            <TimelineMap events={data.mapPoints} />
+            <TimelineMap
+              events={data.mapPoints}
+              selectedEventId={selectedEventId}
+              onSelectEvent={setSelectedEventId}
+            />
             <p className="muted">線はGPS軌跡ではなく、記録順を結んだ推定表示です。</p>
+            {selectedEvent && <SelectedEventPanel event={selectedEvent} />}
+            <MaplessEvents events={data.events.filter((event) => !data.mapPoints.some((point) => point.id === event.id))} onSelectEvent={setSelectedEventId} />
           </section>
 
           <section className="card">
@@ -200,7 +212,7 @@ export function TimeMachinePage() {
             {data.empty ? (
               <EmptyState>この日の記録はまだありません。下のフォームから、いた場所やメモを補完できます。</EmptyState>
             ) : (
-              <TimelineList events={data.events} />
+              <TimelineList events={data.events} selectedEventId={selectedEventId} onSelectEvent={setSelectedEventId} />
             )}
           </section>
 
@@ -214,28 +226,44 @@ export function TimeMachinePage() {
   );
 }
 
-function TimelineList({ events }: { events: TimelineEvent[] }) {
+function TimelineList({
+  events,
+  selectedEventId,
+  onSelectEvent,
+}: {
+  events: TimelineEvent[];
+  selectedEventId?: string;
+  onSelectEvent: (eventId: string) => void;
+}) {
   const timed = events.filter((event) => event.startAt && event.timePrecision !== 'day');
   const untimed = events.filter((event) => !event.startAt || event.timePrecision === 'day');
   return (
     <div className="timeline-list">
-      {timed.map((event) => <TimelineRow key={event.id} event={event} />)}
+      {timed.map((event) => <TimelineRow key={event.id} event={event} selected={event.id === selectedEventId} onSelectEvent={onSelectEvent} />)}
       {untimed.length > 0 && (
         <div className="timeline-untimed">
           <h3>時刻不明・この日の記録</h3>
-          {untimed.map((event) => <TimelineRow key={event.id} event={event} />)}
+          {untimed.map((event) => <TimelineRow key={event.id} event={event} selected={event.id === selectedEventId} onSelectEvent={onSelectEvent} />)}
         </div>
       )}
     </div>
   );
 }
 
-function TimelineRow({ event }: { event: TimelineEvent }) {
+function TimelineRow({
+  event,
+  selected,
+  onSelectEvent,
+}: {
+  event: TimelineEvent;
+  selected: boolean;
+  onSelectEvent: (eventId: string) => void;
+}) {
   const time = event.startAt && event.timePrecision !== 'day'
     ? new Date(event.startAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
     : '時刻不明';
-  const content = (
-    <>
+  return (
+    <article className={`timeline-row ${selected ? 'selected' : ''}`} id={`timeline-event-${event.id}`}>
       <div className="timeline-row__time">{time}</div>
       <div className="timeline-row__body">
         <div className="timeline-row__head">
@@ -244,13 +272,24 @@ function TimelineRow({ event }: { event: TimelineEvent }) {
         </div>
         {event.description && <p>{event.description}</p>}
         <p className="muted">{event.confidenceReason}</p>
+        <div className="inline-actions timeline-row__actions">
+          <button className="button" type="button" onClick={() => onSelectEvent(event.id)}>地図で見る</button>
+          {event.detailPath && <Link className="button" to={event.detailPath}>詳細</Link>}
+        </div>
       </div>
-    </>
+    </article>
   );
-  return event.detailPath ? <Link className="timeline-row" to={event.detailPath}>{content}</Link> : <div className="timeline-row">{content}</div>;
 }
 
-function TimelineMap({ events }: { events: TimelineEvent[] }) {
+function TimelineMap({
+  events,
+  selectedEventId,
+  onSelectEvent,
+}: {
+  events: TimelineEvent[];
+  selectedEventId?: string;
+  onSelectEvent: (eventId: string) => void;
+}) {
   const points = useMemo(() => {
     if (events.length === 0) return [];
     const lats = events.map((event) => event.latitude ?? 0);
@@ -267,18 +306,66 @@ function TimelineMap({ events }: { events: TimelineEvent[] }) {
     }));
   }, [events]);
   if (points.length === 0) return <EmptyState>緯度経度付きの記録はありません。地図以外の一覧で確認できます。</EmptyState>;
+  const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
   return (
     <div className="time-map" role="img" aria-label="指定日の地点を時系列番号で表示した簡易地図">
+      {points.length > 1 && (
+        <svg className="time-map__route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polyline points={polylinePoints} />
+        </svg>
+      )}
       {points.map((point) => (
-        <span
+        <button
           key={point.event.id}
-          className="time-map__point"
+          className={`time-map__point ${point.event.id === selectedEventId ? 'selected' : ''}`}
           style={{ left: `${point.x}%`, top: `${point.y}%` }}
           title={point.event.title}
+          type="button"
+          onClick={() => onSelectEvent(point.event.id)}
+          aria-label={`${point.index + 1}番目の地点 ${point.event.title}`}
         >
           {point.index + 1}
-        </span>
+        </button>
       ))}
+    </div>
+  );
+}
+
+function SelectedEventPanel({ event }: { event: TimelineEvent }) {
+  return (
+    <div className="selected-event-panel">
+      <h3>選択中の地点</h3>
+      <p className="list-item__title">{event.title}</p>
+      <p className="muted">{event.locationName || '場所名なし'} / {CONFIDENCE_LABELS[event.confidence]}</p>
+      {event.startAt && <p className="muted">{new Date(event.startAt).toLocaleString('ja-JP')}</p>}
+      {event.description && <p>{event.description}</p>}
+      <div className="inline-actions">
+        <a className="button" href={`#timeline-event-${event.id}`}>タイムラインへ</a>
+        {event.detailPath && <Link className="button" to={event.detailPath}>関連詳細</Link>}
+      </div>
+    </div>
+  );
+}
+
+function MaplessEvents({
+  events,
+  onSelectEvent,
+}: {
+  events: TimelineEvent[];
+  onSelectEvent: (eventId: string) => void;
+}) {
+  if (events.length === 0) return null;
+  return (
+    <div className="mapless-events">
+      <h3>地図外の記録</h3>
+      <div className="mapless-events__list">
+        {events.slice(0, 6).map((event) => (
+          <button key={event.id} className="mapless-event" type="button" onClick={() => onSelectEvent(event.id)}>
+            <span>{event.title}</span>
+            <small>{CONFIDENCE_LABELS[event.confidence]}</small>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
