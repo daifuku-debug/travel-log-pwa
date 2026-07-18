@@ -27,11 +27,11 @@ interface JapanGeoMapProps {
 
 const MAP_WIDTH = 640;
 const MAP_HEIGHT = 760;
-const PADDING = 24;
+const PADDING = 10;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
-const DEFAULT_VIEWPORT = { scale: 1.44, x: -118, y: -118 };
+const DEFAULT_VIEWPORT = { scale: 1, x: 0, y: 0 };
 const OKINAWA_CODE = '47';
 const MAINLAND_MAX_LON = 146;
 const OKINAWA_INSET = { x: 432, y: 590, width: 176, height: 116, padding: 14 };

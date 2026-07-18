@@ -615,7 +615,7 @@ await test('日本制覇マップは地図内だけをズームできる', () =>
   assert.match(mapComponent, /event\.preventDefault\(\)/);
   assert.match(mapComponent, /viewport\.scale/);
   assert.match(mapComponent, /DEFAULT_VIEWPORT/);
-  assert.match(mapComponent, /scale:\s*1\.44/);
+  assert.match(mapComponent, /scale:\s*1,\s*x:\s*0,\s*y:\s*0/);
   assert.match(mapComponent, /onPointerMove=\{handlePointerMove\}/);
   assert.match(mapComponent, /createPinchStart/);
   assert.match(mapComponent, /measurePinch/);
