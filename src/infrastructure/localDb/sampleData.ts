@@ -6,6 +6,13 @@ import { putMany, putOne, readById } from './db';
 const USER_ID = 'local-user';
 const now = '2026-07-12T12:00:00.000Z';
 
+export const SAMPLE_TRIP_IDS = ['trip-kyoto-2026', 'trip-kanazawa-2026'];
+export const SAMPLE_PLACE_VISIT_IDS = ['place-kyoto-station', 'place-kanazawa-castle'];
+export const SAMPLE_COLLECTION_VISIT_IDS = ['collection-visit-kanazawa-castle', 'collection-visit-kyoto-station'];
+export const SAMPLE_COLLECTION_IDS = ['collection-castles', 'collection-stations'];
+export const SAMPLE_COLLECTION_ITEM_IDS = ['collection-item-kanazawa-castle', 'collection-item-kyoto-station', 'collection-item-tokyo-station'];
+export const SAMPLE_WISHLIST_ITEM_IDS = ['wish-kanazawa-tea'];
+
 const trips: Trip[] = [
   {
     id: 'trip-kyoto-2026',

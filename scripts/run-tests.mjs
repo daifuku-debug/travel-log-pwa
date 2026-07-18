@@ -25,6 +25,8 @@ const conquestLogic = await readFile(new URL('../src/features/japanConquest/japa
 const tripService = await readFile(new URL('../src/features/trips/tripService.ts', import.meta.url), 'utf8');
 const rpgProgressService = await readFile(new URL('../src/features/rpg/rpgProgressService.ts', import.meta.url), 'utf8');
 const rpgProfilePage = await readFile(new URL('../src/pages/RpgProfilePage.tsx', import.meta.url), 'utf8');
+const collectionService = await readFile(new URL('../src/features/collections/collectionService.ts', import.meta.url), 'utf8');
+const collectionPage = await readFile(new URL('../src/pages/CollectionPage.tsx', import.meta.url), 'utf8');
 
 async function test(name, fn) {
   try {
@@ -295,4 +297,19 @@ await test('RPGマスターに実績、称号、クエストが存在する', ()
   assert.ok(achievementMaster.length >= 15);
   assert.ok(titleMaster.length >= 10);
   assert.ok(questMaster.length >= 10);
+});
+
+await test('コレクション内訳を表示するServiceとUIがある', () => {
+  assert.match(collectionService, /listCollectionDetails/);
+  assert.match(collectionPage, /collection-detail-list/);
+});
+
+await test('サンプル旅行データはRPG経験値の初回集計から除外される', () => {
+  assert.match(rpgProgressService, /SAMPLE_TRIP_IDS/);
+  assert.match(rpgProgressService, /filter\(\(trip\) => !SAMPLE_TRIP_IDS\.includes\(trip\.id\)\)/);
+});
+
+await test('サンプル由来だけのRPGデータはクリーンアップされる', () => {
+  assert.match(rpgProgressService, /cleanupSampleOnlyRpgProgress/);
+  assert.match(rpgProgressService, /clearStore\('rpgExperienceEntries'\)/);
 });

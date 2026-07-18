@@ -22,7 +22,7 @@ export async function refreshAchievements(stats: TravelStats): Promise<UserRpgAc
     const currentValue = getConditionValue(stats, master.conditionType);
     const existing = await repositories.userRpgAchievements.getByAchievementId(master.id);
     const wasUnlocked = existing?.status === 'unlocked';
-    const isUnlocked = wasUnlocked || currentValue >= master.targetValue;
+    const isUnlocked = currentValue >= master.targetValue;
     const now = new Date().toISOString();
     const progress: UserRpgAchievement = {
       id: existing?.id ?? createId('achievement'),
@@ -50,6 +50,13 @@ export async function refreshAchievements(stats: TravelStats): Promise<UserRpgAc
         metadata: { achievementId: master.id },
       });
       if (result.created) progress.rewardClaimedAt = now;
+    }
+    if (!isUnlocked && wasUnlocked) {
+      const rewardEntry = await repositories.rpgExperienceEntries.getBySourceKey(`achievement-unlocked:${master.id}`);
+      if (rewardEntry) await repositories.rpgExperienceEntries.softDelete(rewardEntry.id);
+      progress.unlockedAt = undefined;
+      progress.rewardClaimedAt = undefined;
+      progress.isNew = false;
     }
 
     updated.push(await repositories.userRpgAchievements.save(progress));

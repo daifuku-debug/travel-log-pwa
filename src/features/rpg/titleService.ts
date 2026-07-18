@@ -21,8 +21,12 @@ export async function refreshTitles(stats: TravelStats): Promise<UserRpgTitle[]>
 
   for (const master of masters) {
     const progress = getConditionValue(stats, master.conditionType, master.conditionCategory);
-    if (progress < master.conditionValue) continue;
     const existing = await repositories.userRpgTitles.getByTitleId(master.id);
+    if (existing && progress < master.conditionValue) {
+      await repositories.userRpgTitles.softDelete(existing.id);
+      continue;
+    }
+    if (progress < master.conditionValue) continue;
     if (existing) {
       unlocked.push(await repositories.userRpgTitles.save({ ...existing, progress, updatedAt: new Date().toISOString() }));
       continue;

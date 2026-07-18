@@ -472,6 +472,21 @@ a {
   gap: 4px;
 }
 
+.collection-detail-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.collection-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #eee6da;
+  padding-top: 10px;
+}
+
 .detail-panel {
   scroll-margin-top: 80px;
 }
@@ -544,7 +559,8 @@ a {
   .page-heading__row,
   .section-head,
   .list-item,
-  .prefecture-row {
+  .prefecture-row,
+  .collection-detail-row {
     align-items: stretch;
     flex-direction: column;
   }

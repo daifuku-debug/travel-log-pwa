@@ -1,5 +1,14 @@
 import type { Trip } from '../../domain/models/trip';
 import experienceRules from '../../domain/rpg/experienceRules.json';
+import { clearStore } from '../../infrastructure/localDb/db';
+import {
+  SAMPLE_COLLECTION_VISIT_IDS,
+  SAMPLE_COLLECTION_IDS,
+  SAMPLE_COLLECTION_ITEM_IDS,
+  SAMPLE_PLACE_VISIT_IDS,
+  SAMPLE_TRIP_IDS,
+  SAMPLE_WISHLIST_ITEM_IDS,
+} from '../../infrastructure/localDb/sampleData';
 import { repositories } from '../../infrastructure/repositories/repositoryFactory';
 import { toAppError } from '../../shared/errors';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
@@ -15,6 +24,7 @@ export async function ensureRpgProgressInitialized(): Promise<void> {
   try {
     await bootstrapAppData();
     const settings = await getRpgSettings();
+    await cleanupSampleOnlyRpgProgress();
     if (settings.initialAggregationCompletedAt) {
       await refreshRpgProgress();
       return;
@@ -138,15 +148,23 @@ async function grantExistingDataExperience(): Promise<void> {
     repositories.collections.listWithProgress(),
   ]);
 
-  await Promise.all(trips.map((trip) => grantTripCompletionExperience(trip)));
-  await Promise.all(places.map((place) => grantPlaceVisitExperience(place.id, place.tripId, place.name)));
+  await Promise.all(
+    trips
+      .filter((trip) => !SAMPLE_TRIP_IDS.includes(trip.id))
+      .map((trip) => grantTripCompletionExperience(trip)),
+  );
+  await Promise.all(
+    places
+      .filter((place) => !SAMPLE_PLACE_VISIT_IDS.includes(place.id))
+      .map((place) => grantPlaceVisitExperience(place.id, place.tripId, place.name)),
+  );
   await Promise.all(
     prefectureVisits.map((visit) =>
       grantPrefectureExperience(visit.prefectureCode, visit.status, visit.visitCount),
     ),
   );
   await Promise.all(
-    collectionVisits.map((visit) =>
+    collectionVisits.filter((visit) => !SAMPLE_COLLECTION_VISIT_IDS.includes(visit.id)).map((visit) =>
       grantExperienceOnce({
         amount: experienceRules.collectionItemCompleted,
         sourceType: 'collection',
@@ -187,4 +205,52 @@ async function grantExistingDataExperience(): Promise<void> {
       });
     }
   }
+}
+
+async function cleanupSampleOnlyRpgProgress(): Promise<void> {
+  const [trips, places, prefectureVisits, collectionVisits, wishlist, entries, titles, achievements] = await Promise.all([
+    repositories.trips.list(),
+    repositories.placeVisits.list(),
+    repositories.prefectureVisits.list(),
+    repositories.collectionVisits.list(),
+    repositories.wishlist.list(),
+    repositories.rpgExperienceEntries.list(),
+    repositories.userRpgTitles.list(),
+    repositories.userRpgAchievements.list(),
+  ]);
+  if (entries.length === 0 && titles.length === 0 && achievements.length === 0) return;
+  await Promise.all(
+    entries
+      .filter((entry) => isSampleExperienceSourceKey(entry.sourceKey))
+      .map((entry) => repositories.rpgExperienceEntries.softDelete(entry.id)),
+  );
+  const hasUserData =
+    trips.some((trip) => !SAMPLE_TRIP_IDS.includes(trip.id)) ||
+    places.some((place) => !SAMPLE_PLACE_VISIT_IDS.includes(place.id)) ||
+    prefectureVisits.length > 0 ||
+    collectionVisits.some((visit) => !SAMPLE_COLLECTION_VISIT_IDS.includes(visit.id)) ||
+    wishlist.some((item) => !SAMPLE_WISHLIST_ITEM_IDS.includes(item.id));
+
+  if (hasUserData) return;
+
+  await Promise.all([
+    clearStore('rpgExperienceEntries'),
+    clearStore('userRpgTitles'),
+    clearStore('userRpgAchievements'),
+    clearStore('rpgQuests'),
+    clearStore('tripRpgResults'),
+  ]);
+}
+
+function isSampleExperienceSourceKey(sourceKey: string): boolean {
+  return (
+    SAMPLE_TRIP_IDS.some((tripId) =>
+      sourceKey === `trip-completed:${tripId}` ||
+      sourceKey === `trip-memo:${tripId}` ||
+      sourceKey.startsWith(`trip-type-bonus:${tripId}:`),
+    ) ||
+    SAMPLE_PLACE_VISIT_IDS.some((placeId) => sourceKey === `travel-location-added:${placeId}`) ||
+    SAMPLE_COLLECTION_ITEM_IDS.some((itemId) => sourceKey === `collection-completed:${itemId}`) ||
+    SAMPLE_COLLECTION_IDS.some((collectionId) => sourceKey.startsWith(`collection-milestone:${collectionId}:`))
+  );
 }

@@ -1,4 +1,10 @@
 import { repositories } from '../../infrastructure/repositories/repositoryFactory';
+import {
+  SAMPLE_COLLECTION_VISIT_IDS,
+  SAMPLE_PLACE_VISIT_IDS,
+  SAMPLE_TRIP_IDS,
+  SAMPLE_WISHLIST_ITEM_IDS,
+} from '../../infrastructure/localDb/sampleData';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
 import { buildTravelStats, type TravelStats } from './rpgStats';
 
@@ -11,12 +17,28 @@ export async function getTravelStats(): Promise<TravelStats> {
     repositories.collections.listWithProgress(),
     repositories.wishlist.list(),
   ]);
+  const collectionVisitCountByCollectionId = new Map<string, number>();
+  const collectionItems = await repositories.collectionItems.list();
+  const collectionVisits = (await repositories.collectionVisits.list())
+    .filter((visit) => !SAMPLE_COLLECTION_VISIT_IDS.includes(visit.id));
+
+  for (const visit of collectionVisits) {
+    const item = collectionItems.find((row) => row.id === visit.collectionItemId);
+    if (!item) continue;
+    collectionVisitCountByCollectionId.set(
+      item.collectionId,
+      (collectionVisitCountByCollectionId.get(item.collectionId) ?? 0) + 1,
+    );
+  }
 
   return buildTravelStats({
-    tripTypes: trips.map((trip) => trip.tripType),
-    placeVisitCount: places.length,
+    tripTypes: trips.filter((trip) => !SAMPLE_TRIP_IDS.includes(trip.id)).map((trip) => trip.tripType),
+    placeVisitCount: places.filter((place) => !SAMPLE_PLACE_VISIT_IDS.includes(place.id)).length,
     prefectures,
-    collections,
-    wishlistItemCount: wishlist.length,
+    collections: collections.map((collection) => ({
+      ...collection,
+      visitedCount: collectionVisitCountByCollectionId.get(collection.id) ?? 0,
+    })),
+    wishlistItemCount: wishlist.filter((item) => !SAMPLE_WISHLIST_ITEM_IDS.includes(item.id)).length,
   });
 }
