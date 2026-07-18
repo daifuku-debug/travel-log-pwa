@@ -45,7 +45,10 @@ export function HomePage() {
           <section className="card">
             <div className="section-head">
               <h2>冒険者メモ</h2>
-              <Link className="button" to="/rpg">プロフィール</Link>
+              <div className="inline-actions">
+                <Link className="button" to="/time-machine">タイムマシン</Link>
+                <Link className="button" to="/rpg">プロフィール</Link>
+              </div>
             </div>
             <div className="list">
               <div className="list-item">

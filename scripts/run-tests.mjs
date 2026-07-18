@@ -46,6 +46,10 @@ const scrapbookService = await readFile(new URL('../src/features/scrapbooks/scra
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
 const localDbSource = await readFile(new URL('../src/infrastructure/localDb/db.ts', import.meta.url), 'utf8');
+const timeMachineModel = await readFile(new URL('../src/domain/models/timeMachine.ts', import.meta.url), 'utf8');
+const timeMachineService = await readFile(new URL('../src/features/timeMachine/timeMachineService.ts', import.meta.url), 'utf8');
+const timeMachinePage = await readFile(new URL('../src/pages/TimeMachinePage.tsx', import.meta.url), 'utf8');
+const localTimeMachineRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTimeMachineRepository.ts', import.meta.url), 'utf8');
 const routerSource = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
 const tripDetailPage = await readFile(new URL('../src/pages/TripDetailPage.tsx', import.meta.url), 'utf8');
 
@@ -234,14 +238,78 @@ await test('JSONエクスポート/インポートでスクラップブック情
   assert.equal(normalized.data.mediaAssets.length, 1);
 });
 
+await test('JSONエクスポート/インポートでタイムマシン手動補完が復元できる', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 6,
+    data: {
+      manualTimelineEntries: [
+        {
+          id: 'manual-1',
+          date: '2026-07-18',
+          timePrecision: 'day',
+          locationName: '京都',
+          sourceType: 'manual',
+          confidence: 'medium',
+        },
+      ],
+    },
+  });
+  assert.equal(normalized.schemaVersion, 6);
+  assert.equal(normalized.data.manualTimelineEntries.length, 1);
+});
+
 await test('旧形式バックアップでも日本制覇マップデータなしでエラーにならない', () => {
   const oldObject = normalizeBackupPayload({ trips: [{ id: 'trip-1', title: '旧バックアップ' }] });
   const oldArray = normalizeBackupPayload([{ id: 'trip-2', title: 'さらに古い形式' }]);
   assert.equal(oldObject.data.prefectureVisits.length, 0);
   assert.equal(oldObject.data.castleVisitSummaries.length, 0);
   assert.equal(oldObject.data.scrapbooks.length, 0);
+  assert.equal(oldObject.data.manualTimelineEntries.length, 0);
   assert.equal(oldObject.data.trips.length, 1);
   assert.equal(oldArray.data.trips.length, 1);
+});
+
+await test('タイムマシンは表示用TimelineEventと手動補完モデルを分離する', () => {
+  assert.match(timeMachineModel, /interface TimelineEvent /);
+  assert.match(timeMachineModel, /interface LocationInferenceResult /);
+  assert.match(timeMachineModel, /interface ManualTimelineEntry extends BaseEntity/);
+  assert.match(localTimeMachineRepository, /LocalManualTimelineEntryRepository/);
+});
+
+await test('タイムマシンは日付移動と去年の今日を安全に扱う', () => {
+  assert.match(timeMachineService, /export function shiftDate/);
+  assert.match(timeMachineService, /export function getLastYearDate/);
+  assert.match(timeMachineService, /2月28日を表示します/);
+  assert.match(timeMachineService, /candidate\.getFullYear\(\) === lastYear/);
+});
+
+await test('タイムマシン画面とルート導線がある', () => {
+  assert.match(routerSource, /time-machine/);
+  assert.match(timeMachinePage, /タイムマシン/);
+  assert.match(timeMachinePage, /去年の今日/);
+});
+
+await test('タイムマシンは時刻不明データを正確な時刻として扱わない', () => {
+  assert.match(timeMachineService, /timePrecision:\s*'day'/);
+  assert.match(timeMachinePage, /時刻不明・この日の記録/);
+  assert.doesNotMatch(timeMachineService, /T00:00:00.*timePrecision:\s*'exact'/s);
+});
+
+await test('タイムマシンは推定と確定を確度で分ける', () => {
+  assert.match(timeMachineModel, /TimelineConfidence = 'exact' \| 'high' \| 'medium' \| 'low' \| 'unknown'/);
+  assert.match(timeMachineService, /confidenceReason/);
+  assert.match(timeMachinePage, /CONFIDENCE_LABELS/);
+});
+
+await test('タイムマシンは常時GPSや写真ライブラリ自動走査を追加しない', () => {
+  assert.doesNotMatch(timeMachineService, /watchPosition|getCurrentPosition/);
+  assert.doesNotMatch(timeMachinePage, /webkitdirectory|capture/);
+});
+
+await test('タイムマシンの簡易地図は正確なGPS軌跡と断定しない', () => {
+  assert.match(timeMachinePage, /GPS軌跡ではなく/);
+  assert.match(timeMachinePage, /簡易地図/);
 });
 
 await test('スクラップブックは旅行記録と編集データを分離したモデルを持つ', () => {

@@ -20,6 +20,7 @@ import {
   StaticRpgTitleMasterRepository,
 } from '../localDb/LocalRpgRepository';
 import { LocalPlaceVisitRepository, LocalTripRepository } from '../localDb/LocalTripRepository';
+import { LocalManualTimelineEntryRepository } from '../localDb/LocalTimeMachineRepository';
 import {
   LocalMediaAssetBlobRepository,
   LocalMediaAssetRepository,
@@ -50,6 +51,7 @@ export const repositories = {
   scrapbookBlocks: new LocalScrapbookBlockRepository(),
   mediaAssets: new LocalMediaAssetRepository(),
   mediaAssetBlobs: new LocalMediaAssetBlobRepository(),
+  manualTimelineEntries: new LocalManualTimelineEntryRepository(),
   rpgExperienceEntries: new LocalRpgExperienceRepository(),
   rpgTitleMaster: new StaticRpgTitleMasterRepository(),
   userRpgTitles: new LocalUserRpgTitleRepository(),

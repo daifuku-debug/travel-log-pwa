@@ -10,10 +10,11 @@ import type {
   UserRpgTitle,
 } from '../../domain/models/rpg';
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
+import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 5;
+export const BACKUP_SCHEMA_VERSION = 6;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -34,6 +35,7 @@ export interface TravelLogBackup {
     scrapbookPages: ScrapbookPage[];
     scrapbookBlocks: ScrapbookBlock[];
     mediaAssets: MediaAsset[];
+    manualTimelineEntries: ManualTimelineEntry[];
     rpgExperienceEntries: RpgExperienceEntry[];
     userRpgTitles: UserRpgTitle[];
     userRpgAchievements: UserRpgAchievement[];
@@ -65,6 +67,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
         scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
         mediaAssets: sanitizeMediaAssets(data.mediaAssets),
+        manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
         rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
         userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
         userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -96,6 +99,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
       scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
       mediaAssets: sanitizeMediaAssets(data.mediaAssets),
+      manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
       rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
       userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
       userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -128,6 +132,7 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
       scrapbookPages: data.scrapbookPages ?? [],
       scrapbookBlocks: data.scrapbookBlocks ?? [],
       mediaAssets: data.mediaAssets ?? [],
+      manualTimelineEntries: data.manualTimelineEntries ?? [],
       rpgExperienceEntries: data.rpgExperienceEntries ?? [],
       userRpgTitles: data.userRpgTitles ?? [],
       userRpgAchievements: data.userRpgAchievements ?? [],
@@ -221,6 +226,19 @@ function sanitizeMediaAssets(value: unknown): MediaAsset[] {
       && ['local_only', 'pending', 'synced', 'failed'].includes(asset.mediaSyncStatus),
     ),
     (asset) => asset.id,
+  );
+}
+
+function sanitizeManualTimelineEntries(value: unknown): ManualTimelineEntry[] {
+  return uniqueBy(
+    arrayOrEmpty<ManualTimelineEntry>(value).filter((entry) =>
+      Boolean(entry.id)
+      && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+      && ['exact', 'minute', 'hour', 'day', 'range', 'unknown'].includes(entry.timePrecision)
+      && ['exact', 'high', 'medium', 'low', 'unknown'].includes(entry.confidence)
+      && entry.sourceType === 'manual',
+    ),
+    (entry) => entry.id,
   );
 }
 
