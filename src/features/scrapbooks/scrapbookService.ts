@@ -45,6 +45,8 @@ export interface ScrapbookBlockInput {
   locationId: string;
   title: string;
   note: string;
+  assetId?: EntityId;
+  assetIds?: EntityId[];
 }
 
 export async function listRecentScrapbooks(limit = 3): Promise<Scrapbook[]> {
@@ -231,6 +233,48 @@ export async function addScrapbookBlock(pageId: EntityId, input: ScrapbookBlockI
   }
 }
 
+export async function addPhotoBlockFromFile(
+  pageId: EntityId,
+  tripId: EntityId,
+  file: File,
+  caption: string,
+): Promise<ScrapbookBlock> {
+  try {
+    const asset = await saveLocalMediaAsset(tripId, file);
+    return addScrapbookBlock(pageId, {
+      type: 'photo',
+      text: '',
+      locationId: '',
+      title: '',
+      note: caption,
+      assetId: asset.id,
+    });
+  } catch (error) {
+    throw toAppError(error, '写真ブロックの追加に失敗しました');
+  }
+}
+
+export async function addPhotoGridBlockFromFiles(
+  pageId: EntityId,
+  tripId: EntityId,
+  files: File[],
+  caption: string,
+): Promise<ScrapbookBlock> {
+  try {
+    const assets = await Promise.all(files.map((file) => saveLocalMediaAsset(tripId, file)));
+    return addScrapbookBlock(pageId, {
+      type: 'photo_grid',
+      text: '',
+      locationId: '',
+      title: '',
+      note: caption,
+      assetIds: assets.map((asset) => asset.id),
+    });
+  } catch (error) {
+    throw toAppError(error, '写真グリッドの追加に失敗しました');
+  }
+}
+
 export async function updateScrapbookBlock(blockId: EntityId, input: ScrapbookBlockInput): Promise<ScrapbookBlock> {
   try {
     const current = await repositories.scrapbookBlocks.getById(blockId);
@@ -257,6 +301,18 @@ export async function deleteScrapbookBlock(blockId: EntityId): Promise<void> {
     await repositories.scrapbookBlocks.softDelete(blockId);
   } catch (error) {
     throw toAppError(error, 'ブロックの削除に失敗しました');
+  }
+}
+
+export async function createMediaObjectUrl(asset: MediaAsset, kind: 'original' | 'thumbnail' = 'thumbnail'): Promise<string | undefined> {
+  try {
+    const blobId = kind === 'thumbnail' ? asset.thumbnailReference ?? asset.localReference : asset.localReference;
+    if (!blobId) return undefined;
+    const mediaBlob = await repositories.mediaAssetBlobs.getById(blobId);
+    if (!mediaBlob) return undefined;
+    return URL.createObjectURL(mediaBlob.blob);
+  } catch (error) {
+    throw toAppError(error, '写真の読み込みに失敗しました');
   }
 }
 
@@ -407,12 +463,111 @@ function buildBlock({
   if (input.type === 'place') return { ...base, type: 'place', locationId: input.locationId, snapshotName: input.title.trim() || '訪問場所', caption: optionalText(input.note) };
   if (input.type === 'quote') return { ...base, type: 'quote', text: input.text.trim() || '印象に残った言葉', cite: optionalText(input.title) };
   if (input.type === 'divider') return { ...base, type: 'divider', label: optionalText(input.title) };
+  if (input.type === 'photo') return { ...base, type: 'photo', assetId: input.assetId || input.locationId, caption: optionalText(input.note), altText: optionalText(input.title), displaySize: 'large' };
+  if (input.type === 'photo_grid') return { ...base, type: 'photo_grid', assetIds: input.assetIds ?? [], caption: optionalText(input.note), columns: 2 };
   if (input.type === 'meal') return { ...base, type: 'meal', name: input.title.trim() || '食事', note: optionalText(input.note), assetIds: [], isBestMeal: false };
   if (input.type === 'ticket') return { ...base, type: 'ticket', itemType: 'ticket', title: input.title.trim() || 'チケット', note: optionalText(input.note) };
   if (input.type === 'purchase') return { ...base, type: 'purchase', name: input.title.trim() || '買ったもの', note: optionalText(input.note), assetIds: [] };
   if (input.type === 'trip_summary') return { ...base, type: 'trip_summary', title: optionalText(input.title), body: optionalText(input.text) };
   if (input.type === 'rpg_result') return { ...base, type: 'rpg_result', tripId: input.locationId || 'unknown-trip', title: optionalText(input.title) };
   return { ...base, type: 'text', text: input.text.trim() || 'メモを書く', textStyle: 'body' };
+}
+
+async function saveLocalMediaAsset(tripId: EntityId, file: File): Promise<MediaAsset> {
+  validateImageFile(file);
+  const now = new Date().toISOString();
+  const assetId = createId('media-asset');
+  const originalBlobId = `${assetId}:original`;
+  const thumbnailBlobId = `${assetId}:thumbnail`;
+  const image = await createImagePreview(file);
+  const thumbnail = image ? await createThumbnailBlob(image, file.type) : undefined;
+
+  await repositories.mediaAssetBlobs.save({
+    id: originalBlobId,
+    assetId,
+    kind: 'original',
+    blob: file,
+    mimeType: file.type,
+    createdAt: now,
+  });
+  if (thumbnail) {
+    await repositories.mediaAssetBlobs.save({
+      id: thumbnailBlobId,
+      assetId,
+      kind: 'thumbnail',
+      blob: thumbnail.blob,
+      mimeType: thumbnail.blob.type || file.type,
+      createdAt: now,
+    });
+  }
+
+  return repositories.mediaAssets.save({
+    id: assetId,
+    userId: LOCAL_USER_ID,
+    tripId,
+    storageType: 'local',
+    localReference: originalBlobId,
+    thumbnailReference: thumbnail ? thumbnailBlobId : originalBlobId,
+    mimeType: file.type,
+    width: thumbnail?.sourceWidth,
+    height: thumbnail?.sourceHeight,
+    fileSize: file.size,
+    originalFileName: file.name,
+    mediaSyncStatus: 'local_only',
+    createdAt: now,
+    updatedAt: now,
+    syncStatus: 'pending',
+  });
+}
+
+function validateImageFile(file: File): void {
+  if (!file.type.startsWith('image/')) throw new Error('画像ファイルを選択してください。');
+  const maxBytes = 12 * 1024 * 1024;
+  if (file.size > maxBytes) throw new Error('写真は12MB以下にしてください。');
+}
+
+async function createImagePreview(file: File): Promise<HTMLImageElement | undefined> {
+  if (typeof Image === 'undefined' || typeof URL === 'undefined') return undefined;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error('画像を読み込めませんでした。'));
+      image.src = objectUrl;
+    });
+    return image;
+  } catch {
+    return undefined;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function createThumbnailBlob(
+  image: HTMLImageElement,
+  mimeType: string,
+): Promise<{ blob: Blob; sourceWidth: number; sourceHeight: number } | undefined> {
+  if (typeof document === 'undefined') return undefined;
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  if (!sourceWidth || !sourceHeight) return undefined;
+  const maxEdge = 960;
+  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return undefined;
+  context.drawImage(image, 0, 0, width, height);
+  const outputType = mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+  const blob = await new Promise<Blob | undefined>((resolve) => {
+    canvas.toBlob((value) => resolve(value ?? undefined), outputType, 0.82);
+  });
+  return blob ? { blob, sourceWidth, sourceHeight } : undefined;
 }
 
 export function validateScrapbookInput(input: ScrapbookInput): string[] {
@@ -496,7 +651,12 @@ async function grantScrapbookCompletionExperience(
     reason: 'スクラップブックを完成',
     metadata: { scrapbookId },
   });
-  if (blocks.filter((block) => block.type === 'photo' || block.type === 'photo_grid').length >= 5) {
+  const photoCount = blocks.reduce((count, block) => {
+    if (block.type === 'photo') return count + 1;
+    if (block.type === 'photo_grid') return count + block.assetIds.length;
+    return count;
+  }, 0);
+  if (photoCount >= 5) {
     await grantExperienceOnce({
       amount: experienceRules.scrapbookPhotoMilestone,
       sourceType: 'scrapbook',

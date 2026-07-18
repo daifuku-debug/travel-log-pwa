@@ -184,3 +184,12 @@ export interface MediaAsset extends BaseEntity {
   uploadedAt?: IsoDateTimeString;
   mediaSyncStatus: MediaSyncStatus;
 }
+
+export interface MediaAssetBlob {
+  id: EntityId;
+  assetId: EntityId;
+  kind: 'original' | 'thumbnail';
+  blob: Blob;
+  mimeType: string;
+  createdAt: IsoDateTimeString;
+}

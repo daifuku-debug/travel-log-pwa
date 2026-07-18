@@ -1,11 +1,13 @@
 import type { EntityId } from '../../domain/models/common';
-import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
+import type { MediaAsset, MediaAssetBlob, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type {
+  MediaAssetBlobRepository,
   MediaAssetRepository,
   ScrapbookBlockRepository,
   ScrapbookPageRepository,
   ScrapbookRepository,
 } from '../../domain/repositories/ScrapbookRepository';
+import { readAll, readById, putOne, clearStore } from './db';
 import { LocalBaseRepository } from './LocalBaseRepository';
 
 export class LocalScrapbookRepository extends LocalBaseRepository<Scrapbook> implements ScrapbookRepository {
@@ -69,5 +71,25 @@ export class LocalMediaAssetRepository extends LocalBaseRepository<MediaAsset> i
     return assets
       .filter((asset) => asset.tripId === tripId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+}
+
+export class LocalMediaAssetBlobRepository implements MediaAssetBlobRepository {
+  async getById(id: EntityId): Promise<MediaAssetBlob | undefined> {
+    return readById<MediaAssetBlob>('mediaAssetBlobs', id);
+  }
+
+  async save(blob: MediaAssetBlob): Promise<MediaAssetBlob> {
+    return putOne('mediaAssetBlobs', blob);
+  }
+
+  async deleteByAssetId(assetId: EntityId): Promise<void> {
+    const blobs = await readAll<MediaAssetBlob>('mediaAssetBlobs');
+    await clearStore('mediaAssetBlobs');
+    await Promise.all(
+      blobs
+        .filter((blob) => blob.assetId !== assetId)
+        .map((blob) => putOne('mediaAssetBlobs', blob)),
+    );
   }
 }

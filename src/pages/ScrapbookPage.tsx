@@ -1,10 +1,13 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { Scrapbook, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel, ScrapbookThemeId } from '../domain/models/scrapbook';
+import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel, ScrapbookThemeId } from '../domain/models/scrapbook';
 import {
+  addPhotoBlockFromFile,
+  addPhotoGridBlockFromFiles,
   addScrapbookBlock,
   addScrapbookPage,
   createScrapbookForTrip,
+  createMediaObjectUrl,
   deleteScrapbookBlock,
   deleteScrapbookPage,
   getScrapbookByTripId,
@@ -66,6 +69,11 @@ export function ScrapbookPage() {
     () => scrapbookDetail?.pages.find((page) => page.id === selectedPageId) ?? scrapbookDetail?.pages[0],
     [scrapbookDetail, selectedPageId],
   );
+  const assetsById = useMemo(() => {
+    const map = new Map<string, MediaAsset>();
+    scrapbookDetail?.mediaAssets.forEach((asset) => map.set(asset.id, asset));
+    return map;
+  }, [scrapbookDetail?.mediaAssets]);
 
   async function handleCreate() {
     if (!tripId) return;
@@ -206,6 +214,7 @@ export function ScrapbookPage() {
                           block={block}
                           places={data.tripDetail?.places ?? []}
                           tripId={data.tripDetail!.trip.id}
+                          assetsById={assetsById}
                           mode={mode}
                           onSaved={() => setReloadKey((value) => value + 1)}
                         />
@@ -231,8 +240,7 @@ export function ScrapbookPage() {
           <section className="card">
             <h2>写真について</h2>
             <p className="muted">
-              今回は画像メタデータの保存先のみ用意しています。写真本体はGitHub PagesやJSONバックアップへ保存しません。
-              端末内画像保存とサムネイル生成は次フェーズで追加します。
+              写真本体とサムネイルはこの端末のIndexedDBに保存します。GitHub PagesやJSONバックアップには画像本体を含めず、メタデータだけを保存します。
             </p>
           </section>
         </div>
@@ -356,20 +364,42 @@ function BlockForm({
   onSaved: () => void;
 }) {
   const [input, setInput] = useState<ScrapbookBlockInput>({ ...EMPTY_BLOCK, locationId: tripId });
+  const [files, setFiles] = useState<File[]>([]);
+  const [error, setError] = useState('');
   return (
     <form className="form form--compact scrapbook-editor" onSubmit={async (event) => {
       event.preventDefault();
-      await addScrapbookBlock(page.id, input);
-      setInput({ ...EMPTY_BLOCK, locationId: tripId });
-      onSaved();
+      setError('');
+      try {
+        if (input.type === 'photo') {
+          if (!files[0]) throw new Error('写真を1枚選択してください。');
+          await addPhotoBlockFromFile(page.id, tripId, files[0], input.note);
+        } else if (input.type === 'photo_grid') {
+          if (files.length === 0) throw new Error('写真を1枚以上選択してください。');
+          await addPhotoGridBlockFromFiles(page.id, tripId, files, input.note);
+        } else {
+          await addScrapbookBlock(page.id, input);
+        }
+        setInput({ ...EMPTY_BLOCK, locationId: tripId });
+        setFiles([]);
+        onSaved();
+      } catch (submitError) {
+        setError(submitError instanceof Error ? submitError.message : 'ブロックの追加に失敗しました。');
+      }
     }}>
       <h3>ブロック追加</h3>
+      {error && <div className="form-errors">{error}</div>}
       <div className="form-grid">
         <label className="field">
           <span>種類</span>
-          <select value={input.type} onChange={(event) => setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] })}>
+          <select value={input.type} onChange={(event) => {
+            setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] });
+            setFiles([]);
+          }}>
             <option value="text">本文</option>
             <option value="heading">見出し</option>
+            <option value="photo">写真</option>
+            <option value="photo_grid">写真グリッド</option>
             <option value="place">訪問場所</option>
             <option value="meal">食事</option>
             <option value="ticket">チケット・紙もの</option>
@@ -388,6 +418,18 @@ function BlockForm({
           </select>
         </label>
       </div>
+      {(input.type === 'photo' || input.type === 'photo_grid') && (
+        <label className="field">
+          <span>{input.type === 'photo' ? '写真' : '写真'}</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple={input.type === 'photo_grid'}
+            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+          />
+          <small className="muted">{files.length > 0 ? `${files.length}枚選択中` : '写真本体は端末内だけに保存します。'}</small>
+        </label>
+      )}
       <label className="field">
         <span>タイトル</span>
         <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
@@ -409,12 +451,14 @@ function ScrapbookBlockView({
   block,
   places,
   tripId,
+  assetsById,
   mode,
   onSaved,
 }: {
   block: ScrapbookBlock;
   places: Array<{ id: string; name: string; visitedAt?: string; memo?: string }>;
   tripId: string;
+  assetsById: Map<string, MediaAsset>;
   mode: 'view' | 'edit';
   onSaved: () => void;
 }) {
@@ -434,7 +478,7 @@ function ScrapbookBlockView({
           }}
         />
       ) : (
-        <BlockContent block={block} place={place} />
+        <BlockContent block={block} place={place} assetsById={assetsById} />
       )}
       {mode === 'edit' && (
         <div className="inline-actions scrapbook-block-actions">
@@ -478,6 +522,8 @@ function BlockEditForm({
           <select value={input.type} onChange={(event) => setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] })}>
             <option value="text">本文</option>
             <option value="heading">見出し</option>
+            <option value="photo">写真</option>
+            <option value="photo_grid">写真グリッド</option>
             <option value="place">訪問場所</option>
             <option value="meal">食事</option>
             <option value="ticket">チケット・紙もの</option>
@@ -516,7 +562,15 @@ function BlockEditForm({
   );
 }
 
-function BlockContent({ block, place }: { block: ScrapbookBlock; place?: { name: string; visitedAt?: string; memo?: string } }) {
+function BlockContent({
+  block,
+  place,
+  assetsById,
+}: {
+  block: ScrapbookBlock;
+  place?: { name: string; visitedAt?: string; memo?: string };
+  assetsById: Map<string, MediaAsset>;
+}) {
   if (block.type === 'heading') return <h3>{block.text}</h3>;
   if (block.type === 'place') {
     return (
@@ -534,8 +588,60 @@ function BlockContent({ block, place }: { block: ScrapbookBlock; place?: { name:
   if (block.type === 'divider') return <hr aria-label={block.label || '区切り'} />;
   if (block.type === 'trip_summary') return <div><h3>{block.title || '旅のまとめ'}</h3><p>{block.body || '旅全体の感想を書けます。'}</p></div>;
   if (block.type === 'rpg_result') return <div><h3>{block.title || 'RPGリザルト'}</h3><p className="muted">旅行リザルト画面と連携するためのブロックです。</p></div>;
-  if (block.type === 'photo' || block.type === 'photo_grid') return <div className="empty-state">写真ブロックは次フェーズで画像表示に対応します。</div>;
+  if (block.type === 'photo') {
+    const asset = assetsById.get(block.assetId);
+    return (
+      <figure className="scrapbook-photo">
+        {asset ? <MediaImage asset={asset} alt={block.altText || block.caption || asset.originalFileName || 'スクラップブック写真'} /> : <div className="empty-state">写真データが見つかりません。</div>}
+        {block.caption && <figcaption>{block.caption}</figcaption>}
+      </figure>
+    );
+  }
+  if (block.type === 'photo_grid') {
+    return (
+      <figure className="scrapbook-photo-grid">
+        <div className="scrapbook-photo-grid__items">
+          {block.assetIds.map((assetId) => {
+            const asset = assetsById.get(assetId);
+            return asset ? <MediaImage key={assetId} asset={asset} alt={asset.originalFileName || 'スクラップブック写真'} /> : <div key={assetId} className="empty-state">写真なし</div>;
+          })}
+        </div>
+        {block.caption && <figcaption>{block.caption}</figcaption>}
+      </figure>
+    );
+  }
   return <p>{block.text}</p>;
+}
+
+function MediaImage({ asset, alt }: { asset: MediaAsset; alt: string }) {
+  const [url, setUrl] = useState<string>();
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let objectUrl: string | undefined;
+    let cancelled = false;
+    setUrl(undefined);
+    setError('');
+    void createMediaObjectUrl(asset, 'thumbnail')
+      .then((nextUrl) => {
+        if (cancelled) {
+          if (nextUrl) URL.revokeObjectURL(nextUrl);
+          return;
+        }
+        objectUrl = nextUrl;
+        setUrl(nextUrl);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : '写真を読み込めません。');
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [asset]);
+
+  if (error) return <div className="empty-state">{error}</div>;
+  if (!url) return <div className="empty-state">写真を読み込み中...</div>;
+  return <img src={url} alt={alt} loading="lazy" />;
 }
 
 function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
@@ -546,6 +652,8 @@ function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
   if (block.type === 'purchase') return { ...EMPTY_BLOCK, type: 'purchase', title: block.name, note: block.note ?? '' };
   if (block.type === 'quote') return { ...EMPTY_BLOCK, type: 'quote', text: block.text, title: block.cite ?? '' };
   if (block.type === 'divider') return { ...EMPTY_BLOCK, type: 'divider', title: block.label ?? '' };
+  if (block.type === 'photo') return { ...EMPTY_BLOCK, type: 'photo', title: block.altText ?? '', note: block.caption ?? '', assetId: block.assetId };
+  if (block.type === 'photo_grid') return { ...EMPTY_BLOCK, type: 'photo_grid', note: block.caption ?? '', assetIds: block.assetIds };
   if (block.type === 'trip_summary') return { ...EMPTY_BLOCK, type: 'trip_summary', title: block.title ?? '', text: block.body ?? '' };
   if (block.type === 'rpg_result') return { ...EMPTY_BLOCK, type: 'rpg_result', locationId: block.tripId || tripId, title: block.title ?? '' };
   return { ...EMPTY_BLOCK, type: 'text', text: block.type === 'text' ? block.text : '' };

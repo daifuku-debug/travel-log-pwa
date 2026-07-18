@@ -21,6 +21,7 @@ import {
 } from '../localDb/LocalRpgRepository';
 import { LocalPlaceVisitRepository, LocalTripRepository } from '../localDb/LocalTripRepository';
 import {
+  LocalMediaAssetBlobRepository,
   LocalMediaAssetRepository,
   LocalScrapbookBlockRepository,
   LocalScrapbookPageRepository,
@@ -48,6 +49,7 @@ export const repositories = {
   scrapbookPages: new LocalScrapbookPageRepository(),
   scrapbookBlocks: new LocalScrapbookBlockRepository(),
   mediaAssets: new LocalMediaAssetRepository(),
+  mediaAssetBlobs: new LocalMediaAssetBlobRepository(),
   rpgExperienceEntries: new LocalRpgExperienceRepository(),
   rpgTitleMaster: new StaticRpgTitleMasterRepository(),
   userRpgTitles: new LocalUserRpgTitleRepository(),
