@@ -19,7 +19,7 @@ import {
   StaticRpgAchievementMasterRepository,
   StaticRpgTitleMasterRepository,
 } from '../localDb/LocalRpgRepository';
-import { LocalPlaceVisitRepository, LocalTripRepository } from '../localDb/LocalTripRepository';
+import { LocalPlaceVisitRepository, LocalTripRepository, LocalTripTransportLegRepository } from '../localDb/LocalTripRepository';
 import { LocalManualTimelineEntryRepository } from '../localDb/LocalTimeMachineRepository';
 import { LocalTravelGachaDrawRepository } from '../localDb/LocalTravelGachaRepository';
 import {
@@ -37,6 +37,7 @@ const collectionVisitRepository = new LocalCollectionVisitRepository();
 export const repositories = {
   trips: new LocalTripRepository(),
   placeVisits: new LocalPlaceVisitRepository(),
+  tripTransportLegs: new LocalTripTransportLegRepository(),
   wishlist: new LocalWishlistRepository(),
   collections: new LocalCollectionRepository(collectionItemRepository, collectionVisitRepository),
   collectionItems: collectionItemRepository,

@@ -12,10 +12,10 @@ import type {
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
-import type { PlaceVisit, Trip } from '../../domain/models/trip';
+import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 7;
+export const BACKUP_SCHEMA_VERSION = 8;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -24,6 +24,7 @@ export interface TravelLogBackup {
   data: {
     trips: Trip[];
     placeVisits: PlaceVisit[];
+    tripTransportLegs: TripTransportLeg[];
     wishlistItems: WishlistItem[];
     collections: Collection[];
     collectionItems: CollectionItem[];
@@ -57,6 +58,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       data: {
         trips: arrayOrEmpty<Trip>(data.trips),
         placeVisits: arrayOrEmpty<PlaceVisit>(data.placeVisits),
+        tripTransportLegs: sanitizeTripTransportLegs(data.tripTransportLegs),
         wishlistItems: arrayOrEmpty<WishlistItem>(data.wishlistItems),
         collections: arrayOrEmpty<Collection>(data.collections),
         collectionItems: arrayOrEmpty<CollectionItem>(data.collectionItems),
@@ -90,6 +92,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
     return emptyBackup({
       trips: arrayOrEmpty<Trip>(data.trips),
       placeVisits: arrayOrEmpty<PlaceVisit>(data.placeVisits),
+      tripTransportLegs: sanitizeTripTransportLegs(data.tripTransportLegs),
       wishlistItems: arrayOrEmpty<WishlistItem>(data.wishlistItems),
       collections: arrayOrEmpty<Collection>(data.collections),
       collectionItems: arrayOrEmpty<CollectionItem>(data.collectionItems),
@@ -124,6 +127,7 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
     data: {
       trips: data.trips ?? [],
       placeVisits: data.placeVisits ?? [],
+      tripTransportLegs: data.tripTransportLegs ?? [],
       wishlistItems: data.wishlistItems ?? [],
       collections: data.collections ?? [],
       collectionItems: data.collectionItems ?? [],
@@ -160,6 +164,25 @@ function sanitizeExperienceEntries(value: unknown): RpgExperienceEntry[] {
   return uniqueBy(
     arrayOrEmpty<RpgExperienceEntry>(value).filter((entry) => entry.amount >= 0 && Boolean(entry.sourceKey)),
     (entry) => entry.sourceKey,
+  );
+}
+
+function sanitizeTripTransportLegs(value: unknown): TripTransportLeg[] {
+  const modes = ['walk', 'bike', 'train', 'shinkansen', 'bus', 'car', 'flight', 'ship', 'taxi', 'other'];
+  return uniqueBy(
+    arrayOrEmpty<TripTransportLeg>(value).filter((leg) =>
+      Boolean(leg.id)
+      && Boolean(leg.tripId)
+      && /^\d{4}-\d{2}-\d{2}$/.test(leg.date)
+      && Boolean(leg.fromName)
+      && Boolean(leg.toName)
+      && modes.includes(leg.transportMode)
+      && Number.isFinite(leg.partyCount)
+      && Number.isFinite(leg.totalCost)
+      && ['manual', 'estimated', 'api'].includes(leg.costSource)
+      && ['exact', 'high', 'medium', 'rough', 'unknown'].includes(leg.estimatePrecision),
+    ),
+    (leg) => leg.id,
   );
 }
 

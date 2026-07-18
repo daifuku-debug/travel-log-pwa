@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
+import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import {
+  createTripTransportLeg,
   createPlaceVisit,
+  deleteTripTransportLeg,
   deletePlaceVisit,
   deleteTrip,
   getTripDetail,
+  updateTripTransportLeg,
   updatePlaceVisit,
 } from '../features/trips/tripService';
-import type { PlaceVisit } from '../domain/models/trip';
+import type { PlaceVisit, TripTransportLeg } from '../domain/models/trip';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { formatDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
@@ -18,6 +22,7 @@ export function TripDetailPage() {
   const navigate = useNavigate();
   const [reloadKey, setReloadKey] = useState(0);
   const [editingPlace, setEditingPlace] = useState<PlaceVisit | undefined>();
+  const [editingTransportLeg, setEditingTransportLeg] = useState<TripTransportLeg | undefined>();
   const { data, error, loading } = useAsyncData(
     () => (tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
     [tripId, reloadKey],
@@ -32,6 +37,12 @@ export function TripDetailPage() {
   async function handleDeletePlace(place: PlaceVisit) {
     if (!window.confirm(`「${place.name}」を削除しますか？`)) return;
     await deletePlaceVisit(place.id);
+    setReloadKey((value) => value + 1);
+  }
+
+  async function handleDeleteTransportLeg(leg: TripTransportLeg) {
+    if (!window.confirm(`「${leg.fromName} → ${leg.toName}」を削除しますか？`)) return;
+    await deleteTripTransportLeg(leg.id);
     setReloadKey((value) => value + 1);
   }
 
@@ -75,6 +86,47 @@ export function TripDetailPage() {
             <p className="muted">目的: {data.trip.purpose || '未設定'}</p>
             <p className="muted">同行者: {data.trip.companions.join(', ') || 'なし'}</p>
             <p>{data.trip.memo || 'メモはありません。'}</p>
+          </section>
+
+          <section className="card">
+            <div className="section-head">
+              <h2>交通費・移動</h2>
+              <span className="muted">{data.transportSummary.legCount}区間 / {formatYen(data.transportSummary.totalCost)}</span>
+            </div>
+            <div className="transport-summary">
+              <div className="summary-card"><strong>{formatYen(data.transportSummary.totalCost)}</strong><span>交通費合計</span></div>
+              <div className="summary-card"><strong>{formatYen(data.transportSummary.manualCost)}</strong><span>手入力</span></div>
+              <div className="summary-card"><strong>{formatYen(data.transportSummary.apiCost)}</strong><span>API計算</span></div>
+            </div>
+            {data.transportLegs.length === 0 ? (
+              <EmptyState>まだ移動区間が登録されていません。</EmptyState>
+            ) : (
+              <div className="list">
+                {data.transportLegs.map((leg) => (
+                  <div className="list-item" key={leg.id}>
+                    <div>
+                      <p className="list-item__title">{leg.fromName} → {leg.toName}</p>
+                      <div className="list-item__meta">
+                        {leg.date} / {TRANSPORT_MODE_LABELS[leg.transportMode]} / {formatYen(leg.totalCost)}
+                      </div>
+                      <div className="list-item__meta">
+                        {[leg.departureTime, leg.arrivalTime].filter(Boolean).join(' → ') || '時刻未設定'}
+                        {leg.durationMinutes ? ` / 約${leg.durationMinutes}分` : ''}
+                        {leg.memo ? ` / ${leg.memo}` : ''}
+                      </div>
+                    </div>
+                    <div className="inline-actions">
+                      <button className="button" type="button" onClick={() => setEditingTransportLeg(leg)}>
+                        編集
+                      </button>
+                      <button className="button button--danger" type="button" onClick={() => void handleDeleteTransportLeg(leg)}>
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="card">
@@ -130,8 +182,46 @@ export function TripDetailPage() {
               }}
             />
           </section>
+
+          <section className="card">
+            <h2>{editingTransportLeg ? '移動区間を編集' : '移動区間を追加'}</h2>
+            <TransportLegForm
+              key={editingTransportLeg?.id ?? 'new-transport-leg'}
+              leg={editingTransportLeg}
+              defaultDate={data.trip.startDate}
+              submitLabel={editingTransportLeg ? '移動区間を更新' : '移動区間を追加'}
+              onCancel={editingTransportLeg ? () => setEditingTransportLeg(undefined) : undefined}
+              onSubmit={async (input) => {
+                if (!tripId) return;
+                if (editingTransportLeg) {
+                  await updateTripTransportLeg(editingTransportLeg.id, input);
+                  setEditingTransportLeg(undefined);
+                } else {
+                  await createTripTransportLeg(tripId, input);
+                }
+                setReloadKey((value) => value + 1);
+              }}
+            />
+          </section>
         </div>
       )}
     </>
   );
+}
+
+const TRANSPORT_MODE_LABELS: Record<TripTransportLeg['transportMode'], string> = {
+  walk: '徒歩',
+  bike: '自転車',
+  train: '電車',
+  shinkansen: '新幹線',
+  bus: 'バス',
+  car: '車',
+  flight: '飛行機',
+  ship: '船',
+  taxi: 'タクシー',
+  other: 'その他',
+};
+
+function formatYen(value: number): string {
+  return `${value.toLocaleString()}円`;
 }

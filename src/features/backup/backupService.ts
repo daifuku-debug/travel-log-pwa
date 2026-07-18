@@ -12,7 +12,7 @@ import type {
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
-import type { PlaceVisit, Trip } from '../../domain/models/trip';
+import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 import { clearStore, putMany, readAll } from '../../infrastructure/localDb/db';
 import { toAppError } from '../../shared/errors';
@@ -23,6 +23,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
     const [
       trips,
       placeVisits,
+      tripTransportLegs,
       wishlistItems,
       collections,
       collectionItems,
@@ -46,6 +47,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
     ] = await Promise.all([
       readAll<Trip>('trips'),
       readAll<PlaceVisit>('placeVisits'),
+      readAll<TripTransportLeg>('tripTransportLegs'),
       readAll<WishlistItem>('wishlistItems'),
       readAll<Collection>('collections'),
       readAll<CollectionItem>('collectionItems'),
@@ -75,6 +77,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       data: {
         trips,
         placeVisits,
+        tripTransportLegs,
         wishlistItems,
         collections,
         collectionItems,
@@ -108,6 +111,7 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
     await Promise.all([
       clearStore('trips'),
       clearStore('placeVisits'),
+      clearStore('tripTransportLegs'),
       clearStore('wishlistItems'),
       clearStore('collections'),
       clearStore('collectionItems'),
@@ -133,6 +137,7 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
     await Promise.all([
       putMany('trips', normalized.data.trips),
       putMany('placeVisits', normalized.data.placeVisits),
+      putMany('tripTransportLegs', normalized.data.tripTransportLegs),
       putMany('wishlistItems', normalized.data.wishlistItems),
       putMany('collections', normalized.data.collections),
       putMany('collectionItems', normalized.data.collectionItems),
