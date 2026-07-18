@@ -904,6 +904,13 @@ await test('GitHub Pagesのベースパス配下でReact Routerが動く', async
   assert.match(router, /basename: import\.meta\.env\.BASE_URL/);
 });
 
+await test('画面単位で遅延読み込みして初期JSを軽くする', () => {
+  assert.match(routerSource, /lazyPage/);
+  assert.match(routerSource, /Suspense/);
+  assert.match(routerSource, /import\('\.\.\/pages\/TravelGachaPage'\)/);
+  assert.doesNotMatch(routerSource, /import \{ TravelGachaPage \} from '\.\.\/pages\/TravelGachaPage'/);
+});
+
 await test('RPGマスターに実績、称号、クエストが存在する', () => {
   assert.ok(achievementMaster.length >= 15);
   assert.ok(titleMaster.length >= 10);
