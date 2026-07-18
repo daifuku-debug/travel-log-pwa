@@ -22,6 +22,11 @@ import { grantExperienceOnce } from '../rpg/experienceService';
 
 const LOCAL_USER_ID = 'local-user';
 const RECENT_DRAW_COUNT = 5;
+const SOFT_REJECTION_REASONS = [
+  '最近抽選された候補です。',
+  '予算超過の可能性があります。',
+  '移動時間超過の可能性があります。',
+];
 
 export interface RandomProvider {
   next(): number;
@@ -39,7 +44,7 @@ export const defaultTravelGachaSettings: TravelGachaSettings = {
   departureLabel: '',
   tripDurationDays: 1,
   stayType: 'dayTrip',
-  maxBudget: 15000,
+  maxBudget: 25000,
   maxOneWayTravelMinutes: 180,
   transportModes: ['train'],
   candidateScope: 'all',
@@ -176,9 +181,10 @@ async function buildEligibleCandidates(
     .filter((candidate) => candidate.eligibility.eligible)
     .sort((a, b) => b.score - a.score)
     .slice(0, Math.max(1, settings.candidateLimit));
+  const relaxed = accepted.length > 0 ? [] : buildRelaxedCandidates(scored, settings.candidateLimit);
   const suggestions = buildSuggestions(scored);
   return {
-    accepted,
+    accepted: accepted.length > 0 ? accepted : relaxed,
     rejectedCount: scored.length - accepted.length,
     suggestions,
   };
@@ -504,6 +510,26 @@ function buildSuggestions(candidates: TravelCandidate[]): string[] {
     return [...new Set([...suggestions, '地域指定を解除する', '候補範囲を広げる'])].slice(0, 5);
   }
   return [...new Set(suggestions)].slice(0, 5);
+}
+
+function buildRelaxedCandidates(candidates: TravelCandidate[], limit: number): TravelCandidate[] {
+  return candidates
+    .filter((candidate) => candidate.eligibility.rejectedReasons.length > 0)
+    .filter((candidate) => candidate.eligibility.rejectedReasons.every((reason) => SOFT_REJECTION_REASONS.includes(reason)))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(1, limit))
+    .map((candidate) => ({
+      ...candidate,
+      eligibility: {
+        eligible: true,
+        rejectedReasons: [],
+        suggestions: candidate.eligibility.suggestions,
+      },
+      scoreReasons: [
+        ...candidate.scoreReasons,
+        '条件が少し厳しいため、近い候補として表示しています。',
+      ],
+    }));
 }
 
 function estimateTravelTime(regionCode: TravelCandidate['regionCode'], prefectureCode: string | undefined, settings: TravelGachaSettings): number {

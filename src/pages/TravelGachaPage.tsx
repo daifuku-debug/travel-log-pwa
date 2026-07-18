@@ -145,6 +145,11 @@ export function TravelGachaPage() {
               onReroll={() => void runDraw(result.draw?.id)}
               busy={busy}
             />
+          ) : !busy && result ? (
+            <div>
+              <EmptyState>抽選できる候補が見つかりませんでした。</EmptyState>
+              {result.suggestions.length > 0 && <p className="muted">おすすめ緩和: {result.suggestions.join(' / ')}</p>}
+            </div>
           ) : (
             <EmptyState>条件を決めて、旅ガチャを引いてみましょう。</EmptyState>
           )}
