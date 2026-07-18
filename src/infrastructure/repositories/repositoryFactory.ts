@@ -1,3 +1,8 @@
+import {
+  LocalCastleVisitEventRepository,
+  LocalCastleVisitSummaryRepository,
+  StaticCastleMasterRepository,
+} from '../localDb/LocalCastleRepository';
 import { LocalCollectionRepository, LocalCollectionItemRepository, LocalCollectionVisitRepository } from '../localDb/LocalCollectionRepository';
 import {
   LocalPrefectureVisitRepository,
@@ -30,6 +35,9 @@ export const repositories = {
   prefectureMaster: new StaticPrefectureMasterRepository(),
   prefectureVisits: new LocalPrefectureVisitRepository(),
   tripPrefectureVisits: new LocalTripPrefectureVisitRepository(),
+  castleMaster: new StaticCastleMasterRepository(),
+  castleVisitSummaries: new LocalCastleVisitSummaryRepository(),
+  castleVisitEvents: new LocalCastleVisitEventRepository(),
   rpgExperienceEntries: new LocalRpgExperienceRepository(),
   rpgTitleMaster: new StaticRpgTitleMasterRepository(),
   userRpgTitles: new LocalUserRpgTitleRepository(),

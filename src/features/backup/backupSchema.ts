@@ -1,3 +1,4 @@
+import type { CastleVisitEvent, CastleVisitSummary } from '../../domain/models/castle';
 import type { Collection, CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { PrefectureVisit, TripPrefectureVisit } from '../../domain/models/japanConquest';
 import type {
@@ -11,7 +12,7 @@ import type {
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 3;
+export const BACKUP_SCHEMA_VERSION = 4;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -26,6 +27,8 @@ export interface TravelLogBackup {
     collectionVisits: CollectionVisit[];
     prefectureVisits: PrefectureVisit[];
     tripPrefectureVisits: TripPrefectureVisit[];
+    castleVisitSummaries: CastleVisitSummary[];
+    castleVisitEvents: CastleVisitEvent[];
     rpgExperienceEntries: RpgExperienceEntry[];
     userRpgTitles: UserRpgTitle[];
     userRpgAchievements: UserRpgAchievement[];
@@ -51,6 +54,8 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         collectionVisits: arrayOrEmpty<CollectionVisit>(data.collectionVisits),
         prefectureVisits: arrayOrEmpty<PrefectureVisit>(data.prefectureVisits),
         tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
+        castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
+        castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
         rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
         userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
         userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -76,6 +81,8 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       collectionVisits: arrayOrEmpty<CollectionVisit>(data.collectionVisits),
       prefectureVisits: arrayOrEmpty<PrefectureVisit>(data.prefectureVisits),
       tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
+      castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
+      castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
       rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
       userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
       userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -102,6 +109,8 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
       collectionVisits: data.collectionVisits ?? [],
       prefectureVisits: data.prefectureVisits ?? [],
       tripPrefectureVisits: data.tripPrefectureVisits ?? [],
+      castleVisitSummaries: data.castleVisitSummaries ?? [],
+      castleVisitEvents: data.castleVisitEvents ?? [],
       rpgExperienceEntries: data.rpgExperienceEntries ?? [],
       userRpgTitles: data.userRpgTitles ?? [],
       userRpgAchievements: data.userRpgAchievements ?? [],
@@ -124,6 +133,27 @@ function sanitizeExperienceEntries(value: unknown): RpgExperienceEntry[] {
   return uniqueBy(
     arrayOrEmpty<RpgExperienceEntry>(value).filter((entry) => entry.amount >= 0 && Boolean(entry.sourceKey)),
     (entry) => entry.sourceKey,
+  );
+}
+
+function sanitizeCastleVisitSummaries(value: unknown): CastleVisitSummary[] {
+  return uniqueBy(
+    arrayOrEmpty<CastleVisitSummary>(value).filter((summary) =>
+      ['unvisited', 'planned', 'visited'].includes(summary.status)
+      && ['unknown', 'not_acquired', 'acquired'].includes(summary.stampStatus)
+      && ['unknown', 'not_acquired', 'acquired'].includes(summary.goshuinStatus)
+      && Boolean(summary.castleId),
+    ),
+    (summary) => summary.castleId,
+  );
+}
+
+function sanitizeCastleVisitEvents(value: unknown): CastleVisitEvent[] {
+  return uniqueBy(
+    arrayOrEmpty<CastleVisitEvent>(value).filter((event) =>
+      Boolean(event.castleId) && Boolean(event.sourceKey) && Boolean(event.visitedAt),
+    ),
+    (event) => event.sourceKey,
   );
 }
 

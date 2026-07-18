@@ -10,12 +10,14 @@ import { buildTravelStats, type TravelStats } from './rpgStats';
 
 export async function getTravelStats(): Promise<TravelStats> {
   await bootstrapAppData();
-  const [trips, places, prefectures, collections, wishlist] = await Promise.all([
+  const [trips, places, prefectures, collections, wishlist, castleSummaries, castleMaster] = await Promise.all([
     repositories.trips.list(),
     repositories.placeVisits.list(),
     repositories.prefectureVisits.list(),
     repositories.collections.listWithProgress(),
     repositories.wishlist.list(),
+    repositories.castleVisitSummaries.list(),
+    repositories.castleMaster.list(),
   ]);
   const collectionVisitCountByCollectionId = new Map<string, number>();
   const collectionItems = await repositories.collectionItems.list();
@@ -39,6 +41,8 @@ export async function getTravelStats(): Promise<TravelStats> {
       ...collection,
       visitedCount: collectionVisitCountByCollectionId.get(collection.id) ?? 0,
     })),
+    castleSummaries,
+    castleSeriesById: new Map(castleMaster.map((castle) => [castle.id, castle.series])),
     wishlistItemCount: wishlist.filter((item) => !SAMPLE_WISHLIST_ITEM_IDS.includes(item.id)).length,
   });
 }

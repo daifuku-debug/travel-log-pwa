@@ -23,5 +23,22 @@
     "40": 700,
     "47": 1500
   },
-  "customQuestRewardMax": 500
+  "customQuestRewardMax": 500,
+  "castle": {
+    "firstVisit": 30,
+    "revisit": 5,
+    "firstStamp": 20,
+    "firstGoshuin": 10,
+    "firstSeriesVisit": 20,
+    "milestones": {
+      "5": 50,
+      "10": 100,
+      "25": 200,
+      "50": 400,
+      "75": 600
+    },
+    "completeJapanese100": 1500,
+    "completeContinued100": 1500,
+    "completeAll200": 3000
+  }
 }

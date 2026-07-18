@@ -1,3 +1,4 @@
+import type { CastleVisitEvent, CastleVisitSummary } from '../../domain/models/castle';
 import type { Collection, CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { PrefectureVisit, TripPrefectureVisit } from '../../domain/models/japanConquest';
 import type {
@@ -25,6 +26,8 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       collectionVisits,
       prefectureVisits,
       tripPrefectureVisits,
+      castleVisitSummaries,
+      castleVisitEvents,
       rpgExperienceEntries,
       userRpgTitles,
       userRpgAchievements,
@@ -40,6 +43,8 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       readAll<CollectionVisit>('collectionVisits'),
       readAll<PrefectureVisit>('prefectureVisits'),
       readAll<TripPrefectureVisit>('tripPrefectureVisits'),
+      readAll<CastleVisitSummary>('castleVisitSummaries'),
+      readAll<CastleVisitEvent>('castleVisitEvents'),
       readAll<RpgExperienceEntry>('rpgExperienceEntries'),
       readAll<UserRpgTitle>('userRpgTitles'),
       readAll<UserRpgAchievement>('userRpgAchievements'),
@@ -61,6 +66,8 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
         collectionVisits,
         prefectureVisits,
         tripPrefectureVisits,
+        castleVisitSummaries,
+        castleVisitEvents,
         rpgExperienceEntries,
         userRpgTitles,
         userRpgAchievements,
@@ -86,6 +93,8 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       clearStore('collectionVisits'),
       clearStore('prefectureVisits'),
       clearStore('tripPrefectureVisits'),
+      clearStore('castleVisitSummaries'),
+      clearStore('castleVisitEvents'),
       clearStore('rpgExperienceEntries'),
       clearStore('userRpgTitles'),
       clearStore('userRpgAchievements'),
@@ -103,6 +112,8 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       putMany('collectionVisits', normalized.data.collectionVisits),
       putMany('prefectureVisits', normalized.data.prefectureVisits),
       putMany('tripPrefectureVisits', normalized.data.tripPrefectureVisits),
+      putMany('castleVisitSummaries', normalized.data.castleVisitSummaries),
+      putMany('castleVisitEvents', normalized.data.castleVisitEvents),
       putMany('rpgExperienceEntries', normalized.data.rpgExperienceEntries),
       putMany('userRpgTitles', normalized.data.userRpgTitles),
       putMany('userRpgAchievements', normalized.data.userRpgAchievements),

@@ -23,6 +23,16 @@ export function getConditionValue(
       return stats.collectionCompletedCount;
     case 'collectionCategoryCompletedCount':
       return conditionCategory ? stats.collectionCompletedByCategory[conditionCategory] ?? 0 : 0;
+    case 'castleVisitedCount':
+      return stats.castleVisitedCount;
+    case 'castleJapanese100VisitedCount':
+      return stats.castleJapanese100VisitedCount;
+    case 'castleContinued100VisitedCount':
+      return stats.castleContinued100VisitedCount;
+    case 'castleStampCount':
+      return stats.castleStampCount;
+    case 'castleGoshuinCount':
+      return stats.castleGoshuinCount;
     case 'samePrefectureVisitCount':
       return stats.maxSamePrefectureVisitCount;
     case 'wishlistItemCount':

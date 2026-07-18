@@ -4,6 +4,7 @@ const navItems = [
   { to: '/', label: 'ホーム', end: true },
   { to: '/trips', label: '旅行' },
   { to: '/japan-map', label: '地図' },
+  { to: '/castles', label: '城' },
   { to: '/rpg', label: 'RPG' },
   { to: '/collections', label: '収集' },
   { to: '/wishlist', label: '欲しいもの' },
@@ -34,9 +35,7 @@ export function AppLayout() {
               key={item.to}
               to={item.to}
               end={item.end}
-              className={({ isActive }) =>
-                isActive ? 'bottom-nav__item active' : 'bottom-nav__item'
-              }
+              className={({ isActive }) => (isActive ? 'bottom-nav__item active' : 'bottom-nav__item')}
             >
               {item.label}
             </NavLink>

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '../shared/layout/AppLayout';
+import { CastleCollectionPage } from '../pages/CastleCollectionPage';
 import { CollectionPage } from '../pages/CollectionPage';
 import { HomePage } from '../pages/HomePage';
 import { JapanConquestPage } from '../pages/JapanConquestPage';
@@ -28,6 +29,7 @@ export const router = createBrowserRouter(
         { path: 'trips/:tripId/result', element: <TripResultPage /> },
         { path: 'trips/:tripId', element: <TripDetailPage /> },
         { path: 'japan-map', element: <JapanConquestPage /> },
+        { path: 'castles', element: <CastleCollectionPage /> },
         { path: 'rpg', element: <RpgProfilePage /> },
         { path: 'rpg/achievements', element: <RpgAchievementsPage /> },
         { path: 'rpg/titles', element: <RpgTitlesPage /> },
