@@ -5,6 +5,8 @@ import { compareDateInputValuesDesc, dateInputToIsoDateTime, isValidDateInputVal
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
+import { grantPlaceVisitExperience, grantTripCompletionExperience, refreshRpgProgress } from '../rpg/rpgProgressService';
+import { createTripResultIfNeeded } from '../rpg/tripResultService';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -89,7 +91,7 @@ export async function createTrip(input: TripInput): Promise<Trip> {
     await bootstrapAppData();
     assertNoValidationErrors(validateTripInput(input));
     const now = new Date().toISOString();
-    return repositories.trips.save({
+    const trip = await repositories.trips.save({
       id: createId('trip'),
       userId: LOCAL_USER_ID,
       title: input.title.trim(),
@@ -103,6 +105,10 @@ export async function createTrip(input: TripInput): Promise<Trip> {
       updatedAt: now,
       syncStatus: 'pending',
     });
+    await grantTripCompletionExperience(trip);
+    await refreshRpgProgress();
+    await createTripResultIfNeeded(trip.id);
+    return trip;
   } catch (error) {
     throw toAppError(error, '旅行の作成に失敗しました');
   }
@@ -114,7 +120,7 @@ export async function updateTrip(tripId: EntityId, input: TripInput): Promise<Tr
     assertNoValidationErrors(validateTripInput(input));
     const current = await repositories.trips.getById(tripId);
     if (!current) throw new Error('旅行が見つかりません。');
-    return repositories.trips.save({
+    const trip = await repositories.trips.save({
       ...current,
       title: input.title.trim(),
       startDate: input.startDate,
@@ -126,6 +132,9 @@ export async function updateTrip(tripId: EntityId, input: TripInput): Promise<Tr
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending',
     });
+    await grantTripCompletionExperience(trip);
+    await refreshRpgProgress();
+    return trip;
   } catch (error) {
     throw toAppError(error, '旅行の更新に失敗しました');
   }
@@ -149,7 +158,7 @@ export async function createPlaceVisit(tripId: EntityId, input: PlaceVisitInput)
     const trip = await repositories.trips.getById(tripId);
     if (!trip) throw new Error('旅行が見つかりません。');
     const now = new Date().toISOString();
-    return repositories.placeVisits.save({
+    const place = await repositories.placeVisits.save({
       id: createId('place'),
       userId: LOCAL_USER_ID,
       tripId,
@@ -162,6 +171,9 @@ export async function createPlaceVisit(tripId: EntityId, input: PlaceVisitInput)
       updatedAt: now,
       syncStatus: 'pending',
     });
+    await grantPlaceVisitExperience(place.id, tripId, place.name);
+    await refreshRpgProgress();
+    return place;
   } catch (error) {
     throw toAppError(error, '訪問場所の追加に失敗しました');
   }

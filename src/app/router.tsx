@@ -3,9 +3,15 @@ import { AppLayout } from '../shared/layout/AppLayout';
 import { CollectionPage } from '../pages/CollectionPage';
 import { HomePage } from '../pages/HomePage';
 import { JapanConquestPage } from '../pages/JapanConquestPage';
+import { RpgAchievementsPage } from '../pages/RpgAchievementsPage';
+import { RpgExperiencePage } from '../pages/RpgExperiencePage';
+import { RpgProfilePage } from '../pages/RpgProfilePage';
+import { RpgQuestsPage } from '../pages/RpgQuestsPage';
+import { RpgTitlesPage } from '../pages/RpgTitlesPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { TripDetailPage } from '../pages/TripDetailPage';
 import { TripEditPage } from '../pages/TripEditPage';
+import { TripResultPage } from '../pages/TripResultPage';
 import { TripsPage } from '../pages/TripsPage';
 import { WishlistPage } from '../pages/WishlistPage';
 
@@ -19,8 +25,14 @@ export const router = createBrowserRouter(
         { path: 'trips', element: <TripsPage /> },
         { path: 'trips/new', element: <TripEditPage mode="create" /> },
         { path: 'trips/:tripId/edit', element: <TripEditPage mode="edit" /> },
+        { path: 'trips/:tripId/result', element: <TripResultPage /> },
         { path: 'trips/:tripId', element: <TripDetailPage /> },
         { path: 'japan-map', element: <JapanConquestPage /> },
+        { path: 'rpg', element: <RpgProfilePage /> },
+        { path: 'rpg/achievements', element: <RpgAchievementsPage /> },
+        { path: 'rpg/titles', element: <RpgTitlesPage /> },
+        { path: 'rpg/quests', element: <RpgQuestsPage /> },
+        { path: 'rpg/experience', element: <RpgExperiencePage /> },
         { path: 'collections', element: <CollectionPage /> },
         { path: 'wishlist', element: <WishlistPage /> },
         { path: 'settings', element: <SettingsPage /> },

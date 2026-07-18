@@ -60,6 +60,9 @@ export function TripDetailPage() {
                 <Link className="button" to={`/trips/${data.trip.id}/edit`}>
                   編集
                 </Link>
+                <Link className="button" to={`/trips/${data.trip.id}/result`}>
+                  リザルト
+                </Link>
                 <button className="button button--danger" type="button" onClick={handleDeleteTrip}>
                   削除
                 </button>

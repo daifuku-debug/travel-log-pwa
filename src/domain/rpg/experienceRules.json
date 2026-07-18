@@ -1,0 +1,27 @@
+{
+  "tripCompleted": 100,
+  "dayTripBonus": 20,
+  "overnightTripBonus": 50,
+  "placeVisit": 10,
+  "tripMemo": 5,
+  "photoInfo": 2,
+  "prefectureFirstVisit": 100,
+  "prefectureFirstStay": 150,
+  "prefectureRevisit": 20,
+  "collectionItemCompleted": 30,
+  "collectionMilestones": {
+    "25": 100,
+    "50": 200,
+    "75": 300,
+    "100": 500
+  },
+  "japanConquestMilestones": {
+    "5": 100,
+    "10": 200,
+    "20": 300,
+    "30": 500,
+    "40": 700,
+    "47": 1500
+  },
+  "customQuestRewardMax": 500
+}

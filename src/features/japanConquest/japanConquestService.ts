@@ -3,6 +3,7 @@ import { repositories } from '../../infrastructure/repositories/repositoryFactor
 import { isValidDateInputValue } from '../../shared/date/dateUtils';
 import { toAppError } from '../../shared/errors';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
+import { grantPrefectureExperience, refreshRpgProgress } from '../rpg/rpgProgressService';
 import {
   calculateJapanConquestSummary,
   createEmptyPrefectureVisit,
@@ -53,7 +54,7 @@ export async function updatePrefectureVisit(
       (await repositories.prefectureVisits.getByPrefectureCode(prefectureCode)) ??
       createEmptyPrefectureVisit(prefectureCode, now);
 
-    return repositories.prefectureVisits.save({
+    const saved = await repositories.prefectureVisits.save({
       ...current,
       status: input.status,
       manualStatus: input.status,
@@ -65,6 +66,9 @@ export async function updatePrefectureVisit(
       updatedAt: now,
       syncStatus: 'pending',
     });
+    await grantPrefectureExperience(saved.prefectureCode, saved.status, saved.visitCount);
+    await refreshRpgProgress();
+    return saved;
   } catch (error) {
     throw toAppError(error, '都道府県の訪問情報の保存に失敗しました');
   }

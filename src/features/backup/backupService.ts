@@ -1,5 +1,13 @@
 import type { Collection, CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { PrefectureVisit, TripPrefectureVisit } from '../../domain/models/japanConquest';
+import type {
+  RpgExperienceEntry,
+  RpgQuest,
+  RpgSettings,
+  TripRpgResult,
+  UserRpgAchievement,
+  UserRpgTitle,
+} from '../../domain/models/rpg';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 import { clearStore, putMany, readAll } from '../../infrastructure/localDb/db';
@@ -17,6 +25,12 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       collectionVisits,
       prefectureVisits,
       tripPrefectureVisits,
+      rpgExperienceEntries,
+      userRpgTitles,
+      userRpgAchievements,
+      rpgQuests,
+      tripRpgResults,
+      rpgSettings,
     ] = await Promise.all([
       readAll<Trip>('trips'),
       readAll<PlaceVisit>('placeVisits'),
@@ -26,6 +40,12 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       readAll<CollectionVisit>('collectionVisits'),
       readAll<PrefectureVisit>('prefectureVisits'),
       readAll<TripPrefectureVisit>('tripPrefectureVisits'),
+      readAll<RpgExperienceEntry>('rpgExperienceEntries'),
+      readAll<UserRpgTitle>('userRpgTitles'),
+      readAll<UserRpgAchievement>('userRpgAchievements'),
+      readAll<RpgQuest>('rpgQuests'),
+      readAll<TripRpgResult>('tripRpgResults'),
+      readAll<RpgSettings>('rpgSettings'),
     ]);
 
     return {
@@ -41,6 +61,12 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
         collectionVisits,
         prefectureVisits,
         tripPrefectureVisits,
+        rpgExperienceEntries,
+        userRpgTitles,
+        userRpgAchievements,
+        rpgQuests,
+        tripRpgResults,
+        rpgSettings,
       },
     };
   } catch (error) {
@@ -60,6 +86,12 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       clearStore('collectionVisits'),
       clearStore('prefectureVisits'),
       clearStore('tripPrefectureVisits'),
+      clearStore('rpgExperienceEntries'),
+      clearStore('userRpgTitles'),
+      clearStore('userRpgAchievements'),
+      clearStore('rpgQuests'),
+      clearStore('tripRpgResults'),
+      clearStore('rpgSettings'),
     ]);
 
     await Promise.all([
@@ -71,6 +103,12 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       putMany('collectionVisits', normalized.data.collectionVisits),
       putMany('prefectureVisits', normalized.data.prefectureVisits),
       putMany('tripPrefectureVisits', normalized.data.tripPrefectureVisits),
+      putMany('rpgExperienceEntries', normalized.data.rpgExperienceEntries),
+      putMany('userRpgTitles', normalized.data.userRpgTitles),
+      putMany('userRpgAchievements', normalized.data.userRpgAchievements),
+      putMany('rpgQuests', normalized.data.rpgQuests),
+      putMany('tripRpgResults', normalized.data.tripRpgResults),
+      putMany('rpgSettings', normalized.data.rpgSettings),
     ]);
   } catch (error) {
     throw toAppError(error, 'バックアップの復元に失敗しました');

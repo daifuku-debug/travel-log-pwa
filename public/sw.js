@@ -1,4 +1,4 @@
-const CACHE_NAME = 'travel-log-pwa-v2';
+const CACHE_NAME = 'travel-log-pwa-v3';
 const BASE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [
   BASE_PATH,

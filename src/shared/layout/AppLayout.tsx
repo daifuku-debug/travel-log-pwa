@@ -4,6 +4,7 @@ const navItems = [
   { to: '/', label: 'ホーム', end: true },
   { to: '/trips', label: '旅行' },
   { to: '/japan-map', label: '地図' },
+  { to: '/rpg', label: 'RPG' },
   { to: '/collections', label: '収集' },
   { to: '/wishlist', label: '欲しいもの' },
   { to: '/settings', label: '設定' },

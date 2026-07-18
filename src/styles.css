@@ -196,7 +196,7 @@ a {
 
 .bottom-nav__inner {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   max-width: 720px;
   margin: 0 auto;
 }
@@ -474,6 +474,39 @@ a {
 
 .detail-panel {
   scroll-margin-top: 80px;
+}
+
+.rpg-hero {
+  display: grid;
+  gap: 14px;
+}
+
+.rpg-exp-bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e1ded7;
+}
+
+.rpg-exp-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f6f73;
+}
+
+.rpg-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.achievement-unlocked {
+  background: #e4f4f1;
+}
+
+.achievement-in_progress {
+  background: #fff7e6;
 }
 
 .error-panel {

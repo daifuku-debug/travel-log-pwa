@@ -1,9 +1,17 @@
 import type { Collection, CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { PrefectureVisit, TripPrefectureVisit } from '../../domain/models/japanConquest';
+import type {
+  RpgExperienceEntry,
+  RpgQuest,
+  RpgSettings,
+  TripRpgResult,
+  UserRpgAchievement,
+  UserRpgTitle,
+} from '../../domain/models/rpg';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 2;
+export const BACKUP_SCHEMA_VERSION = 3;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -18,6 +26,12 @@ export interface TravelLogBackup {
     collectionVisits: CollectionVisit[];
     prefectureVisits: PrefectureVisit[];
     tripPrefectureVisits: TripPrefectureVisit[];
+    rpgExperienceEntries: RpgExperienceEntry[];
+    userRpgTitles: UserRpgTitle[];
+    userRpgAchievements: UserRpgAchievement[];
+    rpgQuests: RpgQuest[];
+    tripRpgResults: TripRpgResult[];
+    rpgSettings: RpgSettings[];
   };
 }
 
@@ -37,6 +51,12 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         collectionVisits: arrayOrEmpty<CollectionVisit>(data.collectionVisits),
         prefectureVisits: arrayOrEmpty<PrefectureVisit>(data.prefectureVisits),
         tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
+        rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
+        userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
+        userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
+        rpgQuests: arrayOrEmpty<RpgQuest>(data.rpgQuests).filter(isValidQuest),
+        tripRpgResults: arrayOrEmpty<TripRpgResult>(data.tripRpgResults),
+        rpgSettings: arrayOrEmpty<RpgSettings>(data.rpgSettings),
       },
     };
   }
@@ -56,6 +76,12 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       collectionVisits: arrayOrEmpty<CollectionVisit>(data.collectionVisits),
       prefectureVisits: arrayOrEmpty<PrefectureVisit>(data.prefectureVisits),
       tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
+      rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
+      userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
+      userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
+      rpgQuests: arrayOrEmpty<RpgQuest>(data.rpgQuests).filter(isValidQuest),
+      tripRpgResults: arrayOrEmpty<TripRpgResult>(data.tripRpgResults),
+      rpgSettings: arrayOrEmpty<RpgSettings>(data.rpgSettings),
     });
   }
 
@@ -76,6 +102,12 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
       collectionVisits: data.collectionVisits ?? [],
       prefectureVisits: data.prefectureVisits ?? [],
       tripPrefectureVisits: data.tripPrefectureVisits ?? [],
+      rpgExperienceEntries: data.rpgExperienceEntries ?? [],
+      userRpgTitles: data.userRpgTitles ?? [],
+      userRpgAchievements: data.userRpgAchievements ?? [],
+      rpgQuests: data.rpgQuests ?? [],
+      tripRpgResults: data.tripRpgResults ?? [],
+      rpgSettings: data.rpgSettings ?? [],
     },
   };
 }
@@ -86,4 +118,25 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function arrayOrEmpty<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function sanitizeExperienceEntries(value: unknown): RpgExperienceEntry[] {
+  return uniqueBy(
+    arrayOrEmpty<RpgExperienceEntry>(value).filter((entry) => entry.amount >= 0 && Boolean(entry.sourceKey)),
+    (entry) => entry.sourceKey,
+  );
+}
+
+function uniqueBy<T>(values: T[], getKey: (value: T) => string): T[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = getKey(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isValidQuest(quest: RpgQuest): boolean {
+  return ['available', 'in_progress', 'completed', 'claimed', 'expired'].includes(quest.status);
 }

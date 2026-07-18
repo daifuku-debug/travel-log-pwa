@@ -1,10 +1,15 @@
 import { useRef, useState } from 'react';
 import { buildBackupPayload, restoreBackupPayload } from '../features/backup/backupService';
+import { rerunInitialRpgAggregation, resetRpgDataOnly } from '../features/rpg/rpgMaintenanceService';
+import { getRpgSettings, updateRpgSettings } from '../features/rpg/rpgSettingsService';
+import { useAsyncData } from '../shared/hooks/useAsyncData';
 
 export function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const { data: rpgSettings } = useAsyncData(getRpgSettings, [reloadKey]);
 
   async function handleExport() {
     setMessage('');
@@ -81,11 +86,100 @@ export function SettingsPage() {
           <p className="muted">Workers + D1の同期Repositoryを後続フェーズで追加できる構成です。</p>
         </section>
 
+        {rpgSettings && (
+          <section className="card">
+            <h2>旅行RPG設定</h2>
+            <div className="grid">
+              <Toggle
+                label="旅行RPG機能"
+                checked={rpgSettings.rpgEnabled}
+                onChange={async (checked) => {
+                  await updateRpgSettings({ rpgEnabled: checked });
+                  setReloadKey((value) => value + 1);
+                }}
+              />
+              <Toggle
+                label="レベルアップ演出"
+                checked={rpgSettings.levelUpAnimationEnabled}
+                onChange={async (checked) => {
+                  await updateRpgSettings({ levelUpAnimationEnabled: checked });
+                  setReloadKey((value) => value + 1);
+                }}
+              />
+              <Toggle
+                label="実績解除通知"
+                checked={rpgSettings.achievementNotificationsEnabled}
+                onChange={async (checked) => {
+                  await updateRpgSettings({ achievementNotificationsEnabled: checked });
+                  setReloadKey((value) => value + 1);
+                }}
+              />
+              <Toggle
+                label="ユーザー作成クエストEXPをレベルへ含める"
+                checked={rpgSettings.includeCustomQuestExpInLevel}
+                onChange={async (checked) => {
+                  await updateRpgSettings({ includeCustomQuestExpInLevel: checked });
+                  setReloadKey((value) => value + 1);
+                }}
+              />
+              <p className="muted">
+                初回集計: {rpgSettings.initialAggregationCompletedAt ? rpgSettings.initialAggregationCompletedAt.slice(0, 10) : '未実行'}
+              </p>
+              <div className="form-actions">
+                <button
+                  className="button"
+                  type="button"
+                  onClick={async () => {
+                    await rerunInitialRpgAggregation();
+                    setMessage('RPG進捗を再集計しました。');
+                    setReloadKey((value) => value + 1);
+                  }}
+                >
+                  RPG進捗を再集計
+                </button>
+                <button
+                  className="button button--danger"
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm('旅行記録などは残し、RPGデータのみリセットしますか？')) return;
+                    await resetRpgDataOnly();
+                    setMessage('RPGデータのみリセットしました。');
+                    setReloadKey((value) => value + 1);
+                  }}
+                >
+                  RPGデータのみリセット
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="card">
           <h2>PWA</h2>
           <p className="muted">ホーム画面に追加して、インストール済みアプリのように起動できます。</p>
         </section>
       </div>
     </>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => Promise<void>;
+}) {
+  return (
+    <label className="checkbox-field">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => void onChange(event.target.checked)}
+      />
+      {label}
+    </label>
   );
 }

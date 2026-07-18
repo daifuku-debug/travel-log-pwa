@@ -36,11 +36,32 @@ export function HomePage() {
               <div className="muted">コレクション全体</div>
             </div>
             <div className="card">
-              <h2>同期</h2>
-              <div className="stat-value">準備中</div>
-              <div className="muted">Cloudflare同期を後続フェーズで追加</div>
+              <h2>旅行RPG</h2>
+              <div className="stat-value">Lv.{data.rpg.level}</div>
+              <div className="muted">{data.rpg.mainTitleName} / 次まで {data.rpg.expToNextLevel} EXP</div>
             </div>
           </div>
+
+          <section className="card">
+            <div className="section-head">
+              <h2>冒険者メモ</h2>
+              <Link className="button" to="/rpg">プロフィール</Link>
+            </div>
+            <div className="list">
+              <div className="list-item">
+                <div>
+                  <p className="list-item__title">進行中クエスト</p>
+                  <div className="list-item__meta">{data.rpg.questTitles.join(' / ') || '進行中のクエストはありません'}</div>
+                </div>
+              </div>
+              <div className="list-item">
+                <div>
+                  <p className="list-item__title">最近の実績</p>
+                  <div className="list-item__meta">{data.rpg.recentAchievementNames.join(' / ') || 'まだ解除された実績はありません'}</div>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section className="card">
             <h2>最近の旅行</h2>
