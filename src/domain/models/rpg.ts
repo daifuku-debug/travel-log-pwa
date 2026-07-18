@@ -5,6 +5,7 @@ export type RpgSourceType =
   | 'prefecture'
   | 'collection'
   | 'castle'
+  | 'scrapbook'
   | 'achievement'
   | 'quest'
   | 'manual'
@@ -29,6 +30,8 @@ export type RpgConditionType =
   | 'castleContinued100VisitedCount'
   | 'castleStampCount'
   | 'castleGoshuinCount'
+  | 'scrapbookCreatedCount'
+  | 'scrapbookCompletedCount'
   | 'samePrefectureVisitCount'
   | 'wishlistItemCount'
   | 'manual';

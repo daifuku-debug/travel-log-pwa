@@ -9,10 +9,11 @@ import type {
   UserRpgAchievement,
   UserRpgTitle,
 } from '../../domain/models/rpg';
+import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 4;
+export const BACKUP_SCHEMA_VERSION = 5;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -29,6 +30,10 @@ export interface TravelLogBackup {
     tripPrefectureVisits: TripPrefectureVisit[];
     castleVisitSummaries: CastleVisitSummary[];
     castleVisitEvents: CastleVisitEvent[];
+    scrapbooks: Scrapbook[];
+    scrapbookPages: ScrapbookPage[];
+    scrapbookBlocks: ScrapbookBlock[];
+    mediaAssets: MediaAsset[];
     rpgExperienceEntries: RpgExperienceEntry[];
     userRpgTitles: UserRpgTitle[];
     userRpgAchievements: UserRpgAchievement[];
@@ -56,6 +61,10 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
         castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
         castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
+        scrapbooks: sanitizeScrapbooks(data.scrapbooks),
+        scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
+        scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
+        mediaAssets: sanitizeMediaAssets(data.mediaAssets),
         rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
         userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
         userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -83,6 +92,10 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
       castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
       castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
+      scrapbooks: sanitizeScrapbooks(data.scrapbooks),
+      scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
+      scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
+      mediaAssets: sanitizeMediaAssets(data.mediaAssets),
       rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
       userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
       userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -111,6 +124,10 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
       tripPrefectureVisits: data.tripPrefectureVisits ?? [],
       castleVisitSummaries: data.castleVisitSummaries ?? [],
       castleVisitEvents: data.castleVisitEvents ?? [],
+      scrapbooks: data.scrapbooks ?? [],
+      scrapbookPages: data.scrapbookPages ?? [],
+      scrapbookBlocks: data.scrapbookBlocks ?? [],
+      mediaAssets: data.mediaAssets ?? [],
       rpgExperienceEntries: data.rpgExperienceEntries ?? [],
       userRpgTitles: data.userRpgTitles ?? [],
       userRpgAchievements: data.userRpgAchievements ?? [],
@@ -154,6 +171,56 @@ function sanitizeCastleVisitEvents(value: unknown): CastleVisitEvent[] {
       Boolean(event.castleId) && Boolean(event.sourceKey) && Boolean(event.visitedAt),
     ),
     (event) => event.sourceKey,
+  );
+}
+
+function sanitizeScrapbooks(value: unknown): Scrapbook[] {
+  return uniqueBy(
+    arrayOrEmpty<Scrapbook>(value).filter((scrapbook) =>
+      Boolean(scrapbook.id)
+      && Boolean(scrapbook.tripId)
+      && ['draft', 'completed', 'archived'].includes(scrapbook.status)
+      && ['timeline', 'pages', 'freeform'].includes(scrapbook.layoutMode)
+      && ['classic', 'journal', 'minimal', 'adventure'].includes(scrapbook.themeId),
+    ),
+    (scrapbook) => scrapbook.id,
+  );
+}
+
+function sanitizeScrapbookPages(value: unknown): ScrapbookPage[] {
+  return uniqueBy(
+    arrayOrEmpty<ScrapbookPage>(value).filter((page) =>
+      Boolean(page.id)
+      && Boolean(page.scrapbookId)
+      && Number.isFinite(page.sortOrder)
+      && ['cover', 'day', 'section', 'summary'].includes(page.layoutType),
+    ),
+    (page) => page.id,
+  );
+}
+
+function sanitizeScrapbookBlocks(value: unknown): ScrapbookBlock[] {
+  const blockTypes = ['text', 'heading', 'photo', 'photo_grid', 'place', 'meal', 'ticket', 'purchase', 'quote', 'divider', 'trip_summary', 'rpg_result'];
+  return uniqueBy(
+    arrayOrEmpty<ScrapbookBlock>(value).filter((block) =>
+      Boolean(block.id)
+      && Boolean(block.pageId)
+      && Number.isFinite(block.sortOrder)
+      && blockTypes.includes(block.type),
+    ),
+    (block) => block.id,
+  );
+}
+
+function sanitizeMediaAssets(value: unknown): MediaAsset[] {
+  return uniqueBy(
+    arrayOrEmpty<MediaAsset>(value).filter((asset) =>
+      Boolean(asset.id)
+      && Boolean(asset.tripId)
+      && ['local', 'remote', 'external'].includes(asset.storageType)
+      && ['local_only', 'pending', 'synced', 'failed'].includes(asset.mediaSyncStatus),
+    ),
+    (asset) => asset.id,
   );
 }
 

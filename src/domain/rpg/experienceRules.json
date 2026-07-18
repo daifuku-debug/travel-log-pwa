@@ -9,6 +9,10 @@
   "prefectureFirstStay": 150,
   "prefectureFirstLive": 250,
   "prefectureRevisit": 20,
+  "scrapbookCreated": 30,
+  "scrapbookCompleted": 50,
+  "scrapbookPhotoMilestone": 20,
+  "scrapbookReflectionAdded": 10,
   "collectionItemCompleted": 30,
   "collectionMilestones": {
     "25": 100,

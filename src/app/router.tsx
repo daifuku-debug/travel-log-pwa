@@ -10,6 +10,7 @@ import { RpgProfilePage } from '../pages/RpgProfilePage';
 import { RpgQuestsPage } from '../pages/RpgQuestsPage';
 import { RpgTitlesPage } from '../pages/RpgTitlesPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { ScrapbookPage } from '../pages/ScrapbookPage';
 import { TripDetailPage } from '../pages/TripDetailPage';
 import { TripEditPage } from '../pages/TripEditPage';
 import { TripResultPage } from '../pages/TripResultPage';
@@ -27,6 +28,7 @@ export const router = createBrowserRouter(
         { path: 'trips/new', element: <TripEditPage mode="create" /> },
         { path: 'trips/:tripId/edit', element: <TripEditPage mode="edit" /> },
         { path: 'trips/:tripId/result', element: <TripResultPage /> },
+        { path: 'trips/:tripId/scrapbook', element: <ScrapbookPage /> },
         { path: 'trips/:tripId', element: <TripDetailPage /> },
         { path: 'japan-map', element: <JapanConquestPage /> },
         { path: 'castles', element: <CastleCollectionPage /> },

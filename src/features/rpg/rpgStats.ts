@@ -1,6 +1,7 @@
 import type { CollectionCategory } from '../../domain/models/collection';
 import type { CastleVisitSummary } from '../../domain/models/castle';
 import type { PrefectureVisit } from '../../domain/models/japanConquest';
+import type { Scrapbook } from '../../domain/models/scrapbook';
 
 export interface TravelStats {
   tripCompletedCount: number;
@@ -16,6 +17,8 @@ export interface TravelStats {
   castleContinued100VisitedCount: number;
   castleStampCount: number;
   castleGoshuinCount: number;
+  scrapbookCreatedCount: number;
+  scrapbookCompletedCount: number;
   wishlistItemCount: number;
   maxSamePrefectureVisitCount: number;
   collectionCompletedByCategory: Record<string, number>;
@@ -28,6 +31,7 @@ export function buildTravelStats(input: {
   collections: Array<{ category: CollectionCategory; visitedCount: number }>;
   castleSummaries?: CastleVisitSummary[];
   castleSeriesById?: Map<string, 'japanese_100_castles' | 'continued_japanese_100_castles'>;
+  scrapbooks?: Scrapbook[];
   wishlistItemCount: number;
 }): TravelStats {
   const collectionCompletedByCategory: Record<string, number> = {};
@@ -37,6 +41,7 @@ export function buildTravelStats(input: {
   }
   const castleSummaries = input.castleSummaries ?? [];
   const visitedCastles = castleSummaries.filter((summary) => summary.status === 'visited');
+  const scrapbooks = input.scrapbooks ?? [];
 
   return {
     tripCompletedCount: input.tripTypes.length,
@@ -52,6 +57,8 @@ export function buildTravelStats(input: {
     castleContinued100VisitedCount: visitedCastles.filter((summary) => input.castleSeriesById?.get(summary.castleId) === 'continued_japanese_100_castles').length,
     castleStampCount: castleSummaries.filter((summary) => summary.stampStatus === 'acquired').length,
     castleGoshuinCount: castleSummaries.filter((summary) => summary.goshuinStatus === 'acquired').length,
+    scrapbookCreatedCount: scrapbooks.length,
+    scrapbookCompletedCount: scrapbooks.filter((scrapbook) => scrapbook.status === 'completed').length,
     wishlistItemCount: input.wishlistItemCount,
     maxSamePrefectureVisitCount: input.prefectures.reduce((max, visit) => Math.max(max, visit.visitCount), 0),
     collectionCompletedByCategory,

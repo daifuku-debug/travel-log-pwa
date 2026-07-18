@@ -35,6 +35,10 @@ export function getConditionValue(
       return stats.castleStampCount;
     case 'castleGoshuinCount':
       return stats.castleGoshuinCount;
+    case 'scrapbookCreatedCount':
+      return stats.scrapbookCreatedCount;
+    case 'scrapbookCompletedCount':
+      return stats.scrapbookCompletedCount;
     case 'samePrefectureVisitCount':
       return stats.maxSamePrefectureVisitCount;
     case 'wishlistItemCount':

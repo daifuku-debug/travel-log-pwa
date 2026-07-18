@@ -20,6 +20,12 @@ import {
   StaticRpgTitleMasterRepository,
 } from '../localDb/LocalRpgRepository';
 import { LocalPlaceVisitRepository, LocalTripRepository } from '../localDb/LocalTripRepository';
+import {
+  LocalMediaAssetRepository,
+  LocalScrapbookBlockRepository,
+  LocalScrapbookPageRepository,
+  LocalScrapbookRepository,
+} from '../localDb/LocalScrapbookRepository';
 import { LocalWishlistRepository } from '../localDb/LocalWishlistRepository';
 
 const collectionItemRepository = new LocalCollectionItemRepository();
@@ -38,6 +44,10 @@ export const repositories = {
   castleMaster: new StaticCastleMasterRepository(),
   castleVisitSummaries: new LocalCastleVisitSummaryRepository(),
   castleVisitEvents: new LocalCastleVisitEventRepository(),
+  scrapbooks: new LocalScrapbookRepository(),
+  scrapbookPages: new LocalScrapbookPageRepository(),
+  scrapbookBlocks: new LocalScrapbookBlockRepository(),
+  mediaAssets: new LocalMediaAssetRepository(),
   rpgExperienceEntries: new LocalRpgExperienceRepository(),
   rpgTitleMaster: new StaticRpgTitleMasterRepository(),
   userRpgTitles: new LocalUserRpgTitleRepository(),

@@ -1,0 +1,552 @@
+import { useMemo, useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { Scrapbook, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel, ScrapbookThemeId } from '../domain/models/scrapbook';
+import {
+  addScrapbookBlock,
+  addScrapbookPage,
+  createScrapbookForTrip,
+  deleteScrapbookBlock,
+  deleteScrapbookPage,
+  getScrapbookByTripId,
+  moveScrapbookBlock,
+  moveScrapbookPage,
+  updateScrapbook,
+  updateScrapbookBlock,
+  updateScrapbookPage,
+  type ScrapbookBlockInput,
+  type ScrapbookInput,
+  type ScrapbookPageInput,
+} from '../features/scrapbooks/scrapbookService';
+import { getTripDetail } from '../features/trips/tripService';
+import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
+import { formatDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtils';
+import { useAsyncData } from '../shared/hooks/useAsyncData';
+
+const THEME_LABELS: Record<ScrapbookThemeId, string> = {
+  classic: 'クラシック',
+  journal: '旅日誌',
+  minimal: 'ミニマル',
+  adventure: '冒険日誌',
+};
+
+const EMPTY_PAGE: ScrapbookPageInput = {
+  title: '',
+  date: '',
+  dayNumber: 0,
+  layoutType: 'section',
+  backgroundStyle: '',
+};
+
+const EMPTY_BLOCK: ScrapbookBlockInput = {
+  type: 'text',
+  text: '',
+  locationId: '',
+  title: '',
+  note: '',
+};
+
+export function ScrapbookPage() {
+  const { tripId } = useParams();
+  const navigate = useNavigate();
+  const [reloadKey, setReloadKey] = useState(0);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [selectedPageId, setSelectedPageId] = useState<string>();
+  const [formError, setFormError] = useState('');
+  const { data, error, loading } = useAsyncData(async () => {
+    if (!tripId) return undefined;
+    const [tripDetail, scrapbookDetail] = await Promise.all([
+      getTripDetail(tripId),
+      getScrapbookByTripId(tripId),
+    ]);
+    return { tripDetail, scrapbookDetail };
+  }, [tripId, reloadKey]);
+
+  const scrapbookDetail = data?.scrapbookDetail;
+  const selectedPage = useMemo(
+    () => scrapbookDetail?.pages.find((page) => page.id === selectedPageId) ?? scrapbookDetail?.pages[0],
+    [scrapbookDetail, selectedPageId],
+  );
+
+  async function handleCreate() {
+    if (!tripId) return;
+    setFormError('');
+    try {
+      const scrapbook = await createScrapbookForTrip(tripId);
+      setReloadKey((value) => value + 1);
+      setMode('edit');
+      navigate(`/trips/${tripId}/scrapbook`, { replace: true });
+      return scrapbook;
+    } catch (createError) {
+      setFormError(createError instanceof Error ? createError.message : '作成に失敗しました。');
+    }
+  }
+
+  return (
+    <>
+      <section className="page-heading">
+        <div className="page-heading__row">
+          <div>
+            <h1>旅行スクラップブック</h1>
+            <p>{data?.tripDetail ? `${data.tripDetail.trip.title} / ${formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}` : '旅行の思い出を1冊にまとめます。'}</p>
+          </div>
+          <div className="inline-actions">
+            <Link className="button" to={tripId ? `/trips/${tripId}` : '/trips'}>旅行詳細</Link>
+            {scrapbookDetail && (
+              <button className="button" type="button" onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}>
+                {mode === 'view' ? '編集' : '閲覧'}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {loading && <LoadingState />}
+      {error && <ErrorState error={error} />}
+      {formError && <div className="form-errors">{formError}</div>}
+
+      {!loading && !error && data && !data.tripDetail && (
+        <EmptyState>旅行が見つかりません。<Link to="/trips">旅行一覧へ戻る</Link></EmptyState>
+      )}
+
+      {data?.tripDetail && !scrapbookDetail && (
+        <section className="card">
+          <h2>まだスクラップブックがありません</h2>
+          <p className="muted">旅行の日程と訪問場所から、表紙・日付ページ・場所ブロックを自動生成します。</p>
+          <button className="button button--primary" type="button" onClick={() => void handleCreate()}>
+            スクラップブックを作成
+          </button>
+        </section>
+      )}
+
+      {scrapbookDetail && data?.tripDetail && (
+        <div className={`scrapbook scrapbook-theme-${scrapbookDetail.scrapbook.themeId}`}>
+          <section className="card scrapbook-cover">
+            <div>
+              <div className="list-item__meta">旅行スクラップブック</div>
+              <h2>{scrapbookDetail.scrapbook.title}</h2>
+              <p>{scrapbookDetail.scrapbook.subtitle || data.tripDetail.trip.purpose || '旅の記録'}</p>
+              <p className="muted">{formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}</p>
+            </div>
+            <span className={`status-badge ${scrapbookDetail.scrapbook.status === 'completed' ? 'achievement-unlocked' : ''}`}>
+              {scrapbookDetail.scrapbook.status === 'completed' ? '完成' : scrapbookDetail.scrapbook.status === 'archived' ? 'アーカイブ' : '下書き'}
+            </span>
+          </section>
+
+          {mode === 'edit' && (
+            <ScrapbookSettingsForm
+              scrapbook={scrapbookDetail.scrapbook}
+              onSaved={() => setReloadKey((value) => value + 1)}
+            />
+          )}
+
+          <div className="scrapbook-layout">
+            <section className="card scrapbook-pages">
+              <div className="section-head">
+                <h2>ページ</h2>
+                {mode === 'edit' && <PageForm scrapbookId={scrapbookDetail.scrapbook.id} onSaved={() => setReloadKey((value) => value + 1)} />}
+              </div>
+              <div className="prefecture-list">
+                {scrapbookDetail.pages.map((page) => (
+                  <button
+                    key={page.id}
+                    type="button"
+                    className={`prefecture-row ${selectedPage?.id === page.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedPageId(page.id)}
+                  >
+                    <div>
+                      <strong>{page.title}</strong>
+                      <div className="list-item__meta">{page.date || page.layoutType} / {page.blocks.length}ブロック</div>
+                    </div>
+                    {mode === 'edit' && (
+                      <span className="inline-actions">
+                        <button className="button" type="button" onClick={(event) => { event.stopPropagation(); void moveScrapbookPage(page.id, -1).then(() => setReloadKey((value) => value + 1)); }}>上</button>
+                        <button className="button" type="button" onClick={(event) => { event.stopPropagation(); void moveScrapbookPage(page.id, 1).then(() => setReloadKey((value) => value + 1)); }}>下</button>
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="card scrapbook-page-view">
+              {selectedPage ? (
+                <>
+                  <div className="section-head">
+                    <div>
+                      <h2>{selectedPage.title}</h2>
+                      <p className="muted">{selectedPage.date || '日付なし'}</p>
+                    </div>
+                    {mode === 'edit' && (
+                      <button
+                        className="button button--danger"
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm(`「${selectedPage.title}」を削除しますか？`)) return;
+                          await deleteScrapbookPage(selectedPage.id);
+                          setSelectedPageId(undefined);
+                          setReloadKey((value) => value + 1);
+                        }}
+                      >
+                        ページ削除
+                      </button>
+                    )}
+                  </div>
+
+                  {mode === 'edit' && (
+                    <PageEditForm page={selectedPage} onSaved={() => setReloadKey((value) => value + 1)} />
+                  )}
+
+                  <div className="scrapbook-blocks">
+                    {selectedPage.blocks.length === 0 ? (
+                      <EmptyState>このページにはまだブロックがありません。</EmptyState>
+                    ) : (
+                      selectedPage.blocks.map((block) => (
+                        <ScrapbookBlockView
+                          key={block.id}
+                          block={block}
+                          places={data.tripDetail?.places ?? []}
+                          tripId={data.tripDetail!.trip.id}
+                          mode={mode}
+                          onSaved={() => setReloadKey((value) => value + 1)}
+                        />
+                      ))
+                    )}
+                  </div>
+
+                  {mode === 'edit' && (
+                    <BlockForm
+                      page={selectedPage}
+                      places={data.tripDetail.places}
+                      tripId={data.tripDetail.trip.id}
+                      onSaved={() => setReloadKey((value) => value + 1)}
+                    />
+                  )}
+                </>
+              ) : (
+                <EmptyState>ページを選択してください。</EmptyState>
+              )}
+            </section>
+          </div>
+
+          <section className="card">
+            <h2>写真について</h2>
+            <p className="muted">
+              今回は画像メタデータの保存先のみ用意しています。写真本体はGitHub PagesやJSONバックアップへ保存しません。
+              端末内画像保存とサムネイル生成は次フェーズで追加します。
+            </p>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ScrapbookSettingsForm({
+  scrapbook,
+  onSaved,
+}: {
+  scrapbook: Scrapbook;
+  onSaved: () => void;
+}) {
+  const [input, setInput] = useState<ScrapbookInput>({
+    title: scrapbook.title,
+    subtitle: scrapbook.subtitle ?? '',
+    themeId: scrapbook.themeId,
+    status: scrapbook.status,
+    isFavorite: scrapbook.isFavorite,
+  });
+
+  return (
+    <section className="card">
+      <h2>ブック設定</h2>
+      <form className="form form--compact" onSubmit={async (event) => {
+        event.preventDefault();
+        await updateScrapbook(scrapbook.id, input);
+        onSaved();
+      }}>
+        <div className="form-grid">
+          <label className="field">
+            <span>タイトル</span>
+            <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>テーマ</span>
+            <select value={input.themeId} onChange={(event) => setInput({ ...input, themeId: event.target.value as ScrapbookThemeId })}>
+              {Object.entries(THEME_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="field">
+          <span>サブタイトル</span>
+          <input value={input.subtitle} onChange={(event) => setInput({ ...input, subtitle: event.target.value })} />
+        </label>
+        <div className="form-grid">
+          <label className="field">
+            <span>状態</span>
+            <select value={input.status} onChange={(event) => setInput({ ...input, status: event.target.value as ScrapbookInput['status'] })}>
+              <option value="draft">下書き</option>
+              <option value="completed">完成</option>
+              <option value="archived">アーカイブ</option>
+            </select>
+          </label>
+          <label className="checkbox-field filter-checkbox">
+            <input type="checkbox" checked={input.isFavorite} onChange={(event) => setInput({ ...input, isFavorite: event.target.checked })} />
+            お気に入り
+          </label>
+        </div>
+        <button className="button button--primary" type="submit">端末に保存</button>
+      </form>
+    </section>
+  );
+}
+
+function PageForm({ scrapbookId, onSaved }: { scrapbookId: string; onSaved: () => void }) {
+  const [input, setInput] = useState<ScrapbookPageInput>(EMPTY_PAGE);
+  return (
+    <form className="inline-actions" onSubmit={async (event) => {
+      event.preventDefault();
+      await addScrapbookPage(scrapbookId, input);
+      setInput(EMPTY_PAGE);
+      onSaved();
+    }}>
+      <input className="inline-input" value={input.title} placeholder="ページ名" onChange={(event) => setInput({ ...input, title: event.target.value })} />
+      <button className="button" type="submit">追加</button>
+    </form>
+  );
+}
+
+function PageEditForm({ page, onSaved }: { page: ScrapbookPageModel; onSaved: () => void }) {
+  const [input, setInput] = useState<ScrapbookPageInput>({
+    title: page.title,
+    date: page.date ?? '',
+    dayNumber: page.dayNumber ?? 0,
+    layoutType: page.layoutType,
+    backgroundStyle: page.backgroundStyle ?? '',
+  });
+  return (
+    <form className="form form--compact" onSubmit={async (event) => {
+      event.preventDefault();
+      await updateScrapbookPage(page.id, input);
+      onSaved();
+    }}>
+      <div className="form-grid">
+        <label className="field">
+          <span>ページ名</span>
+          <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
+        </label>
+        <label className="field">
+          <span>日付</span>
+          <input type="date" value={input.date} onChange={(event) => setInput({ ...input, date: event.target.value })} />
+        </label>
+      </div>
+      <button className="button" type="submit">ページ保存</button>
+    </form>
+  );
+}
+
+function BlockForm({
+  page,
+  places,
+  tripId,
+  onSaved,
+}: {
+  page: ScrapbookPageModel;
+  places: Array<{ id: string; name: string }>;
+  tripId: string;
+  onSaved: () => void;
+}) {
+  const [input, setInput] = useState<ScrapbookBlockInput>({ ...EMPTY_BLOCK, locationId: tripId });
+  return (
+    <form className="form form--compact scrapbook-editor" onSubmit={async (event) => {
+      event.preventDefault();
+      await addScrapbookBlock(page.id, input);
+      setInput({ ...EMPTY_BLOCK, locationId: tripId });
+      onSaved();
+    }}>
+      <h3>ブロック追加</h3>
+      <div className="form-grid">
+        <label className="field">
+          <span>種類</span>
+          <select value={input.type} onChange={(event) => setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] })}>
+            <option value="text">本文</option>
+            <option value="heading">見出し</option>
+            <option value="place">訪問場所</option>
+            <option value="meal">食事</option>
+            <option value="ticket">チケット・紙もの</option>
+            <option value="purchase">買ったもの</option>
+            <option value="quote">引用・ひとこと</option>
+            <option value="divider">区切り</option>
+            <option value="trip_summary">旅のまとめ</option>
+            <option value="rpg_result">RPGリザルト</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>関連場所</span>
+          <select value={input.locationId} onChange={(event) => setInput({ ...input, locationId: event.target.value })}>
+            <option value={tripId}>旅行全体</option>
+            {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        <span>タイトル</span>
+        <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>本文・感想</span>
+        <textarea rows={3} value={input.text} onChange={(event) => setInput({ ...input, text: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>補足メモ</span>
+        <input value={input.note} onChange={(event) => setInput({ ...input, note: event.target.value })} />
+      </label>
+      <button className="button button--primary" type="submit">ブロック追加</button>
+    </form>
+  );
+}
+
+function ScrapbookBlockView({
+  block,
+  places,
+  tripId,
+  mode,
+  onSaved,
+}: {
+  block: ScrapbookBlock;
+  places: Array<{ id: string; name: string; visitedAt?: string; memo?: string }>;
+  tripId: string;
+  mode: 'view' | 'edit';
+  onSaved: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const place = block.type === 'place' ? places.find((row) => row.id === block.locationId) : undefined;
+  return (
+    <article className={`scrapbook-block scrapbook-block-${block.type}`}>
+      {isEditing ? (
+        <BlockEditForm
+          block={block}
+          places={places}
+          tripId={tripId}
+          onCancel={() => setIsEditing(false)}
+          onSaved={() => {
+            setIsEditing(false);
+            onSaved();
+          }}
+        />
+      ) : (
+        <BlockContent block={block} place={place} />
+      )}
+      {mode === 'edit' && (
+        <div className="inline-actions scrapbook-block-actions">
+          <button className="button" type="button" onClick={() => void moveScrapbookBlock(block.id, -1).then(onSaved)}>上</button>
+          <button className="button" type="button" onClick={() => void moveScrapbookBlock(block.id, 1).then(onSaved)}>下</button>
+          <button className="button" type="button" onClick={() => setIsEditing((value) => !value)}>{isEditing ? '閉じる' : '編集'}</button>
+          <button className="button button--danger" type="button" onClick={async () => {
+            if (!window.confirm('このブロックを削除しますか？')) return;
+            await deleteScrapbookBlock(block.id);
+            onSaved();
+          }}>削除</button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function BlockEditForm({
+  block,
+  places,
+  tripId,
+  onCancel,
+  onSaved,
+}: {
+  block: ScrapbookBlock;
+  places: Array<{ id: string; name: string }>;
+  tripId: string;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [input, setInput] = useState<ScrapbookBlockInput>(blockToInput(block, tripId));
+  return (
+    <form className="form form--compact scrapbook-editor" onSubmit={async (event) => {
+      event.preventDefault();
+      await updateScrapbookBlock(block.id, input);
+      onSaved();
+    }}>
+      <div className="form-grid">
+        <label className="field">
+          <span>種類</span>
+          <select value={input.type} onChange={(event) => setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] })}>
+            <option value="text">本文</option>
+            <option value="heading">見出し</option>
+            <option value="place">訪問場所</option>
+            <option value="meal">食事</option>
+            <option value="ticket">チケット・紙もの</option>
+            <option value="purchase">買ったもの</option>
+            <option value="quote">引用・ひとこと</option>
+            <option value="divider">区切り</option>
+            <option value="trip_summary">旅のまとめ</option>
+            <option value="rpg_result">RPGリザルト</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>関連場所</span>
+          <select value={input.locationId} onChange={(event) => setInput({ ...input, locationId: event.target.value })}>
+            <option value={tripId}>旅行全体</option>
+            {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        <span>タイトル</span>
+        <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>本文・感想</span>
+        <textarea rows={4} value={input.text} onChange={(event) => setInput({ ...input, text: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>補足メモ</span>
+        <input value={input.note} onChange={(event) => setInput({ ...input, note: event.target.value })} />
+      </label>
+      <div className="inline-actions">
+        <button className="button button--primary" type="submit">ブロック保存</button>
+        <button className="button" type="button" onClick={onCancel}>キャンセル</button>
+      </div>
+    </form>
+  );
+}
+
+function BlockContent({ block, place }: { block: ScrapbookBlock; place?: { name: string; visitedAt?: string; memo?: string } }) {
+  if (block.type === 'heading') return <h3>{block.text}</h3>;
+  if (block.type === 'place') {
+    return (
+      <div>
+        <h3>{block.titleOverride || place?.name || block.snapshotName}</h3>
+        <p className="muted">{place?.visitedAt ? isoDateTimeToDateInput(place.visitedAt) : '訪問日未設定'}</p>
+        <p>{block.caption || place?.memo || '訪問メモはありません。'}</p>
+      </div>
+    );
+  }
+  if (block.type === 'meal') return <div><h3>{block.name}</h3><p>{block.note || '食事のメモを追加できます。'}</p></div>;
+  if (block.type === 'ticket') return <div><h3>{block.title}</h3><p>{block.note || 'チケットや紙ものの記録です。'}</p></div>;
+  if (block.type === 'purchase') return <div><h3>{block.name}</h3><p>{block.note || '買ったものの記録です。'}</p></div>;
+  if (block.type === 'quote') return <blockquote>{block.text}{block.cite ? <cite>{block.cite}</cite> : null}</blockquote>;
+  if (block.type === 'divider') return <hr aria-label={block.label || '区切り'} />;
+  if (block.type === 'trip_summary') return <div><h3>{block.title || '旅のまとめ'}</h3><p>{block.body || '旅全体の感想を書けます。'}</p></div>;
+  if (block.type === 'rpg_result') return <div><h3>{block.title || 'RPGリザルト'}</h3><p className="muted">旅行リザルト画面と連携するためのブロックです。</p></div>;
+  if (block.type === 'photo' || block.type === 'photo_grid') return <div className="empty-state">写真ブロックは次フェーズで画像表示に対応します。</div>;
+  return <p>{block.text}</p>;
+}
+
+function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
+  if (block.type === 'heading') return { ...EMPTY_BLOCK, type: 'heading', text: block.text };
+  if (block.type === 'place') return { ...EMPTY_BLOCK, type: 'place', locationId: block.locationId, title: block.snapshotName, note: block.caption ?? '' };
+  if (block.type === 'meal') return { ...EMPTY_BLOCK, type: 'meal', title: block.name, note: block.note ?? '' };
+  if (block.type === 'ticket') return { ...EMPTY_BLOCK, type: 'ticket', title: block.title, note: block.note ?? '' };
+  if (block.type === 'purchase') return { ...EMPTY_BLOCK, type: 'purchase', title: block.name, note: block.note ?? '' };
+  if (block.type === 'quote') return { ...EMPTY_BLOCK, type: 'quote', text: block.text, title: block.cite ?? '' };
+  if (block.type === 'divider') return { ...EMPTY_BLOCK, type: 'divider', title: block.label ?? '' };
+  if (block.type === 'trip_summary') return { ...EMPTY_BLOCK, type: 'trip_summary', title: block.title ?? '', text: block.body ?? '' };
+  if (block.type === 'rpg_result') return { ...EMPTY_BLOCK, type: 'rpg_result', locationId: block.tripId || tripId, title: block.title ?? '' };
+  return { ...EMPTY_BLOCK, type: 'text', text: block.type === 'text' ? block.text : '' };
+}

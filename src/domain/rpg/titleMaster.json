@@ -155,5 +155,27 @@
     "conditionValue": 25,
     "sortOrder": 140,
     "isHidden": false
+  },
+  {
+    "id": "scrapbook-writer",
+    "name": "旅の記録者",
+    "description": "スクラップブックを1冊作成した",
+    "category": "scrapbook",
+    "icon": "book-open",
+    "conditionType": "scrapbookCreatedCount",
+    "conditionValue": 1,
+    "sortOrder": 150,
+    "isHidden": false
+  },
+  {
+    "id": "scrapbook-editor",
+    "name": "旅の編集者",
+    "description": "スクラップブックを5冊完成した",
+    "category": "scrapbook",
+    "icon": "sparkles",
+    "conditionType": "scrapbookCompletedCount",
+    "conditionValue": 5,
+    "sortOrder": 160,
+    "isHidden": false
   }
 ]

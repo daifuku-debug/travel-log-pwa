@@ -41,6 +41,11 @@ const castlePage = await readFile(new URL('../src/pages/CastleCollectionPage.tsx
 const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.url), 'utf8');
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
 const updateCastleMasterScript = await readFile(new URL('../scripts/update-castle-master.mjs', import.meta.url), 'utf8');
+const scrapbookModel = await readFile(new URL('../src/domain/models/scrapbook.ts', import.meta.url), 'utf8');
+const scrapbookService = await readFile(new URL('../src/features/scrapbooks/scrapbookService.ts', import.meta.url), 'utf8');
+const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
+const routerSource = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
+const tripDetailPage = await readFile(new URL('../src/pages/TripDetailPage.tsx', import.meta.url), 'utf8');
 
 async function test(name, fn) {
   try {
@@ -210,13 +215,72 @@ await test('JSONエクスポート/インポートで城訪問情報が復元で
   assert.equal(normalized.data.castleVisitEvents[0].sourceKey, 'castle-visit:manual:castle-j100-001:1');
 });
 
+await test('JSONエクスポート/インポートでスクラップブック情報が復元できる', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 5,
+    data: {
+      scrapbooks: [{ id: 'scrapbook-1', tripId: 'trip-1', title: '旅', status: 'draft', layoutMode: 'pages', themeId: 'journal' }],
+      scrapbookPages: [{ id: 'page-1', scrapbookId: 'scrapbook-1', title: '表紙', sortOrder: 10, layoutType: 'cover' }],
+      scrapbookBlocks: [{ id: 'block-1', pageId: 'page-1', type: 'text', sortOrder: 10, text: 'hello' }],
+      mediaAssets: [{ id: 'asset-1', tripId: 'trip-1', storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' }],
+    },
+  });
+  assert.equal(normalized.data.scrapbooks.length, 1);
+  assert.equal(normalized.data.scrapbookPages.length, 1);
+  assert.equal(normalized.data.scrapbookBlocks.length, 1);
+  assert.equal(normalized.data.mediaAssets.length, 1);
+});
+
 await test('旧形式バックアップでも日本制覇マップデータなしでエラーにならない', () => {
   const oldObject = normalizeBackupPayload({ trips: [{ id: 'trip-1', title: '旧バックアップ' }] });
   const oldArray = normalizeBackupPayload([{ id: 'trip-2', title: 'さらに古い形式' }]);
   assert.equal(oldObject.data.prefectureVisits.length, 0);
   assert.equal(oldObject.data.castleVisitSummaries.length, 0);
+  assert.equal(oldObject.data.scrapbooks.length, 0);
   assert.equal(oldObject.data.trips.length, 1);
   assert.equal(oldArray.data.trips.length, 1);
+});
+
+await test('スクラップブックは旅行記録と編集データを分離したモデルを持つ', () => {
+  assert.match(scrapbookModel, /interface Scrapbook /);
+  assert.match(scrapbookModel, /interface ScrapbookPage /);
+  assert.match(scrapbookModel, /type ScrapbookBlock =/);
+  assert.match(scrapbookModel, /interface MediaAsset /);
+});
+
+await test('旅行詳細からスクラップブック画面へ移動できる', () => {
+  assert.match(routerSource, /trips\/:tripId\/scrapbook/);
+  assert.match(tripDetailPage, /スクラップブック/);
+});
+
+await test('スクラップブックは1旅行に重複作成されない', () => {
+  assert.match(scrapbookService, /getByTripId\(tripId\)/);
+  assert.match(scrapbookService, /if \(existing\) return existing/);
+});
+
+await test('スクラップブック初期生成はsourceKeyで重複防止する', () => {
+  assert.match(scrapbookService, /sourceKey: `cover:\$\{trip\.id\}`/);
+  assert.match(scrapbookService, /const sourceKey = `day:\$\{trip\.id\}:\$\{date\}`/);
+  assert.match(scrapbookService, /sourceKey: `place:\$\{place\.id\}`/);
+});
+
+await test('スクラップブック画面は閲覧モードと編集モードを分ける', () => {
+  assert.match(scrapbookPage, /mode, setMode/);
+  assert.match(scrapbookPage, /mode === 'edit'/);
+  assert.match(scrapbookPage, /mode === 'view'/);
+});
+
+await test('スクラップブックは上下ボタンでページとブロックを並び替えできる', () => {
+  assert.match(scrapbookService, /moveScrapbookPage/);
+  assert.match(scrapbookService, /moveScrapbookBlock/);
+  assert.match(scrapbookPage, />上<\/button>/);
+  assert.match(scrapbookPage, />下<\/button>/);
+});
+
+await test('スクラップブックの画像本体はJSONバックアップに含めない設計', () => {
+  assert.match(scrapbookPage, /写真本体はGitHub PagesやJSONバックアップへ保存しません/);
+  assert.doesNotMatch(scrapbookModel, /base64/i);
 });
 
 await test('GitHub Pagesのベースパス配下でも地図データを読み込む設定になっている', () => {
@@ -344,6 +408,13 @@ await test('城RPG経験値はsourceKeyで二重付与を防ぐ設計', () => {
   assert.match(castleService, /castle:milestone:\$\{milestone\.count\}/);
 });
 
+await test('スクラップブックRPG経験値はsourceKeyで二重付与を防ぐ設計', () => {
+  assert.match(scrapbookService, /scrapbook-created:\$\{scrapbookId\}/);
+  assert.match(scrapbookService, /scrapbook-completed:\$\{scrapbookId\}/);
+  assert.match(scrapbookService, /scrapbook-photo-milestone:\$\{scrapbookId\}:5/);
+  assert.match(scrapbookService, /scrapbook-reflection-added:\$\{scrapbookId\}/);
+});
+
 await test('RPG初期レベルが1になる', () => {
   const level = calculateLevelProgress([]);
   assert.equal(level.currentLevel, 1);
@@ -414,13 +485,17 @@ await test('条件達成時に実績マスターの対象値へ届く', () => {
     collections: [],
     castleSummaries: [{ ...createEmptyCastleSummary('castle-j100-001', '2026-07-18T00:00:00.000Z'), status: 'visited', visitCount: 1 }],
     castleSeriesById: new Map([['castle-j100-001', 'japanese_100_castles']]),
+    scrapbooks: [{ id: 'scrapbook-1', status: 'completed' }],
     wishlistItemCount: 0,
   });
   assert.equal(getConditionValue(stats, 'tripCompletedCount'), 1);
   assert.equal(getConditionValue(stats, 'castleVisitedCount'), 1);
   assert.equal(getConditionValue(stats, 'castleJapanese100VisitedCount'), 1);
+  assert.equal(getConditionValue(stats, 'scrapbookCreatedCount'), 1);
+  assert.equal(getConditionValue(stats, 'scrapbookCompletedCount'), 1);
   assert.equal(achievementMaster.find((item) => item.id === 'trip-1').targetValue, 1);
   assert.equal(achievementMaster.find((item) => item.id === 'castle-1').targetValue, 1);
+  assert.equal(achievementMaster.find((item) => item.id === 'scrapbook-created-1').targetValue, 1);
 });
 
 await test('実績報酬EXPはsourceKeyで一度だけ付与される設計になっている', async () => {

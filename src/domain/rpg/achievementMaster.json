@@ -274,5 +274,41 @@
     "rewardExp": 250,
     "isHidden": false,
     "sortOrder": 230
+  },
+  {
+    "id": "scrapbook-created-1",
+    "name": "旅の記憶",
+    "description": "初めてスクラップブックを作成する",
+    "category": "スクラップブック",
+    "icon": "book-open",
+    "conditionType": "scrapbookCreatedCount",
+    "targetValue": 1,
+    "rewardExp": 30,
+    "isHidden": false,
+    "sortOrder": 240
+  },
+  {
+    "id": "scrapbook-completed-1",
+    "name": "一冊目の旅",
+    "description": "初めてスクラップブックを完成する",
+    "category": "スクラップブック",
+    "icon": "book-check",
+    "conditionType": "scrapbookCompletedCount",
+    "targetValue": 1,
+    "rewardExp": 50,
+    "isHidden": false,
+    "sortOrder": 250
+  },
+  {
+    "id": "scrapbook-completed-5",
+    "name": "思い出収集家",
+    "description": "スクラップブックを5冊完成する",
+    "category": "スクラップブック",
+    "icon": "archive",
+    "conditionType": "scrapbookCompletedCount",
+    "targetValue": 5,
+    "rewardExp": 180,
+    "isHidden": false,
+    "sortOrder": 260
   }
 ]

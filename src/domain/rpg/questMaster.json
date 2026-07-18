@@ -142,5 +142,29 @@
     "targetValue": 1,
     "rewardExp": 30,
     "isRepeatable": true
+  },
+  {
+    "id": "quest-permanent-first-scrapbook",
+    "type": "permanent",
+    "source": "system",
+    "title": "旅のスクラップブックを作る",
+    "description": "旅行詳細からスクラップブックを1冊作成します。",
+    "category": "スクラップブック",
+    "conditionType": "scrapbookCreatedCount",
+    "targetValue": 1,
+    "rewardExp": 40,
+    "isRepeatable": false
+  },
+  {
+    "id": "quest-permanent-complete-scrapbook",
+    "type": "permanent",
+    "source": "system",
+    "title": "スクラップブックを完成させる",
+    "description": "スクラップブックを完成状態にします。",
+    "category": "スクラップブック",
+    "conditionType": "scrapbookCompletedCount",
+    "targetValue": 1,
+    "rewardExp": 60,
+    "isRepeatable": false
   }
 ]
