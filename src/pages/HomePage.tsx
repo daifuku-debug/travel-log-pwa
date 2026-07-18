@@ -47,6 +47,7 @@ export function HomePage() {
               <h2>冒険者メモ</h2>
               <div className="inline-actions">
                 <Link className="button" to="/time-machine">タイムマシン</Link>
+                <Link className="button" to="/travel-gacha">旅ガチャ</Link>
                 <Link className="button" to="/rpg">プロフィール</Link>
               </div>
             </div>

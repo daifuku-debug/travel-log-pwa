@@ -11,10 +11,11 @@ import type {
 } from '../../domain/models/rpg';
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
+import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 
-export const BACKUP_SCHEMA_VERSION = 6;
+export const BACKUP_SCHEMA_VERSION = 7;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -36,6 +37,7 @@ export interface TravelLogBackup {
     scrapbookBlocks: ScrapbookBlock[];
     mediaAssets: MediaAsset[];
     manualTimelineEntries: ManualTimelineEntry[];
+    travelGachaDraws: TravelGachaDraw[];
     rpgExperienceEntries: RpgExperienceEntry[];
     userRpgTitles: UserRpgTitle[];
     userRpgAchievements: UserRpgAchievement[];
@@ -68,6 +70,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
         mediaAssets: sanitizeMediaAssets(data.mediaAssets),
         manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
+        travelGachaDraws: sanitizeTravelGachaDraws(data.travelGachaDraws),
         rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
         userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
         userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -100,6 +103,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
       mediaAssets: sanitizeMediaAssets(data.mediaAssets),
       manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
+      travelGachaDraws: sanitizeTravelGachaDraws(data.travelGachaDraws),
       rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
       userRpgTitles: uniqueBy(arrayOrEmpty<UserRpgTitle>(data.userRpgTitles), (title) => title.titleId),
       userRpgAchievements: arrayOrEmpty<UserRpgAchievement>(data.userRpgAchievements),
@@ -133,6 +137,7 @@ function emptyBackup(data: Partial<TravelLogBackup['data']>): TravelLogBackup {
       scrapbookBlocks: data.scrapbookBlocks ?? [],
       mediaAssets: data.mediaAssets ?? [],
       manualTimelineEntries: data.manualTimelineEntries ?? [],
+      travelGachaDraws: data.travelGachaDraws ?? [],
       rpgExperienceEntries: data.rpgExperienceEntries ?? [],
       userRpgTitles: data.userRpgTitles ?? [],
       userRpgAchievements: data.userRpgAchievements ?? [],
@@ -239,6 +244,23 @@ function sanitizeManualTimelineEntries(value: unknown): ManualTimelineEntry[] {
       && entry.sourceType === 'manual',
     ),
     (entry) => entry.id,
+  );
+}
+
+function sanitizeTravelGachaDraws(value: unknown): TravelGachaDraw[] {
+  const modes = ['random', 'condition', 'unvisited', 'wishlist', 'castle', 'nearby', 'revisit', 'omakase'];
+  return uniqueBy(
+    arrayOrEmpty<TravelGachaDraw>(value).filter((draw) =>
+      Boolean(draw.id)
+      && modes.includes(draw.mode)
+      && Boolean(draw.selectedCandidateId)
+      && Boolean(draw.candidateSnapshot?.id)
+      && Number.isFinite(draw.candidateCount)
+      && draw.candidateCount >= 0
+      && Number.isFinite(draw.score)
+      && Boolean(draw.drawnAt),
+    ),
+    (draw) => draw.id,
   );
 }
 

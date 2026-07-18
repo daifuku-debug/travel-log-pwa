@@ -196,8 +196,8 @@ a {
 
 .bottom-nav__inner {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  max-width: 720px;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  max-width: 780px;
   margin: 0 auto;
 }
 
@@ -834,6 +834,92 @@ a {
   color: #697577;
 }
 
+.travel-gacha-hero h1::after {
+  content: " ◎";
+  color: #d9793d;
+}
+
+.travel-gacha-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(280px, 1.05fr);
+  gap: 14px;
+}
+
+.travel-gacha-wide {
+  grid-column: 1 / -1;
+}
+
+.travel-gacha-result-card {
+  min-height: 360px;
+}
+
+.option-fieldset {
+  border: 1px solid #ded7cc;
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+}
+
+.option-fieldset legend {
+  padding: 0 6px;
+  color: #4d5a5c;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+  gap: 8px;
+}
+
+.travel-ticket {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d6cab8;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 253, 249, 0) 0 16px, rgba(214, 202, 184, 0.45) 16px 17px, rgba(255, 253, 249, 0) 17px),
+    #fffdf9;
+  padding: 16px 16px 16px 28px;
+}
+
+.travel-ticket__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #697577;
+  font-size: 0.86rem;
+}
+
+.travel-ticket__header strong {
+  border: 1px solid #d9d2c7;
+  border-radius: 999px;
+  background: #f8f2e8;
+  color: #8a552a;
+  padding: 4px 9px;
+}
+
+.travel-ticket h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.travel-ticket p {
+  margin: 0;
+  color: #4d5a5c;
+  line-height: 1.6;
+}
+
+.travel-gacha-button {
+  min-width: 140px;
+}
+
+.travel-candidate-list {
+  margin-top: 0;
+}
+
 .time-map {
   position: relative;
   min-height: 260px;
@@ -1050,6 +1136,10 @@ a {
   }
 
   .time-machine-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .travel-gacha-layout {
     grid-template-columns: 1fr;
   }
 

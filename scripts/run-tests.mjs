@@ -53,6 +53,10 @@ const timeMachinePage = await readFile(new URL('../src/pages/TimeMachinePage.tsx
 const localTimeMachineRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTimeMachineRepository.ts', import.meta.url), 'utf8');
 const routerSource = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
 const tripDetailPage = await readFile(new URL('../src/pages/TripDetailPage.tsx', import.meta.url), 'utf8');
+const travelGachaModel = await readFile(new URL('../src/domain/models/travelGacha.ts', import.meta.url), 'utf8');
+const travelGachaService = await readFile(new URL('../src/features/travelGacha/travelGachaService.ts', import.meta.url), 'utf8');
+const travelGachaPage = await readFile(new URL('../src/pages/TravelGachaPage.tsx', import.meta.url), 'utf8');
+const localTravelGachaRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTravelGachaRepository.ts', import.meta.url), 'utf8');
 
 async function test(name, fn) {
   try {
@@ -260,6 +264,85 @@ await test('JSONエクスポート/インポートでタイムマシン手動補
   assert.equal(normalized.data.manualTimelineEntries.length, 1);
 });
 
+await test('JSONエクスポート/インポートで旅ガチャ履歴が復元できる', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 7,
+    data: {
+      travelGachaDraws: [
+        {
+          id: 'travel-gacha-draw-1',
+          userId: 'local-user',
+          mode: 'condition',
+          settingsSnapshot: {
+            departureLabel: '東京',
+            tripDurationDays: 1,
+            stayType: 'dayTrip',
+            maxBudget: 15000,
+            maxOneWayTravelMinutes: 180,
+            transportModes: ['train'],
+            candidateScope: 'all',
+            travelStyleTags: [],
+            regionCodes: [],
+            prefectureCodes: [],
+            prioritizeUnvisited: true,
+            prioritizeWishlist: true,
+            includeVisited: true,
+            includeRecentlyVisited: true,
+            includeRecentlyDrawn: false,
+            randomnessLevel: 'balanced',
+            candidateLimit: 30,
+          },
+          selectedCandidateId: 'prefecture:13',
+          candidateSnapshot: {
+            id: 'prefecture:13',
+            sourceType: 'prefecture',
+            sourceId: '13',
+            name: '東京都旅',
+            travelStyleTags: ['city_walk'],
+            estimatedTravelTimeMinutes: 60,
+            recommendedTransportModes: ['train'],
+            recommendedStayType: 'dayTrip',
+            minimumRecommendedHours: 4,
+            isVisited: false,
+            visitCount: 0,
+            isWishlist: false,
+            isFavorite: false,
+            collectionIds: [],
+            sourcePriority: 6,
+            eligibility: { eligible: true, rejectedReasons: [], suggestions: [] },
+            costEstimate: {
+              transportCost: 1200,
+              accommodationCost: 0,
+              foodCost: 2500,
+              activityCost: 1800,
+              localTransportCost: 1200,
+              contingencyCost: 2000,
+              totalEstimatedCost: 9900,
+              minTotalEstimatedCost: 7920,
+              maxTotalEstimatedCost: 12375,
+              estimatePrecision: 'rough',
+              estimateReasons: ['概算'],
+            },
+            score: 40,
+            scoreReasons: ['条件に合う候補です。'],
+          },
+          candidateCount: 1,
+          score: 40,
+          scoreReasons: ['条件に合う候補です。'],
+          drawnAt: '2026-07-18T00:00:00.000Z',
+          createdAt: '2026-07-18T00:00:00.000Z',
+          updatedAt: '2026-07-18T00:00:00.000Z',
+          syncStatus: 'pending',
+        },
+      ],
+    },
+  });
+  assert.equal(normalized.schemaVersion, 7);
+  assert.equal(normalized.data.travelGachaDraws.length, 1);
+  assert.equal(normalized.data.travelGachaDraws[0].selectedCandidateId, 'prefecture:13');
+});
+
 await test('旧形式バックアップでも日本制覇マップデータなしでエラーにならない', () => {
   const oldObject = normalizeBackupPayload({ trips: [{ id: 'trip-1', title: '旧バックアップ' }] });
   const oldArray = normalizeBackupPayload([{ id: 'trip-2', title: 'さらに古い形式' }]);
@@ -267,8 +350,48 @@ await test('旧形式バックアップでも日本制覇マップデータな�
   assert.equal(oldObject.data.castleVisitSummaries.length, 0);
   assert.equal(oldObject.data.scrapbooks.length, 0);
   assert.equal(oldObject.data.manualTimelineEntries.length, 0);
+  assert.equal(oldObject.data.travelGachaDraws.length, 0);
   assert.equal(oldObject.data.trips.length, 1);
   assert.equal(oldArray.data.trips.length, 1);
+});
+
+await test('旅ガチャは候補モデルと抽選履歴モデルを分離する', () => {
+  assert.match(travelGachaModel, /interface TravelCandidate /);
+  assert.match(travelGachaModel, /interface TravelGachaDraw extends BaseEntity/);
+  assert.match(travelGachaModel, /TravelGachaRandomnessLevel = 'realistic' \| 'balanced' \| 'adventure' \| 'chaos'/);
+});
+
+await test('旅ガチャ候補は既存データから生成し外部APIに依存しない', () => {
+  assert.match(travelGachaService, /fromPrefecture/);
+  assert.match(travelGachaService, /fromWishlist/);
+  assert.match(travelGachaService, /fromPlaceVisit/);
+  assert.match(travelGachaService, /fromCastle/);
+  assert.match(travelGachaService, /fromCollectionItem/);
+  assert.match(travelGachaService, /pickWeightedCandidate/);
+  assert.match(travelGachaService, /interface RandomProvider/);
+  assert.doesNotMatch(travelGachaService, /fetch\(|getCurrentPosition|API_KEY/);
+});
+
+await test('旅ガチャ画面とルート導線がある', () => {
+  assert.match(routerSource, /travel-gacha/);
+  assert.match(travelGachaPage, /旅ガチャ/);
+  assert.match(travelGachaPage, /候補を見る/);
+  assert.match(travelGachaPage, /旅ガチャを引く/);
+  assert.match(travelGachaPage, /この旅に決める/);
+  assert.match(travelGachaPage, /もう一度引く/);
+});
+
+await test('旅ガチャ履歴Repositoryは端末内保存を使う', () => {
+  assert.match(localDbSource, /travelGachaDraws/);
+  assert.match(localTravelGachaRepository, /LocalTravelGachaDrawRepository/);
+  assert.match(localTravelGachaRepository, /listRecent/);
+});
+
+await test('旅ガチャRPG経験値はsourceKeyで二重付与を防ぐ設計', () => {
+  assert.match(travelGachaService, /travel-gacha-first-draw/);
+  assert.match(travelGachaService, /travel-gacha-accepted:\$\{draw\.id\}/);
+  assert.equal(experienceRules.travelGachaFirstDraw, 10);
+  assert.equal(experienceRules.travelGachaAccepted, 20);
 });
 
 await test('タイムマシンは表示用TimelineEventと手動補完モデルを分離する', () => {

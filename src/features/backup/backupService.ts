@@ -11,6 +11,7 @@ import type {
 } from '../../domain/models/rpg';
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
 import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
+import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 import { clearStore, putMany, readAll } from '../../infrastructure/localDb/db';
@@ -35,6 +36,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       scrapbookBlocks,
       mediaAssets,
       manualTimelineEntries,
+      travelGachaDraws,
       rpgExperienceEntries,
       userRpgTitles,
       userRpgAchievements,
@@ -57,6 +59,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       readAll<ScrapbookBlock>('scrapbookBlocks'),
       readAll<MediaAsset>('mediaAssets'),
       readAll<ManualTimelineEntry>('manualTimelineEntries'),
+      readAll<TravelGachaDraw>('travelGachaDraws'),
       readAll<RpgExperienceEntry>('rpgExperienceEntries'),
       readAll<UserRpgTitle>('userRpgTitles'),
       readAll<UserRpgAchievement>('userRpgAchievements'),
@@ -85,6 +88,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
         scrapbookBlocks,
         mediaAssets,
         manualTimelineEntries,
+        travelGachaDraws,
         rpgExperienceEntries,
         userRpgTitles,
         userRpgAchievements,
@@ -117,6 +121,7 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       clearStore('scrapbookBlocks'),
       clearStore('mediaAssets'),
       clearStore('manualTimelineEntries'),
+      clearStore('travelGachaDraws'),
       clearStore('rpgExperienceEntries'),
       clearStore('userRpgTitles'),
       clearStore('userRpgAchievements'),
@@ -141,6 +146,7 @@ export async function restoreBackupPayload(payload: unknown): Promise<void> {
       putMany('scrapbookBlocks', normalized.data.scrapbookBlocks),
       putMany('mediaAssets', normalized.data.mediaAssets),
       putMany('manualTimelineEntries', normalized.data.manualTimelineEntries),
+      putMany('travelGachaDraws', normalized.data.travelGachaDraws),
       putMany('rpgExperienceEntries', normalized.data.rpgExperienceEntries),
       putMany('userRpgTitles', normalized.data.userRpgTitles),
       putMany('userRpgAchievements', normalized.data.userRpgAchievements),

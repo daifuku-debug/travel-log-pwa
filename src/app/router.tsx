@@ -16,6 +16,7 @@ import { TripEditPage } from '../pages/TripEditPage';
 import { TripResultPage } from '../pages/TripResultPage';
 import { TripsPage } from '../pages/TripsPage';
 import { TimeMachinePage } from '../pages/TimeMachinePage';
+import { TravelGachaPage } from '../pages/TravelGachaPage';
 import { WishlistPage } from '../pages/WishlistPage';
 
 export const router = createBrowserRouter(
@@ -34,6 +35,7 @@ export const router = createBrowserRouter(
         { path: 'japan-map', element: <JapanConquestPage /> },
         { path: 'castles', element: <CastleCollectionPage /> },
         { path: 'time-machine', element: <TimeMachinePage /> },
+        { path: 'travel-gacha', element: <TravelGachaPage /> },
         { path: 'rpg', element: <RpgProfilePage /> },
         { path: 'rpg/achievements', element: <RpgAchievementsPage /> },
         { path: 'rpg/titles', element: <RpgTitlesPage /> },

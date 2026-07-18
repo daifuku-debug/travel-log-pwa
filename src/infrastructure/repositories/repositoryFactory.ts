@@ -21,6 +21,7 @@ import {
 } from '../localDb/LocalRpgRepository';
 import { LocalPlaceVisitRepository, LocalTripRepository } from '../localDb/LocalTripRepository';
 import { LocalManualTimelineEntryRepository } from '../localDb/LocalTimeMachineRepository';
+import { LocalTravelGachaDrawRepository } from '../localDb/LocalTravelGachaRepository';
 import {
   LocalMediaAssetBlobRepository,
   LocalMediaAssetRepository,
@@ -52,6 +53,7 @@ export const repositories = {
   mediaAssets: new LocalMediaAssetRepository(),
   mediaAssetBlobs: new LocalMediaAssetBlobRepository(),
   manualTimelineEntries: new LocalManualTimelineEntryRepository(),
+  travelGachaDraws: new LocalTravelGachaDrawRepository(),
   rpgExperienceEntries: new LocalRpgExperienceRepository(),
   rpgTitleMaster: new StaticRpgTitleMasterRepository(),
   userRpgTitles: new LocalUserRpgTitleRepository(),

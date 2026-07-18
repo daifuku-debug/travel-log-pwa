@@ -6,6 +6,7 @@ export type RpgSourceType =
   | 'collection'
   | 'castle'
   | 'scrapbook'
+  | 'travelGacha'
   | 'achievement'
   | 'quest'
   | 'manual'

@@ -6,6 +6,7 @@ const navItems = [
   { to: '/japan-map', label: '地図', icon: '◇' },
   { to: '/castles', label: '城', icon: '♜' },
   { to: '/time-machine', label: '時間', icon: '◷' },
+  { to: '/travel-gacha', label: 'ガチャ', icon: '◎' },
   { to: '/rpg', label: 'RPG', icon: '★' },
   { to: '/collections', label: '収集', icon: '▣' },
   { to: '/wishlist', label: '欲しいもの', icon: '＋' },

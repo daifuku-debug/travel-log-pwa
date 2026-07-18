@@ -1,7 +1,7 @@
 import { AppError } from '../../shared/errors';
 
 const DB_NAME = 'travel-log-local-db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 export type StoreName =
   | 'trips'
@@ -20,6 +20,7 @@ export type StoreName =
   | 'mediaAssets'
   | 'mediaAssetBlobs'
   | 'manualTimelineEntries'
+  | 'travelGachaDraws'
   | 'rpgExperienceEntries'
   | 'userRpgTitles'
   | 'userRpgAchievements'
@@ -46,6 +47,7 @@ const STORE_NAMES: StoreName[] = [
   'mediaAssets',
   'mediaAssetBlobs',
   'manualTimelineEntries',
+  'travelGachaDraws',
   'rpgExperienceEntries',
   'userRpgTitles',
   'userRpgAchievements',
