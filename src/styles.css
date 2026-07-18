@@ -417,7 +417,7 @@ a {
   cursor: pointer;
   filter: url("#map-soft-shadow");
   stroke: #f8fcf9;
-  stroke-width: 1.15;
+  stroke-width: 0.62;
   transition: filter 120ms ease, stroke-width 120ms ease;
 }
 
@@ -426,13 +426,13 @@ a {
   filter: brightness(1.03) url("#map-soft-shadow");
   outline: none;
   stroke: #253b40;
-  stroke-width: 2.2;
+  stroke-width: 1.35;
 }
 
 .prefecture-shape.selected {
   filter: brightness(1.06) url("#map-soft-shadow");
   stroke: #223237;
-  stroke-width: 3;
+  stroke-width: 1.8;
 }
 
 .status-unvisited {

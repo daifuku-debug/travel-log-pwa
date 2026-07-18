@@ -31,11 +31,12 @@ const PADDING = 24;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
+const DEFAULT_VIEWPORT = { scale: 1.22, x: -58, y: -48 };
 
 export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
   const [geoJson, setGeoJson] = useState<GeoJson | undefined>();
   const [error, setError] = useState<string | undefined>();
-  const [viewport, setViewport] = useState({ scale: 1, x: 0, y: 0 });
+  const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
   const [dragging, setDragging] = useState(false);
   const dragStartRef = useRef<{ pointerId: number; x: number; y: number; viewportX: number; viewportY: number } | undefined>(undefined);
   const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -182,7 +183,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   return (
     <>
       <div className="map-toolbar" aria-label="地図操作">
-        <button className="button" type="button" onClick={() => setViewport({ scale: 1, x: 0, y: 0 })}>
+        <button className="button" type="button" onClick={() => setViewport(DEFAULT_VIEWPORT)}>
           リセット
         </button>
         <span className="muted">ピンチで拡大縮小、ドラッグで移動できます</span>

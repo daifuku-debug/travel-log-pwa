@@ -70,8 +70,8 @@ function HomeIcon() {
 function SuitcaseIcon() {
   return (
     <NavSvg>
-      <rect className="nav-fill-soft" x="5.5" y="10.5" width="21" height="16" rx="4" />
-      <path className="nav-stroke" d="M12 10.5V8.8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.7M10 16.5h12M9.5 26.5v-16h13" />
+      <rect className="nav-fill-soft" x="6.5" y="10.5" width="19" height="15" rx="4" />
+      <path className="nav-stroke" d="M12 10.5V8.8a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.7M10.5 16.5h11M10 25.5v-15h12" />
     </NavSvg>
   );
 }
@@ -88,8 +88,9 @@ function MapIcon() {
 function CastleIcon() {
   return (
     <NavSvg>
-      <path className="nav-fill-soft" d="M7 12h4V8h4v4h2V8h4v4h4v15H7Z" />
-      <path className="nav-stroke" d="M7 27V12h4V8h4v4h2V8h4v4h4v15M11 27v-6a5 5 0 0 1 10 0v6M7 16h18" />
+      <path className="nav-fill-soft" d="M6.5 26.5h19l-1.4-9.2H7.9Z" />
+      <path className="nav-fill-accent" d="M10 13.5h12l-2.2-5.2h-7.6Z" />
+      <path className="nav-stroke" d="M6.5 26.5h19M8 17.3h16M10 13.5h12l-2.2-5.2h-7.6ZM11.2 17.3l-.9 9.2m10.5-9.2.9 9.2M13 22h6M15 8.3V5.8h3.5" />
     </NavSvg>
   );
 }
@@ -106,9 +107,10 @@ function ClockIcon() {
 function GachaIcon() {
   return (
     <NavSvg>
-      <circle className="nav-fill-soft" cx="16" cy="11.5" r="6.5" />
-      <path className="nav-fill-accent" d="M9 17h14l-1.6 9.5H10.6Z" />
-      <path className="nav-stroke" d="M9 17h14l-1.6 9.5H10.6ZM11 11.5h10M16 5v13.5M12.5 23h7" />
+      <rect className="nav-fill-soft" x="8" y="12.5" width="16" height="13.5" rx="3.5" />
+      <circle className="nav-fill-accent" cx="16" cy="10.5" r="6" />
+      <circle className="nav-fill-soft" cx="16" cy="19" r="2.7" />
+      <path className="nav-stroke" d="M10.5 12.5h11M8 16h16M8 12.5h16V26H8ZM10 26v2m12-2v2M16 4.5a6 6 0 0 1 6 6v2h-12v-2a6 6 0 0 1 6-6ZM13.2 19h5.6" />
     </NavSvg>
   );
 }
@@ -116,8 +118,9 @@ function GachaIcon() {
 function StarIcon() {
   return (
     <NavSvg>
-      <path className="nav-fill-soft" d="m16 5.5 3.2 6.5 7.1 1-5.1 5 1.2 7.1-6.4-3.4-6.4 3.4 1.2-7.1-5.1-5 7.1-1Z" />
-      <path className="nav-stroke" d="m16 5.5 3.2 6.5 7.1 1-5.1 5 1.2 7.1-6.4-3.4-6.4 3.4 1.2-7.1-5.1-5 7.1-1Z" />
+      <path className="nav-fill-soft" d="M9 27v-6.2a7 7 0 0 1 14 0V27Z" />
+      <path className="nav-fill-accent" d="M11.2 9.4 16 4.8l4.8 4.6-1.2 5.2h-7.2Z" />
+      <path className="nav-stroke" d="M9 27v-6.2a7 7 0 0 1 14 0V27M12.4 14.6h7.2l1.2-5.2L16 4.8l-4.8 4.6ZM13 20.5h6M16 14.6v3.2M8.3 11.2l3.4 1.6m12-1.6-3.4 1.6" />
     </NavSvg>
   );
 }
