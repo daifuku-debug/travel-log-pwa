@@ -232,6 +232,16 @@ await test('日本制覇マップは地図内だけをズームできる', () =>
   assert.match(mapComponent, /event\.preventDefault\(\)/);
   assert.match(mapComponent, /viewport\.scale/);
   assert.match(mapComponent, /onPointerMove=\{handlePointerMove\}/);
+  assert.match(mapComponent, /createPinchStart/);
+  assert.match(mapComponent, /measurePinch/);
+  assert.doesNotMatch(mapComponent, />\s*拡大\s*<\/button>/);
+  assert.doesNotMatch(mapComponent, />\s*縮小\s*<\/button>/);
+});
+
+await test('下部ナビゲーションにタブアイコンがある', async () => {
+  const appLayout = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
+  assert.match(appLayout, /bottom-nav__icon/);
+  assert.match(appLayout, /icon:/);
 });
 
 await test('城マスターはバンドル同梱でPWAオフライン閲覧できる設計', () => {

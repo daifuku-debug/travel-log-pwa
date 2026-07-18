@@ -1,14 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const navItems = [
-  { to: '/', label: 'ホーム', end: true },
-  { to: '/trips', label: '旅行' },
-  { to: '/japan-map', label: '地図' },
-  { to: '/castles', label: '城' },
-  { to: '/rpg', label: 'RPG' },
-  { to: '/collections', label: '収集' },
-  { to: '/wishlist', label: '欲しいもの' },
-  { to: '/settings', label: '設定' },
+  { to: '/', label: 'ホーム', icon: '⌂', end: true },
+  { to: '/trips', label: '旅行', icon: '✈' },
+  { to: '/japan-map', label: '地図', icon: '◇' },
+  { to: '/castles', label: '城', icon: '♜' },
+  { to: '/rpg', label: 'RPG', icon: '★' },
+  { to: '/collections', label: '収集', icon: '▣' },
+  { to: '/wishlist', label: '欲しいもの', icon: '＋' },
+  { to: '/settings', label: '設定', icon: '⚙' },
 ];
 
 export function AppLayout() {
@@ -37,7 +37,8 @@ export function AppLayout() {
               end={item.end}
               className={({ isActive }) => (isActive ? 'bottom-nav__item active' : 'bottom-nav__item')}
             >
-              {item.label}
+              <span className="bottom-nav__icon" aria-hidden="true">{item.icon}</span>
+              <span className="bottom-nav__label">{item.label}</span>
             </NavLink>
           ))}
         </div>

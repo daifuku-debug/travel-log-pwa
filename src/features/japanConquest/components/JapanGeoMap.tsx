@@ -37,6 +37,10 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   const [viewport, setViewport] = useState({ scale: 1, x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStartRef = useRef<{ pointerId: number; x: number; y: number; viewportX: number; viewportY: number } | undefined>(undefined);
+  const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStartRef = useRef<
+    { distance: number; centerX: number; centerY: number; scale: number; viewportX: number; viewportY: number } | undefined
+  >(undefined);
   const suppressClickRef = useRef(false);
   const viewByCode = useMemo(
     () => new Map(views.map((view) => [view.master.code, view])),
@@ -107,6 +111,14 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    suppressClickRef.current = false;
+    if (activePointersRef.current.size >= 2) {
+      dragStartRef.current = undefined;
+      pinchStartRef.current = createPinchStart(event.currentTarget, activePointersRef.current, viewport);
+      setDragging(false);
+      return;
+    }
     dragStartRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -114,11 +126,26 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
       viewportX: viewport.x,
       viewportY: viewport.y,
     };
-    suppressClickRef.current = false;
     setDragging(true);
   }
 
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    if (activePointersRef.current.has(event.pointerId)) {
+      activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (activePointersRef.current.size >= 2 && pinchStartRef.current) {
+      suppressClickRef.current = true;
+      const pinch = measurePinch(event.currentTarget, activePointersRef.current);
+      if (!pinch) return;
+      const nextScale = clamp(pinchStartRef.current.scale * (pinch.distance / pinchStartRef.current.distance), MIN_ZOOM, MAX_ZOOM);
+      const ratio = nextScale / pinchStartRef.current.scale;
+      setViewport(clampViewport({
+        scale: nextScale,
+        x: pinch.centerX - (pinchStartRef.current.centerX - pinchStartRef.current.viewportX) * ratio,
+        y: pinch.centerY - (pinchStartRef.current.centerY - pinchStartRef.current.viewportY) * ratio,
+      }));
+      return;
+    }
     const start = dragStartRef.current;
     if (!start || start.pointerId !== event.pointerId) return;
     if (Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y) > 4) {
@@ -133,6 +160,10 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   }
 
   function handlePointerUp(event: PointerEvent<SVGSVGElement>) {
+    activePointersRef.current.delete(event.pointerId);
+    if (activePointersRef.current.size < 2) {
+      pinchStartRef.current = undefined;
+    }
     if (dragStartRef.current?.pointerId === event.pointerId) {
       dragStartRef.current = undefined;
       setDragging(false);
@@ -150,16 +181,10 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   return (
     <>
       <div className="map-toolbar" aria-label="地図操作">
-        <button className="button" type="button" onClick={() => zoomAt(viewport.scale * 1.35)}>
-          拡大
-        </button>
-        <button className="button" type="button" onClick={() => zoomAt(viewport.scale / 1.35)}>
-          縮小
-        </button>
         <button className="button" type="button" onClick={() => setViewport({ scale: 1, x: 0, y: 0 })}>
           リセット
         </button>
-        <span className="muted">地図上でスクロール/ドラッグできます</span>
+        <span className="muted">ピンチで拡大縮小、ドラッグで移動できます</span>
       </div>
       <div className="map-shell">
       <svg
@@ -268,5 +293,32 @@ function clientMovementToSvg(svg: SVGSVGElement, deltaX: number, deltaY: number)
   return {
     x: (deltaX / rect.width) * MAP_WIDTH,
     y: (deltaY / rect.height) * MAP_HEIGHT,
+  };
+}
+
+function measurePinch(svg: SVGSVGElement, pointers: Map<number, { x: number; y: number }>) {
+  const [first, second] = Array.from(pointers.values());
+  if (!first || !second) return undefined;
+  const firstPoint = svgPointFromClient(svg, first.x, first.y);
+  const secondPoint = svgPointFromClient(svg, second.x, second.y);
+  return {
+    distance: Math.hypot(secondPoint.x - firstPoint.x, secondPoint.y - firstPoint.y),
+    centerX: (firstPoint.x + secondPoint.x) / 2,
+    centerY: (firstPoint.y + secondPoint.y) / 2,
+  };
+}
+
+function createPinchStart(
+  svg: SVGSVGElement,
+  pointers: Map<number, { x: number; y: number }>,
+  viewport: { scale: number; x: number; y: number },
+) {
+  const pinch = measurePinch(svg, pointers);
+  if (!pinch) return undefined;
+  return {
+    ...pinch,
+    scale: viewport.scale,
+    viewportX: viewport.x,
+    viewportY: viewport.y,
   };
 }
