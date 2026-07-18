@@ -12,6 +12,7 @@ export const STATUS_LABELS: Record<PrefectureVisitStatus, string> = {
   passed: '通過',
   visited: '訪問',
   stayed: '宿泊',
+  lived: '居住',
 };
 
 export const REGION_LABELS: Record<JapanRegion, string> = {
@@ -30,6 +31,7 @@ const STATUS_PRIORITY: Record<PrefectureVisitStatus, number> = {
   passed: 1,
   visited: 2,
   stayed: 3,
+  lived: 4,
 };
 
 export interface PrefectureView {
@@ -40,11 +42,13 @@ export interface PrefectureView {
 export interface JapanConquestSummary {
   visitedCount: number;
   stayedCount: number;
+  livedCount: number;
   passedOnlyCount: number;
   reachedCount: number;
   unvisitedCount: number;
   visitRate: number;
   stayRate: number;
+  livedRate: number;
   reachedRate: number;
 }
 
@@ -99,8 +103,9 @@ export function mergePrefectureViews(
 }
 
 export function calculateJapanConquestSummary(views: PrefectureView[]): JapanConquestSummary {
-  const visitedCount = views.filter(({ visit }) => visit.status === 'visited' || visit.status === 'stayed').length;
-  const stayedCount = views.filter(({ visit }) => visit.status === 'stayed').length;
+  const visitedCount = views.filter(({ visit }) => visit.status === 'visited' || visit.status === 'stayed' || visit.status === 'lived').length;
+  const stayedCount = views.filter(({ visit }) => visit.status === 'stayed' || visit.status === 'lived').length;
+  const livedCount = views.filter(({ visit }) => visit.status === 'lived').length;
   const passedOnlyCount = views.filter(({ visit }) => visit.status === 'passed').length;
   const reachedCount = views.filter(({ visit }) => visit.status !== 'unvisited').length;
   const unvisitedCount = PREFECTURE_TOTAL - reachedCount;
@@ -108,11 +113,13 @@ export function calculateJapanConquestSummary(views: PrefectureView[]): JapanCon
   return {
     visitedCount,
     stayedCount,
+    livedCount,
     passedOnlyCount,
     reachedCount,
     unvisitedCount,
     visitRate: roundRate(visitedCount),
     stayRate: roundRate(stayedCount),
+    livedRate: roundRate(livedCount),
     reachedRate: roundRate(reachedCount),
   };
 }

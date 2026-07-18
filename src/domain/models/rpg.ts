@@ -21,6 +21,7 @@ export type RpgConditionType =
   | 'placeVisitCount'
   | 'prefectureVisitedCount'
   | 'prefectureStayedCount'
+  | 'prefectureLivedCount'
   | 'collectionCompletedCount'
   | 'collectionCategoryCompletedCount'
   | 'castleVisitedCount'

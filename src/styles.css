@@ -314,7 +314,7 @@ a {
 }
 
 .summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .map-card {
@@ -327,12 +327,26 @@ a {
   border: 1px solid #ded7cc;
   border-radius: 8px;
   background: #eef6f6;
+  touch-action: none;
+  user-select: none;
+}
+
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .japan-map {
   display: block;
   width: 100%;
   max-height: 72vh;
+  cursor: grab;
+}
+
+.japan-map.dragging {
+  cursor: grabbing;
 }
 
 .prefecture-shape {
@@ -377,6 +391,12 @@ a {
   stroke-width: 1.8;
 }
 
+.status-lived {
+  fill: #5b4d99;
+  color: #fff;
+  stroke-width: 2;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -406,6 +426,12 @@ a {
 
 .status-badge.status-stayed {
   background: #2f6f73;
+  color: #fff;
+}
+
+.status-badge.status-lived {
+  border-color: #5b4d99;
+  background: #5b4d99;
   color: #fff;
 }
 

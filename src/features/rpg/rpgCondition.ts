@@ -19,6 +19,8 @@ export function getConditionValue(
       return stats.prefectureVisitedCount;
     case 'prefectureStayedCount':
       return stats.prefectureStayedCount;
+    case 'prefectureLivedCount':
+      return stats.prefectureLivedCount;
     case 'collectionCompletedCount':
       return stats.collectionCompletedCount;
     case 'collectionCategoryCompletedCount':

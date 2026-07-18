@@ -47,6 +47,7 @@ export function JapanConquestPage() {
           <div className="grid grid--two summary-grid">
             <SummaryCard label="訪問済み" value={`${data.summary.visitedCount}`} sub={`${data.summary.visitRate.toFixed(1)}%`} />
             <SummaryCard label="宿泊済み" value={`${data.summary.stayedCount}`} sub={`${data.summary.stayRate.toFixed(1)}%`} />
+            <SummaryCard label="居住経験" value={`${data.summary.livedCount}`} sub={`${data.summary.livedRate.toFixed(1)}%`} />
             <SummaryCard label="通過のみ" value={`${data.summary.passedOnlyCount}`} sub={`到達率 ${data.summary.reachedRate.toFixed(1)}%`} />
             <SummaryCard label="未訪問" value={`${data.summary.unvisitedCount}`} sub="これから" />
           </div>

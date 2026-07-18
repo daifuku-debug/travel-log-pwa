@@ -9,6 +9,7 @@ export interface TravelStats {
   placeVisitCount: number;
   prefectureVisitedCount: number;
   prefectureStayedCount: number;
+  prefectureLivedCount: number;
   collectionCompletedCount: number;
   castleVisitedCount: number;
   castleJapanese100VisitedCount: number;
@@ -42,8 +43,9 @@ export function buildTravelStats(input: {
     dayTripCompletedCount: input.tripTypes.filter((type) => type === 'dayTrip').length,
     overnightTripCompletedCount: input.tripTypes.filter((type) => type === 'overnight').length,
     placeVisitCount: input.placeVisitCount,
-    prefectureVisitedCount: input.prefectures.filter((visit) => visit.status === 'visited' || visit.status === 'stayed').length,
-    prefectureStayedCount: input.prefectures.filter((visit) => visit.status === 'stayed').length,
+    prefectureVisitedCount: input.prefectures.filter((visit) => visit.status === 'visited' || visit.status === 'stayed' || visit.status === 'lived').length,
+    prefectureStayedCount: input.prefectures.filter((visit) => visit.status === 'stayed' || visit.status === 'lived').length,
+    prefectureLivedCount: input.prefectures.filter((visit) => visit.status === 'lived').length,
     collectionCompletedCount: input.collections.reduce((sum, collection) => sum + collection.visitedCount, 0),
     castleVisitedCount: visitedCastles.length,
     castleJapanese100VisitedCount: visitedCastles.filter((summary) => input.castleSeriesById?.get(summary.castleId) === 'japanese_100_castles').length,

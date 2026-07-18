@@ -116,7 +116,7 @@ export async function grantCollectionItemExperience(itemId: string, itemName: st
 
 export async function grantPrefectureExperience(
   prefectureCode: string,
-  status: 'unvisited' | 'passed' | 'visited' | 'stayed',
+  status: 'unvisited' | 'passed' | 'visited' | 'stayed' | 'lived',
   visitCount: number,
 ): Promise<void> {
   if (status === 'unvisited' || status === 'passed') return;
@@ -128,13 +128,23 @@ export async function grantPrefectureExperience(
     reason: `${prefectureCode} を初訪問`,
     metadata: { prefectureCode, status },
   });
-  if (status === 'stayed') {
+  if (status === 'stayed' || status === 'lived') {
     await grantExperienceOnce({
       amount: experienceRules.prefectureFirstStay,
       sourceType: 'prefecture',
       sourceId: prefectureCode,
       sourceKey: `prefecture-first-stay:${prefectureCode}`,
       reason: `${prefectureCode} に初宿泊`,
+      metadata: { prefectureCode, status },
+    });
+  }
+  if (status === 'lived') {
+    await grantExperienceOnce({
+      amount: experienceRules.prefectureFirstLive,
+      sourceType: 'prefecture',
+      sourceId: prefectureCode,
+      sourceKey: `prefecture-first-live:${prefectureCode}`,
+      reason: `${prefectureCode} に居住経験`,
       metadata: { prefectureCode, status },
     });
   }
@@ -204,7 +214,7 @@ async function grantExistingDataExperience(): Promise<void> {
     }
   }
 
-  const visitedPrefectureCount = prefectureVisits.filter((visit) => visit.status === 'visited' || visit.status === 'stayed').length;
+  const visitedPrefectureCount = prefectureVisits.filter((visit) => visit.status === 'visited' || visit.status === 'stayed' || visit.status === 'lived').length;
   for (const [threshold, amount] of Object.entries(experienceRules.japanConquestMilestones)) {
     if (visitedPrefectureCount >= Number(threshold)) {
       await grantExperienceOnce({
