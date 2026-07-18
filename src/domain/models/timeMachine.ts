@@ -70,10 +70,16 @@ export interface LocationCandidate {
   longitude?: number;
   confidence: TimelineConfidence;
   reasons: string[];
+  supportingEventIds: EntityId[];
+  sourcePriorities: number[];
+  distanceMinutes?: number;
 }
+
+export type LocationInferenceMode = 'exact_match' | 'between_same_place' | 'moving_between_places' | 'candidate_list' | 'insufficient_data';
 
 export interface LocationInferenceResult {
   queryAt?: IsoDateTimeString;
+  mode: LocationInferenceMode;
   primaryCandidate?: LocationCandidate;
   candidateLocations: LocationCandidate[];
   confidence: TimelineConfidence;

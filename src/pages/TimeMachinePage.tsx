@@ -24,6 +24,14 @@ const CONFIDENCE_LABELS: Record<TimelineConfidence, string> = {
   unknown: '記録不足',
 };
 
+const INFERENCE_MODE_LABELS = {
+  exact_match: '指定時刻付近の記録',
+  between_same_place: '前後の記録が同じ場所',
+  moving_between_places: '移動中の可能性',
+  candidate_list: 'この日の候補地',
+  insufficient_data: '記録不足',
+};
+
 export function TimeMachinePage() {
   const [query, setQuery] = useState<TimeMachineQuery>(getDefaultTimeMachineQuery);
   const [reloadKey, setReloadKey] = useState(0);
@@ -110,12 +118,30 @@ export function TimeMachinePage() {
                 <span className={`confidence-badge confidence-${data.locationInference.confidence}`}>
                   {CONFIDENCE_LABELS[data.locationInference.confidence]}
                 </span>
+                <span className="inference-mode">{INFERENCE_MODE_LABELS[data.locationInference.mode]}</span>
                 <ul className="muted-list">
                   {data.locationInference.reasons.map((reason) => <li key={reason}>{reason}</li>)}
                 </ul>
                 {data.locationInference.beforeEvent && <p className="muted">前の地点: {data.locationInference.beforeEvent.title}</p>}
                 {data.locationInference.afterEvent && <p className="muted">次の地点: {data.locationInference.afterEvent.title}</p>}
                 {data.locationInference.conflictingSources.length > 0 && <p className="muted">前後の候補地が異なるため、移動中または記録誤差の可能性があります。</p>}
+                {data.locationInference.candidateLocations.length > 1 && (
+                  <div className="candidate-list">
+                    <h3>ほかの候補</h3>
+                    {data.locationInference.candidateLocations.slice(1, 5).map((candidate) => (
+                      <div className="candidate-row" key={`${candidate.eventId}-${candidate.locationName}`}>
+                        <div>
+                          <strong>{candidate.locationName}</strong>
+                          <div className="list-item__meta">
+                            根拠 {candidate.supportingEventIds.length}件
+                            {candidate.distanceMinutes !== undefined ? ` / 指定時刻から約${candidate.distanceMinutes}分` : ''}
+                          </div>
+                        </div>
+                        <span className={`confidence-badge confidence-${candidate.confidence}`}>{CONFIDENCE_LABELS[candidate.confidence]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <EmptyState>この日の場所はまだ分かりません。</EmptyState>

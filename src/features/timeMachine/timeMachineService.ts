@@ -3,7 +3,6 @@ import type { EntityId, IsoDateString } from '../../domain/models/common';
 import type { CollectionItem, CollectionVisit } from '../../domain/models/collection';
 import type { MediaAsset, Scrapbook, ScrapbookPage } from '../../domain/models/scrapbook';
 import type {
-  LocationCandidate,
   LocationInferenceResult,
   ManualTimelineEntry,
   TimelineConfidence,
@@ -16,6 +15,7 @@ import { repositories } from '../../infrastructure/repositories/repositoryFactor
 import { isValidDateInputValue, todayDateInputValue } from '../../shared/date/dateUtils';
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
+import { inferLocationFromTimeline } from './locationInferenceService';
 
 const LOCAL_USER_ID = 'local-user';
 const DEFAULT_TIMEZONE = 'Asia/Tokyo';
@@ -114,7 +114,6 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
       normalizedQuery.includeRpg ? repositories.userRpgTitles.list() : Promise.resolve([]),
     ]);
     const tripsById = new Map(trips.map((trip) => [trip.id, trip]));
-    const placesById = new Map(placeVisits.map((place) => [place.id, place]));
     const castleById = new Map(castleMaster.map((castle) => [castle.id, castle]));
     const collectionItemById = new Map(collectionItems.map((item) => [item.id, item]));
 
@@ -133,7 +132,7 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
         pages: scrapbookPages.filter((page) => page.scrapbookId === scrapbook.id && (!page.date || page.date === normalizedQuery.date)),
       }));
 
-    const events = dedupeTimelineEvents([
+    const events = filterEstimatedEvents(dedupeTimelineEvents([
       ...buildTripEvents(relatedTrips),
       ...buildPlaceVisitEvents(placeVisits, tripsById, normalizedQuery.date, queryAt),
       ...buildPhotoEvents(mediaAssets, tripsById, normalizedQuery.date, queryAt),
@@ -142,10 +141,10 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
       ...buildCastleEvents(castleEvents, castleById, tripsById, normalizedQuery.date),
       ...(normalizedQuery.includeCollections ? buildCollectionEvents(collectionVisits, collectionItemById, tripsById, normalizedQuery.date) : []),
       ...(normalizedQuery.includeRpg ? buildRpgEvents(rpgEntries, userAchievements, userTitles, normalizedQuery.date) : []),
-    ]).sort(compareTimelineEvents);
+    ]), normalizedQuery.includeEstimated).sort(compareTimelineEvents);
 
     const photos = mediaAssets.filter((asset) => isMediaOnDate(asset, normalizedQuery.date, queryAt));
-    const locationInference = inferLocation(events, queryAt);
+    const locationInference = inferLocationFromTimeline(events, queryAt);
     const mapPoints = events.filter((event) => isValidCoordinate(event.latitude, event.longitude));
 
     return {
@@ -462,38 +461,6 @@ function buildRpgEvents(
   return [...expEvents, ...achievementEvents, ...titleEvents];
 }
 
-function inferLocation(events: TimelineEvent[], queryAt?: string): LocationInferenceResult {
-  const candidates = events
-    .filter((event) => event.locationName || isValidCoordinate(event.latitude, event.longitude))
-    .map<LocationCandidate>((event) => ({
-      eventId: event.id,
-      locationName: event.locationName ?? `${event.latitude}, ${event.longitude}`,
-      latitude: event.latitude,
-      longitude: event.longitude,
-      confidence: adjustConfidenceForTime(event, queryAt),
-      reasons: [event.confidenceReason],
-    }))
-    .sort((a, b) => confidenceRank(b.confidence) - confidenceRank(a.confidence));
-
-  const timed = events.filter((event) => event.startAt).sort(compareTimelineEvents);
-  const beforeEvent = queryAt ? timed.filter((event) => event.startAt! <= queryAt).at(-1) : undefined;
-  const afterEvent = queryAt ? timed.find((event) => event.startAt! > queryAt) : undefined;
-  const conflictingSources = beforeEvent && afterEvent && beforeEvent.locationName && afterEvent.locationName && beforeEvent.locationName !== afterEvent.locationName
-    ? [toEventSource(beforeEvent), toEventSource(afterEvent)]
-    : [];
-
-  return {
-    queryAt,
-    primaryCandidate: candidates[0],
-    candidateLocations: candidates,
-    confidence: candidates[0]?.confidence ?? 'unknown',
-    reasons: candidates.length > 0 ? candidates[0].reasons : ['この日の場所を示す記録がまだありません。'],
-    conflictingSources,
-    beforeEvent,
-    afterEvent,
-  };
-}
-
 function dedupeTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
   const merged = new Map<string, TimelineEvent>();
   for (const event of events) {
@@ -514,6 +481,11 @@ function dedupeTimelineEvents(events: TimelineEvent[]): TimelineEvent[] {
     });
   }
   return [...merged.values()];
+}
+
+function filterEstimatedEvents(events: TimelineEvent[], includeEstimated = true): TimelineEvent[] {
+  if (includeEstimated) return events;
+  return events.filter((event) => event.confidence === 'exact' || event.confidence === 'high');
 }
 
 function createEvent(input: Omit<TimelineEvent, 'timezone' | 'assetIds' | 'sources'> & Partial<Pick<TimelineEvent, 'timezone' | 'assetIds' | 'sources'>>): TimelineEvent {
@@ -599,13 +571,6 @@ function isValidCoordinate(latitude?: number, longitude?: number): boolean {
 
 function confidenceRank(confidence: TimelineConfidence): number {
   return { unknown: 0, low: 1, medium: 2, high: 3, exact: 4 }[confidence];
-}
-
-function adjustConfidenceForTime(event: TimelineEvent, queryAt?: string): TimelineConfidence {
-  if (!queryAt) return event.confidence;
-  if (!event.startAt) return event.confidence === 'exact' ? 'medium' : event.confidence;
-  if (withinHours(event.startAt, queryAt, TIME_QUERY_WINDOW_HOURS)) return event.confidence;
-  return confidenceRank(event.confidence) > confidenceRank('medium') ? 'medium' : event.confidence;
 }
 
 function optionalText(value?: string): string | undefined {

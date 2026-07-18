@@ -48,6 +48,7 @@ const localScrapbookRepository = await readFile(new URL('../src/infrastructure/l
 const localDbSource = await readFile(new URL('../src/infrastructure/localDb/db.ts', import.meta.url), 'utf8');
 const timeMachineModel = await readFile(new URL('../src/domain/models/timeMachine.ts', import.meta.url), 'utf8');
 const timeMachineService = await readFile(new URL('../src/features/timeMachine/timeMachineService.ts', import.meta.url), 'utf8');
+const locationInferenceService = await readFile(new URL('../src/features/timeMachine/locationInferenceService.ts', import.meta.url), 'utf8');
 const timeMachinePage = await readFile(new URL('../src/pages/TimeMachinePage.tsx', import.meta.url), 'utf8');
 const localTimeMachineRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTimeMachineRepository.ts', import.meta.url), 'utf8');
 const routerSource = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
@@ -298,8 +299,24 @@ await test('タイムマシンは時刻不明データを正確な時刻とし�
 
 await test('タイムマシンは推定と確定を確度で分ける', () => {
   assert.match(timeMachineModel, /TimelineConfidence = 'exact' \| 'high' \| 'medium' \| 'low' \| 'unknown'/);
-  assert.match(timeMachineService, /confidenceReason/);
+  assert.match(locationInferenceService, /inferLocationFromTimeline/);
+  assert.match(locationInferenceService, /confidenceReason/);
   assert.match(timeMachinePage, /CONFIDENCE_LABELS/);
+});
+
+await test('場所推定は前後同一地点と移動中候補を区別する', () => {
+  assert.match(timeMachineModel, /between_same_place/);
+  assert.match(timeMachineModel, /moving_between_places/);
+  assert.match(locationInferenceService, /samePlace\(beforeEvent, afterEvent\)/);
+  assert.match(locationInferenceService, /移動中または記録誤差/);
+  assert.match(timeMachinePage, /INFERENCE_MODE_LABELS/);
+});
+
+await test('場所推定は候補を複数表示し根拠件数を持つ', () => {
+  assert.match(timeMachineModel, /supportingEventIds/);
+  assert.match(timeMachineModel, /distanceMinutes/);
+  assert.match(locationInferenceService, /candidateLocations/);
+  assert.match(timeMachinePage, /ほかの候補/);
 });
 
 await test('タイムマシンは常時GPSや写真ライブラリ自動走査を追加しない', () => {

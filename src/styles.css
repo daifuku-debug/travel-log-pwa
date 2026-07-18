@@ -766,6 +766,35 @@ a {
   font-weight: 900;
 }
 
+.inference-mode {
+  display: inline-flex;
+  margin-left: 8px;
+  color: #697577;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.candidate-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.candidate-list h3 {
+  margin: 0;
+}
+
+.candidate-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e1ded7;
+  border-radius: 8px;
+  background: #fffdf9;
+  padding: 10px;
+}
+
 .confidence-badge {
   display: inline-flex;
   align-items: center;
@@ -955,6 +984,11 @@ a {
 
   .timeline-row {
     grid-template-columns: 1fr;
+  }
+
+  .candidate-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .scrapbook-pages {
