@@ -83,7 +83,13 @@ export function SettingsPage() {
 
         <section className="card">
           <h2>Cloudflare同期</h2>
-          <p className="muted">Workers + D1の同期Repositoryを後続フェーズで追加できる構成です。</p>
+          <p className="muted">
+            Workers + D1の同期Repositoryを後続フェーズで追加できる構成です。JSONバックアップには城コレクションの
+            `castleVisitSummaries` と `castleVisitEvents` も含まれます。
+          </p>
+          <p className="muted">
+            実通信にはCloudflare Worker URL、認証方式、D1/KVスキーマが必要です。未設定のため現在は端末内保存です。
+          </p>
         </section>
 
         {rpgSettings && (

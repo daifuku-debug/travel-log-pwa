@@ -1,8 +1,10 @@
 import type { EntityId } from '../../domain/models/common';
 import type { CastleMaster, CastleVisitSummary } from '../../domain/models/castle';
+import type { PlaceVisit } from '../../domain/models/trip';
 import { repositories } from '../../infrastructure/repositories/repositoryFactory';
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
+import { isoDateTimeToDateInput, todayDateInputValue } from '../../shared/date/dateUtils';
 import { refreshRpgProgress } from '../rpg/rpgProgressService';
 import { grantExperienceOnce } from '../rpg/experienceService';
 import {
@@ -24,6 +26,31 @@ export interface CastleCollectionView {
   filteredRows: CastleListRow[];
   stats: CastleCollectionStats;
   castles: CastleMaster[];
+}
+
+export interface CastleOption {
+  id: EntityId;
+  label: string;
+}
+
+export interface CastleRelatedTrip {
+  tripId: EntityId;
+  title: string;
+  startDate: string;
+  endDate: string;
+  placeNames: string[];
+}
+
+export async function listCastleOptions(): Promise<CastleOption[]> {
+  try {
+    const castles = await repositories.castleMaster.list();
+    return castles.map((castle) => ({
+      id: castle.id,
+      label: `${castle.sourceNumber}. ${castle.nameJa}（${castle.prefectureName}${castle.municipality}）`,
+    }));
+  } catch (error) {
+    throw toAppError(error, '城一覧の読み込みに失敗しました');
+  }
 }
 
 export async function getCastleCollectionView(filter: CastleFilter): Promise<CastleCollectionView> {
@@ -60,6 +87,104 @@ export async function updateCastleRecord(castleId: EntityId, input: CastleRecord
     return saved;
   } catch (error) {
     throw toAppError(error, '城記録の保存に失敗しました');
+  }
+}
+
+export async function linkCastleVisitFromTripPlace(place: PlaceVisit): Promise<void> {
+  if (!place.castleId) return;
+  try {
+    const castle = await repositories.castleMaster.getById(place.castleId);
+    if (!castle) return;
+    const current = await repositories.castleVisitSummaries.getByCastleId(place.castleId);
+    const now = new Date().toISOString();
+    const visitedDate = isoDateTimeToDateInput(place.visitedAt) || todayDateInputValue();
+    const sourceKey = `castle-visit:trip:${place.id}`;
+    const existingEvent = await repositories.castleVisitEvents.getBySourceKey(sourceKey);
+    const nextVisitCount = existingEvent ? Math.max(current?.visitCount ?? 1, 1) : (current?.visitCount ?? 0) + 1;
+    const next: CastleVisitSummary = {
+      ...(current ?? {
+        id: place.castleId,
+        userId: LOCAL_USER_ID,
+        castleId: place.castleId,
+        createdAt: now,
+        stampStatus: 'unknown',
+        goshuinStatus: 'unknown',
+        isFavorite: false,
+        relatedTripIds: [],
+        syncStatus: 'pending',
+      }),
+      status: 'visited',
+      firstVisitedAt: minDate(current?.firstVisitedAt, visitedDate),
+      lastVisitedAt: maxDate(current?.lastVisitedAt, visitedDate),
+      visitCount: Math.max(nextVisitCount, 1),
+      relatedTripIds: unique([...(current?.relatedTripIds ?? []), place.tripId]),
+      updatedAt: now,
+      syncStatus: 'pending',
+    };
+    const saved = await repositories.castleVisitSummaries.save(next);
+    if (!existingEvent) {
+      await repositories.castleVisitEvents.save({
+        id: createId('castle-event'),
+        userId: LOCAL_USER_ID,
+        castleId: place.castleId,
+        visitedAt: visitedDate,
+        tripId: place.tripId,
+        locationId: place.id,
+        stampAcquired: false,
+        goshuinAcquired: false,
+        source: 'trip',
+        sourceKey,
+        createdAt: now,
+        updatedAt: now,
+        syncStatus: 'pending',
+      });
+    }
+    await grantCastleExperience(castle, current, saved);
+    await refreshRpgProgress();
+  } catch (error) {
+    throw toAppError(error, '旅行記録から城コレクションへの反映に失敗しました');
+  }
+}
+
+export async function listCastleRelatedTrips(castleId: EntityId): Promise<CastleRelatedTrip[]> {
+  try {
+    const [places, trips] = await Promise.all([
+      repositories.placeVisits.list(),
+      repositories.trips.list(),
+    ]);
+    const linkedPlaces = places.filter((place) => place.castleId === castleId);
+    const placesByTripId = new Map<string, PlaceVisit[]>();
+    for (const place of linkedPlaces) {
+      placesByTripId.set(place.tripId, [...(placesByTripId.get(place.tripId) ?? []), place]);
+    }
+    return trips
+      .filter((trip) => placesByTripId.has(trip.id))
+      .map((trip) => ({
+        tripId: trip.id,
+        title: trip.title,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        placeNames: (placesByTripId.get(trip.id) ?? []).map((place) => place.name),
+      }))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate));
+  } catch (error) {
+    throw toAppError(error, '関連する旅行記録の読み込みに失敗しました');
+  }
+}
+
+export async function removeTripRelationFromCastle(place: PlaceVisit): Promise<void> {
+  if (!place.castleId) return;
+  try {
+    const current = await repositories.castleVisitSummaries.getByCastleId(place.castleId);
+    if (!current) return;
+    await repositories.castleVisitSummaries.save({
+      ...current,
+      relatedTripIds: current.relatedTripIds.filter((tripId) => tripId !== place.tripId),
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'pending',
+    });
+  } catch (error) {
+    throw toAppError(error, '城コレクションの旅行関連付け解除に失敗しました');
   }
 }
 
@@ -192,4 +317,18 @@ async function grantCastleMilestoneExperience(): Promise<void> {
 
 function assertNoValidationErrors(errors: string[]): void {
   if (errors.length > 0) throw new Error(errors.join('\n'));
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function minDate(current: string | undefined, next: string): string {
+  if (!current) return next;
+  return current < next ? current : next;
+}
+
+function maxDate(current: string | undefined, next: string): string {
+  if (!current) return next;
+  return current > next ? current : next;
 }

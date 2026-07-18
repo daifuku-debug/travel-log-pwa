@@ -20,8 +20,10 @@
 ## 管理対象ファイル
 
 - `src/domain/castles/castleMaster.json`
+- `scripts/update-castle-master.mjs`
 
 固定マスターには訪問状態を書き込まず、ユーザーの訪問情報はIndexedDBの `castleVisitSummaries` と `castleVisitEvents` に保存します。
+公式一覧の更新確認は `npm run update:castle-master` で行えます。既存の座標や読み仮名など、公式一覧に含まれない補足項目は可能な限り保持します。
 
 ## 座標について
 

@@ -5,6 +5,7 @@ import { compareDateInputValuesDesc, dateInputToIsoDateTime, isValidDateInputVal
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
+import { linkCastleVisitFromTripPlace, removeTripRelationFromCastle } from '../castles/castleService';
 import { grantPlaceVisitExperience, grantTripCompletionExperience, refreshRpgProgress } from '../rpg/rpgProgressService';
 import { createTripResultIfNeeded } from '../rpg/tripResultService';
 
@@ -30,6 +31,7 @@ export interface PlaceVisitInput {
   address: string;
   visitedDate: string;
   memo: string;
+  castleId: string;
 }
 
 export function validateTripInput(input: TripInput): string[] {
@@ -166,11 +168,13 @@ export async function createPlaceVisit(tripId: EntityId, input: PlaceVisitInput)
       address: optionalText(input.address),
       visitedAt: dateInputToIsoDateTime(input.visitedDate),
       memo: optionalText(input.memo),
+      castleId: optionalText(input.castleId),
       collectionItemIds: [],
       createdAt: now,
       updatedAt: now,
       syncStatus: 'pending',
     });
+    await linkCastleVisitFromTripPlace(place);
     await grantPlaceVisitExperience(place.id, tripId, place.name);
     await refreshRpgProgress();
     return place;
@@ -185,15 +189,21 @@ export async function updatePlaceVisit(placeId: EntityId, input: PlaceVisitInput
     assertNoValidationErrors(validatePlaceVisitInput(input));
     const current = await repositories.placeVisits.getById(placeId);
     if (!current) throw new Error('訪問場所が見つかりません。');
-    return repositories.placeVisits.save({
+    const saved = await repositories.placeVisits.save({
       ...current,
       name: input.name.trim(),
       address: optionalText(input.address),
       visitedAt: dateInputToIsoDateTime(input.visitedDate),
       memo: optionalText(input.memo),
+      castleId: optionalText(input.castleId),
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending',
     });
+    if (current.castleId && current.castleId !== saved.castleId) {
+      await removeTripRelationFromCastle(current);
+    }
+    await linkCastleVisitFromTripPlace(saved);
+    return saved;
   } catch (error) {
     throw toAppError(error, '訪問場所の更新に失敗しました');
   }
@@ -202,6 +212,8 @@ export async function updatePlaceVisit(placeId: EntityId, input: PlaceVisitInput
 export async function deletePlaceVisit(placeId: EntityId): Promise<void> {
   try {
     await bootstrapAppData();
+    const current = await repositories.placeVisits.getById(placeId);
+    if (current) await removeTripRelationFromCastle(current);
     await repositories.placeVisits.softDelete(placeId);
   } catch (error) {
     throw toAppError(error, '訪問場所の削除に失敗しました');

@@ -20,5 +20,6 @@ export interface PlaceVisit extends BaseEntity {
   longitude?: number;
   visitedAt?: IsoDateTimeString;
   memo?: string;
+  castleId?: EntityId;
   collectionItemIds: EntityId[];
 }

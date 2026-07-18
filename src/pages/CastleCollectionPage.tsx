@@ -9,11 +9,14 @@ import {
 } from '../features/castles/castleUi';
 import {
   getCastleCollectionView,
+  listCastleRelatedTrips,
   updateCastleRecord,
   type CastleCollectionView,
+  type CastleRelatedTrip,
 } from '../features/castles/castleService';
 import type { CastleFilter, CastleRecordInput } from '../features/castles/castleLogic';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
+import { formatDateRange } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
 
 const ACQUISITION_LABELS: Record<CastleVisitSummary['stampStatus'], string> = {
@@ -60,6 +63,7 @@ export function CastleCollectionPage() {
           <p className="status-banner">
             この画面は個人の訪問記録です。日本城郭協会等による公式認定・公式証明ではありません。
           </p>
+          <CastleMap rows={data.rows} selectedCastleId={selectedRow?.castle.id} onSelect={setSelectedCastleId} />
           <CastleFilters view={data} filter={filter} onChange={setFilter} />
           <div className="castle-layout">
             <CastleList
@@ -80,6 +84,57 @@ export function CastleCollectionPage() {
         </div>
       )}
     </>
+  );
+}
+
+function CastleMap({
+  rows,
+  selectedCastleId,
+  onSelect,
+}: {
+  rows: CastleCollectionView['rows'];
+  selectedCastleId?: string;
+  onSelect: (castleId: string) => void;
+}) {
+  const plottedRows = rows.filter((row) => typeof row.castle.latitude === 'number' && typeof row.castle.longitude === 'number');
+  return (
+    <section className="card map-card">
+      <div className="section-head">
+        <h2>城マップ</h2>
+        <span className="muted">{plottedRows.length} / 200城</span>
+      </div>
+      {plottedRows.length === 0 ? (
+        <EmptyState>検証済み座標がまだありません。座標出典を追加するとここに表示されます。</EmptyState>
+      ) : (
+        <svg className="castle-map" viewBox="0 0 320 360" role="img" aria-label="城の位置">
+          <rect x="0" y="0" width="320" height="360" rx="8" fill="#eef6f6" />
+          {plottedRows.map(({ castle, summary }) => {
+            const x = ((Number(castle.longitude) - 122) / (154 - 122)) * 300 + 10;
+            const y = (1 - ((Number(castle.latitude) - 20) / (46 - 20))) * 340 + 10;
+            return (
+              <g
+                key={castle.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect(castle.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') onSelect(castle.id);
+                }}
+              >
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={selectedCastleId === castle.id ? 7 : 5}
+                  className={`castle-map-point castle-status-${summary.status}`}
+                >
+                  <title>{castle.nameJa}</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+    </section>
   );
 }
 
@@ -244,6 +299,10 @@ function CastleDetailPanel({
   const [input, setInput] = useState<CastleRecordInput>(() => toInput(row.summary));
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const { data: relatedTrips } = useAsyncData<CastleRelatedTrip[]>(
+    () => listCastleRelatedTrips(row.castle.id),
+    [row.castle.id],
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -339,8 +398,12 @@ function CastleDetailPanel({
           <span>メモ</span>
           <textarea rows={4} value={input.note} onChange={(event) => setInput({ ...input, note: event.target.value })} />
         </label>
+        <CastleRelatedTripList relatedTrips={relatedTrips ?? []} />
         <div className="status-banner">
-          関連する旅行記録: {row.summary.relatedTripIds.length > 0 ? `${row.summary.relatedTripIds.length}件` : '今後対応予定'}
+          <strong>公式スタンプ・認定</strong>
+          <div>
+            このアプリのスタンプ/御城印記録は個人メモです。公式スタンプ帳、認定証、公式ロゴ、スタンプ画像とは連携していません。
+          </div>
         </div>
         {row.castle.officialReferenceUrl && (
           <a className="button" href={row.castle.officialReferenceUrl} target="_blank" rel="noreferrer">
@@ -354,6 +417,26 @@ function CastleDetailPanel({
         </div>
       </form>
     </section>
+  );
+}
+
+function CastleRelatedTripList({ relatedTrips }: { relatedTrips: CastleRelatedTrip[] }) {
+  return (
+    <div className="status-banner">
+      <strong>関連する旅行記録</strong>
+      {relatedTrips.length === 0 ? (
+        <div>旅行の訪問場所でこの城を選ぶと、ここに表示されます。</div>
+      ) : (
+        <div className="castle-related-trips">
+          {relatedTrips.map((trip) => (
+            <Link key={trip.tripId} to={`/trips/${trip.tripId}`}>
+              {trip.title} / {formatDateRange(trip.startDate, trip.endDate)}
+              {trip.placeNames.length > 0 ? ` / ${trip.placeNames.join(', ')}` : ''}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

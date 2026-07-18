@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import type { PlaceVisit } from '../../../domain/models/trip';
+import { listCastleOptions, type CastleOption } from '../../castles/castleService';
 import { isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
+import { useAsyncData } from '../../../shared/hooks/useAsyncData';
 import { type PlaceVisitInput, validatePlaceVisitInput } from '../tripService';
 
 interface PlaceVisitFormProps {
@@ -23,7 +25,9 @@ export function PlaceVisitForm({
     address: place?.address ?? '',
     visitedDate: isoDateTimeToDateInput(place?.visitedAt) || defaultVisitedDate,
     memo: place?.memo ?? '',
+    castleId: place?.castleId ?? '',
   }));
+  const { data: castleOptions } = useAsyncData<CastleOption[]>(listCastleOptions, []);
   const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,7 +44,7 @@ export function PlaceVisitForm({
     try {
       await onSubmit(input);
       if (!place) {
-        setInput({ name: '', address: '', visitedDate: defaultVisitedDate, memo: '' });
+        setInput({ name: '', address: '', visitedDate: defaultVisitedDate, memo: '', castleId: '' });
       }
     } catch (error) {
       setErrors([error instanceof Error ? error.message : '保存に失敗しました。']);
@@ -87,6 +91,19 @@ export function PlaceVisitForm({
           />
         </label>
       </div>
+
+      <label className="field">
+        <span>城コレクション連携</span>
+        <select
+          value={input.castleId}
+          onChange={(event) => setInput({ ...input, castleId: event.target.value })}
+        >
+          <option value="">連携しない</option>
+          {(castleOptions ?? []).map((castle) => (
+            <option key={castle.id} value={castle.id}>{castle.label}</option>
+          ))}
+        </select>
+      </label>
 
       <label className="field">
         <span>メモ</span>

@@ -503,6 +503,30 @@ a {
   overflow: auto;
 }
 
+.castle-map {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+}
+
+.castle-map-point {
+  cursor: pointer;
+  stroke: #213133;
+  stroke-width: 1.5;
+}
+
+.castle-related-trips {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.castle-related-trips a {
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .castle-filter-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

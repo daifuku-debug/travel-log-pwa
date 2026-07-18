@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "test": "node --experimental-strip-types scripts/run-tests.mjs",
+    "update:castle-master": "node scripts/update-castle-master.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
