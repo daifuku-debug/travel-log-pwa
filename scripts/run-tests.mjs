@@ -39,6 +39,8 @@ const rpgProgressService = await readFile(new URL('../src/features/rpg/rpgProgre
 const rpgProfilePage = await readFile(new URL('../src/pages/RpgProfilePage.tsx', import.meta.url), 'utf8');
 const collectionService = await readFile(new URL('../src/features/collections/collectionService.ts', import.meta.url), 'utf8');
 const collectionPage = await readFile(new URL('../src/pages/CollectionPage.tsx', import.meta.url), 'utf8');
+const wishlistService = await readFile(new URL('../src/features/wishlist/wishlistService.ts', import.meta.url), 'utf8');
+const wishlistPage = await readFile(new URL('../src/pages/WishlistPage.tsx', import.meta.url), 'utf8');
 const castleService = await readFile(new URL('../src/features/castles/castleService.ts', import.meta.url), 'utf8');
 const castlePage = await readFile(new URL('../src/pages/CastleCollectionPage.tsx', import.meta.url), 'utf8');
 const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.url), 'utf8');
@@ -979,6 +981,22 @@ await test('コレクションと項目を追加、編集、削除できるServi
   assert.match(collectionService, /deleteCollectionItem/);
   assert.match(collectionPage, /項目を追加/);
   assert.match(collectionPage, /訪問済みにする/);
+});
+
+await test('欲しいものメモを追加、編集、削除できるServiceとUIがある', () => {
+  assert.match(wishlistService, /createWishlistItem/);
+  assert.match(wishlistService, /updateWishlistItem/);
+  assert.match(wishlistService, /deleteWishlistItem/);
+  assert.match(wishlistService, /validateWishlistItemInput/);
+  assert.match(wishlistService, /repositories\.wishlist\.save/);
+  assert.match(wishlistService, /repositories\.wishlist\.softDelete/);
+  assert.match(wishlistPage, /WishlistItemForm/);
+  assert.match(wishlistPage, /編集/);
+  assert.match(wishlistPage, /削除/);
+});
+
+await test('欲しいもの画面はRepositoryや端末保存を直接操作しない', () => {
+  assert.doesNotMatch(wishlistPage, /repositories\.|localStorage|indexedDB/);
 });
 
 await test('サンプル旅行データはRPG経験値の初回集計から除外される', () => {
