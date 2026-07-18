@@ -31,7 +31,7 @@ const PADDING = 24;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
-const DEFAULT_VIEWPORT = { scale: 1.22, x: -58, y: -48 };
+const DEFAULT_VIEWPORT = { scale: 1.34, x: -96, y: -91 };
 
 export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
   const [geoJson, setGeoJson] = useState<GeoJson | undefined>();

@@ -418,7 +418,7 @@ a {
   filter: url("#map-soft-shadow");
   stroke: #f8fcf9;
   stroke-width: 0.62;
-  transition: filter 120ms ease, stroke-width 120ms ease;
+  transition: filter 120ms ease, stroke 120ms ease;
 }
 
 .prefecture-shape:hover,
@@ -426,13 +426,13 @@ a {
   filter: brightness(1.03) url("#map-soft-shadow");
   outline: none;
   stroke: #253b40;
-  stroke-width: 1.35;
+  stroke-width: 0.62;
 }
 
 .prefecture-shape.selected {
   filter: brightness(1.06) url("#map-soft-shadow");
   stroke: #223237;
-  stroke-width: 1.8;
+  stroke-width: 0.62;
 }
 
 .status-unvisited {
@@ -454,13 +454,11 @@ a {
 .status-stayed {
   fill: url("#map-pattern-stayed");
   color: #fff;
-  stroke-width: 1.8;
 }
 
 .status-lived {
   fill: url("#map-pattern-lived");
   color: #fff;
-  stroke-width: 2;
 }
 
 .legend {
