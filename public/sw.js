@@ -1,4 +1,4 @@
-const CACHE_NAME = 'travel-log-pwa-v1';
+const CACHE_NAME = 'travel-log-pwa-v2';
 const BASE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [
   BASE_PATH,
@@ -6,6 +6,7 @@ const APP_SHELL = [
   `${BASE_PATH}icons/icon.svg`,
   `${BASE_PATH}icons/icon-192.png`,
   `${BASE_PATH}icons/icon-512.png`,
+  `${BASE_PATH}maps/japan-prefectures.geojson`,
 ];
 
 self.addEventListener('install', (event) => {

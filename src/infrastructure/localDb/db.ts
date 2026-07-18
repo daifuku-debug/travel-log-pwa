@@ -1,7 +1,7 @@
 import { AppError } from '../../shared/errors';
 
 const DB_NAME = 'travel-log-local-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type StoreName =
   | 'trips'
@@ -10,6 +10,8 @@ export type StoreName =
   | 'collections'
   | 'collectionItems'
   | 'collectionVisits'
+  | 'prefectureVisits'
+  | 'tripPrefectureVisits'
   | 'syncOperations'
   | 'meta';
 
@@ -20,6 +22,8 @@ const STORE_NAMES: StoreName[] = [
   'collections',
   'collectionItems',
   'collectionVisits',
+  'prefectureVisits',
+  'tripPrefectureVisits',
   'syncOperations',
   'meta',
 ];
@@ -83,5 +87,14 @@ export async function putMany<T>(storeName: StoreName, values: T[]): Promise<voi
     values.forEach((value) => store.put(value));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(new AppError('端末内データの保存に失敗しました', transaction.error));
+  });
+}
+
+export async function clearStore(storeName: StoreName): Promise<void> {
+  const db = await getLocalDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(storeName, 'readwrite').objectStore(storeName).clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(new AppError('端末内データの削除に失敗しました', request.error));
   });
 }

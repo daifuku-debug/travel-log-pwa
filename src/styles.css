@@ -196,7 +196,7 @@ a {
 
 .bottom-nav__inner {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   max-width: 720px;
   margin: 0 auto;
 }
@@ -313,6 +313,169 @@ a {
   color: #a33b2c;
 }
 
+.summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.map-card {
+  overflow: hidden;
+}
+
+.map-shell {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #ded7cc;
+  border-radius: 8px;
+  background: #eef6f6;
+}
+
+.japan-map {
+  display: block;
+  width: 100%;
+  max-height: 72vh;
+}
+
+.prefecture-shape {
+  cursor: pointer;
+  stroke: #536063;
+  stroke-width: 0.8;
+  transition: filter 120ms ease, stroke-width 120ms ease;
+}
+
+.prefecture-shape:hover,
+.prefecture-shape:focus {
+  filter: brightness(0.95);
+  outline: none;
+  stroke: #172f33;
+  stroke-width: 2;
+}
+
+.prefecture-shape.selected {
+  stroke: #111;
+  stroke-width: 2.8;
+}
+
+.status-unvisited {
+  fill: #eef0ec;
+  color: #6b716b;
+}
+
+.status-passed {
+  fill: #f2d27c;
+  color: #765319;
+  stroke-dasharray: 3 2;
+}
+
+.status-visited {
+  fill: #72b7b2;
+  color: #1f5c61;
+}
+
+.status-stayed {
+  fill: #2f6f73;
+  color: #fff;
+  stroke-width: 1.8;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.legend-item,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cfc7ba;
+  border-radius: 999px;
+  background: #fffdf9;
+  padding: 5px 9px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.legend-swatch {
+  width: 18px;
+  height: 12px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.status-badge.status-stayed {
+  background: #2f6f73;
+  color: #fff;
+}
+
+.status-badge.status-visited {
+  background: #e4f4f1;
+}
+
+.status-badge.status-passed {
+  background: repeating-linear-gradient(135deg, #fff7dd, #fff7dd 4px, #f2d27c 4px, #f2d27c 8px);
+}
+
+.status-badge.status-unvisited {
+  background: #f4f4f1;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #4d5a5c;
+  font-weight: 800;
+}
+
+.filter-checkbox {
+  min-height: 42px;
+}
+
+.prefecture-list {
+  display: grid;
+  gap: 8px;
+}
+
+.prefecture-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid #ded7cc;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: #213133;
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+}
+
+.prefecture-row.selected {
+  border-color: #2f6f73;
+  box-shadow: 0 0 0 2px rgba(47, 111, 115, 0.16);
+}
+
+.prefecture-row__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.detail-panel {
+  scroll-margin-top: 80px;
+}
+
 .error-panel {
   max-width: 680px;
   margin: 40px auto;
@@ -336,15 +499,25 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .summary-grid,
+  .filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
 
   .page-heading__row,
   .section-head,
-  .list-item {
+  .list-item,
+  .prefecture-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .prefecture-row__right {
+    align-items: flex-start;
   }
 
   .app-main {
