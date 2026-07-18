@@ -14,7 +14,7 @@ import {
   type CastleCollectionView,
   type CastleRelatedTrip,
 } from '../features/castles/castleService';
-import type { CastleFilter, CastleRecordInput } from '../features/castles/castleLogic';
+import { filterCastleRows, type CastleFilter, type CastleRecordInput } from '../features/castles/castleLogic';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { formatDateRange } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
@@ -32,15 +32,16 @@ export function CastleCollectionPage() {
     ...getDefaultCastleFilter(),
     prefectureCode: searchParams.get('prefecture') ?? 'all',
   }));
-  const { data, error, loading } = useAsyncData(() => getCastleCollectionView(filter), [filter, reloadKey]);
+  const { data, error, loading } = useAsyncData(() => getCastleCollectionView(getDefaultCastleFilter()), [reloadKey]);
   const [selectedCastleId, setSelectedCastleId] = useState<string>();
-  const selectedRow = data?.filteredRows.find((row) => row.castle.id === selectedCastleId) ?? data?.filteredRows[0];
+  const filteredRows = useMemo(() => (data ? filterCastleRows(data.rows, filter) : []), [data, filter]);
+  const selectedRow = filteredRows.find((row) => row.castle.id === selectedCastleId) ?? filteredRows[0];
 
   useEffect(() => {
-    if (!selectedCastleId && data?.filteredRows[0]) {
-      setSelectedCastleId(data.filteredRows[0].castle.id);
+    if (!selectedCastleId && filteredRows[0]) {
+      setSelectedCastleId(filteredRows[0].castle.id);
     }
-  }, [data, selectedCastleId]);
+  }, [filteredRows, selectedCastleId]);
 
   return (
     <>
@@ -67,7 +68,7 @@ export function CastleCollectionPage() {
           <CastleFilters view={data} filter={filter} onChange={setFilter} />
           <div className="castle-layout">
             <CastleList
-              rows={data.filteredRows}
+              rows={filteredRows}
               selectedCastleId={selectedRow?.castle.id}
               onSelect={(castleId) => setSelectedCastleId(castleId)}
             />
