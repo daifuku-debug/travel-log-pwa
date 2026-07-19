@@ -371,14 +371,12 @@ function BlockForm({
       event.preventDefault();
       setError('');
       try {
-        if (input.type === 'photo') {
-          if (!files[0]) throw new Error('写真を1枚選択してください。');
-          await addPhotoBlockFromFile(page.id, tripId, files[0], input.note, input.text);
-        } else if (input.type === 'photo_grid') {
-          if (files.length === 0) throw new Error('写真を1枚以上選択してください。');
-          await addPhotoGridBlockFromFiles(page.id, tripId, files, input.note, input.text);
+        if (files.length === 1) {
+          await addPhotoBlockFromFile(page.id, tripId, files[0], input.note, input.text, input.title);
+        } else if (files.length > 1) {
+          await addPhotoGridBlockFromFiles(page.id, tripId, files, input.note, input.text, input.title);
         } else {
-          await addScrapbookBlock(page.id, input);
+          await addScrapbookBlock(page.id, { ...input, type: 'text' });
         }
         setInput({ ...EMPTY_BLOCK, locationId: tripId });
         setFiles([]);
@@ -389,47 +387,13 @@ function BlockForm({
     }}>
       <h3>ブロック追加</h3>
       {error && <div className="form-errors">{error}</div>}
-      <div className="form-grid">
-        <label className="field">
-          <span>種類</span>
-          <select value={input.type} onChange={(event) => {
-            setInput({ ...input, type: event.target.value as ScrapbookBlockInput['type'] });
-            setFiles([]);
-          }}>
-            <option value="text">本文</option>
-            <option value="heading">見出し</option>
-            <option value="photo">写真</option>
-            <option value="photo_grid">写真グリッド</option>
-            <option value="place">訪問場所</option>
-            <option value="meal">食事</option>
-            <option value="ticket">チケット・紙もの</option>
-            <option value="purchase">買ったもの</option>
-            <option value="quote">引用・ひとこと</option>
-            <option value="divider">区切り</option>
-            <option value="trip_summary">旅のまとめ</option>
-            <option value="rpg_result">RPGリザルト</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>関連場所</span>
-          <select value={input.locationId} onChange={(event) => setInput({ ...input, locationId: event.target.value })}>
-            <option value={tripId}>旅行全体</option>
-            {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
-          </select>
-        </label>
-      </div>
-      {(input.type === 'photo' || input.type === 'photo_grid') && (
-        <label className="field">
-          <span>{input.type === 'photo' ? '写真' : '写真'}</span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple={input.type === 'photo_grid'}
-            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
-          />
-          <small className="muted">{files.length > 0 ? `${files.length}枚選択中` : '写真本体は端末内だけに保存します。'}</small>
-        </label>
-      )}
+      <label className="field">
+        <span>関連場所</span>
+        <select value={input.locationId} onChange={(event) => setInput({ ...input, locationId: event.target.value })}>
+          <option value={tripId}>旅行全体</option>
+          {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+        </select>
+      </label>
       <label className="field">
         <span>タイトル</span>
         <input value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} />
@@ -441,6 +405,16 @@ function BlockForm({
       <label className="field">
         <span>補足メモ</span>
         <input value={input.note} onChange={(event) => setInput({ ...input, note: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>写真</span>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+        />
+        <small className="muted">{files.length > 0 ? `${files.length}枚選択中` : '写真は任意です。写真本体は端末内だけに保存します。'}</small>
       </label>
       <button className="button button--primary" type="submit">ブロック追加</button>
     </form>
@@ -593,6 +567,7 @@ function BlockContent({
     const asset = assetsById.get(block.assetId);
     return (
       <figure className="scrapbook-photo">
+        {block.title && <h3>{block.title}</h3>}
         {asset ? <MediaImage asset={asset} alt={block.altText || block.caption || asset.originalFileName || 'スクラップブック写真'} /> : <div className="empty-state">写真データが見つかりません。</div>}
         {block.body && <p>{block.body}</p>}
         {block.caption && <figcaption>{block.caption}</figcaption>}
@@ -602,6 +577,7 @@ function BlockContent({
   if (block.type === 'photo_grid') {
     return (
       <figure className="scrapbook-photo-grid">
+        {block.title && <h3>{block.title}</h3>}
         <div className="scrapbook-photo-grid__items">
           {block.assetIds.map((assetId) => {
             const asset = assetsById.get(assetId);
@@ -613,7 +589,7 @@ function BlockContent({
       </figure>
     );
   }
-  return <p>{block.text}</p>;
+  return <BlockTextContent title={block.title} body={block.text} note={block.note} fallback="メモを書く" />;
 }
 
 function BlockTextContent({
@@ -622,14 +598,14 @@ function BlockTextContent({
   note,
   fallback,
 }: {
-  title: string;
+  title?: string;
   body?: string;
   note?: string;
   fallback: string;
 }) {
   return (
     <div>
-      <h3>{title}</h3>
+      {title && <h3>{title}</h3>}
       <p>{body || note || fallback}</p>
       {body && note && <p className="muted">{note}</p>}
     </div>
@@ -675,9 +651,9 @@ function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
   if (block.type === 'purchase') return { ...EMPTY_BLOCK, type: 'purchase', title: block.name, text: block.body ?? '', note: block.note ?? '' };
   if (block.type === 'quote') return { ...EMPTY_BLOCK, type: 'quote', text: block.text, title: block.cite ?? '' };
   if (block.type === 'divider') return { ...EMPTY_BLOCK, type: 'divider', title: block.label ?? '' };
-  if (block.type === 'photo') return { ...EMPTY_BLOCK, type: 'photo', title: block.altText ?? '', text: block.body ?? '', note: block.caption ?? '', assetId: block.assetId };
-  if (block.type === 'photo_grid') return { ...EMPTY_BLOCK, type: 'photo_grid', text: block.body ?? '', note: block.caption ?? '', assetIds: block.assetIds };
+  if (block.type === 'photo') return { ...EMPTY_BLOCK, type: 'photo', title: block.title ?? block.altText ?? '', text: block.body ?? '', note: block.caption ?? '', assetId: block.assetId };
+  if (block.type === 'photo_grid') return { ...EMPTY_BLOCK, type: 'photo_grid', title: block.title ?? '', text: block.body ?? '', note: block.caption ?? '', assetIds: block.assetIds };
   if (block.type === 'trip_summary') return { ...EMPTY_BLOCK, type: 'trip_summary', title: block.title ?? '', text: block.body ?? '' };
   if (block.type === 'rpg_result') return { ...EMPTY_BLOCK, type: 'rpg_result', locationId: block.tripId || tripId, title: block.title ?? '' };
-  return { ...EMPTY_BLOCK, type: 'text', text: block.type === 'text' ? block.text : '' };
+  return { ...EMPTY_BLOCK, type: 'text', title: block.type === 'text' ? block.title ?? '' : '', text: block.type === 'text' ? block.text : '', note: block.type === 'text' ? block.note ?? '' : '' };
 }

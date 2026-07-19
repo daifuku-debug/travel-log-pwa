@@ -61,7 +61,9 @@ interface ScrapbookBlockBase extends BaseEntity {
 
 export interface TextBlock extends ScrapbookBlockBase {
   type: 'text';
+  title?: string;
   text: string;
+  note?: string;
   textStyle: 'body' | 'memo' | 'list';
 }
 
@@ -74,6 +76,7 @@ export interface HeadingBlock extends ScrapbookBlockBase {
 export interface PhotoBlock extends ScrapbookBlockBase {
   type: 'photo';
   assetId: EntityId;
+  title?: string;
   body?: string;
   caption?: string;
   note?: string;
@@ -84,6 +87,7 @@ export interface PhotoBlock extends ScrapbookBlockBase {
 export interface PhotoGridBlock extends ScrapbookBlockBase {
   type: 'photo_grid';
   assetIds: EntityId[];
+  title?: string;
   body?: string;
   caption?: string;
   note?: string;

@@ -239,6 +239,7 @@ export async function addPhotoBlockFromFile(
   file: File,
   caption: string,
   body = '',
+  title = '',
 ): Promise<ScrapbookBlock> {
   try {
     const asset = await saveLocalMediaAsset(tripId, file);
@@ -246,7 +247,7 @@ export async function addPhotoBlockFromFile(
       type: 'photo',
       text: body,
       locationId: '',
-      title: '',
+      title,
       note: caption,
       assetId: asset.id,
     });
@@ -261,6 +262,7 @@ export async function addPhotoGridBlockFromFiles(
   files: File[],
   caption: string,
   body = '',
+  title = '',
 ): Promise<ScrapbookBlock> {
   try {
     const assets = await Promise.all(files.map((file) => saveLocalMediaAsset(tripId, file)));
@@ -268,7 +270,7 @@ export async function addPhotoGridBlockFromFiles(
       type: 'photo_grid',
       text: body,
       locationId: '',
-      title: '',
+      title,
       note: caption,
       assetIds: assets.map((asset) => asset.id),
     });
@@ -479,6 +481,7 @@ function buildBlock({
       ...base,
       type: 'photo',
       assetId: input.assetId || input.locationId,
+      title: optionalText(input.title),
       body: optionalText(input.text),
       caption: optionalText(input.note),
       altText: optionalText(input.title),
@@ -490,6 +493,7 @@ function buildBlock({
       ...base,
       type: 'photo_grid',
       assetIds: input.assetIds ?? [],
+      title: optionalText(input.title),
       body: optionalText(input.text),
       caption: optionalText(input.note),
       columns: 2,
@@ -500,7 +504,14 @@ function buildBlock({
   if (input.type === 'purchase') return { ...base, type: 'purchase', name: input.title.trim() || '買ったもの', body: optionalText(input.text), note: optionalText(input.note), assetIds: [] };
   if (input.type === 'trip_summary') return { ...base, type: 'trip_summary', title: optionalText(input.title), body: optionalText(input.text) };
   if (input.type === 'rpg_result') return { ...base, type: 'rpg_result', tripId: input.locationId || 'unknown-trip', title: optionalText(input.title) };
-  return { ...base, type: 'text', text: input.text.trim() || 'メモを書く', textStyle: 'body' };
+  return {
+    ...base,
+    type: 'text',
+    title: optionalText(input.title),
+    text: input.text.trim() || 'メモを書く',
+    note: optionalText(input.note),
+    textStyle: 'body',
+  };
 }
 
 async function saveLocalMediaAsset(tripId: EntityId, file: File): Promise<MediaAsset> {

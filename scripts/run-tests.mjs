@@ -605,15 +605,26 @@ await test('スクラップブックは写真と写真グリッドを端末内Bl
 });
 
 await test('スクラップブックの写真や記録ブロックは本文と補足メモを保持して表示する', () => {
+  assert.match(scrapbookModel, /interface TextBlock[\s\S]*title\?: string/);
   assert.match(scrapbookModel, /interface PhotoBlock[\s\S]*body\?: string/);
+  assert.match(scrapbookModel, /interface PhotoBlock[\s\S]*title\?: string/);
   assert.match(scrapbookModel, /interface PhotoGridBlock[\s\S]*body\?: string/);
+  assert.match(scrapbookModel, /interface PhotoGridBlock[\s\S]*title\?: string/);
   assert.match(scrapbookModel, /interface MealBlock[\s\S]*body\?: string/);
   assert.match(scrapbookService, /body: optionalText\(input\.text\)/);
   assert.match(scrapbookService, /note: optionalText\(input\.note\)/);
-  assert.match(scrapbookPage, /addPhotoBlockFromFile\(page\.id, tripId, files\[0\], input\.note, input\.text\)/);
+  assert.match(scrapbookPage, /addPhotoBlockFromFile\(page\.id, tripId, files\[0\], input\.note, input\.text, input\.title\)/);
   assert.match(scrapbookPage, /block\.body && <p>\{block\.body\}<\/p>/);
   assert.match(scrapbookPage, /BlockTextContent/);
   assert.match(scrapbookPage, /text: block\.body \?\? ''/);
+});
+
+await test('スクラップブックの新規ブロック追加は種類選択なしで文章と写真を登録できる', () => {
+  assert.match(scrapbookPage, /files\.length === 1/);
+  assert.match(scrapbookPage, /files\.length > 1/);
+  assert.match(scrapbookPage, /addScrapbookBlock\(page\.id, \{ \.\.\.input, type: 'text' \}\)/);
+  assert.match(scrapbookPage, /<span>写真<\/span>/);
+  assert.doesNotMatch(scrapbookPage, /<h3>ブロック追加<\/h3>[\s\S]*<span>種類<\/span>[\s\S]*ブロック追加/);
 });
 
 await test('GitHub Pagesのベースパス配下でも地図データを読み込む設定になっている', () => {
