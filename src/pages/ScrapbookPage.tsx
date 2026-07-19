@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel, ScrapbookThemeId } from '../domain/models/scrapbook';
 import {
@@ -7,7 +7,6 @@ import {
   addScrapbookBlock,
   addScrapbookPage,
   createScrapbookForTrip,
-  createMediaObjectUrl,
   deleteScrapbookBlock,
   deleteScrapbookPage,
   getScrapbookByTripId,
@@ -26,7 +25,9 @@ import { formatDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtil
 import { useAsyncData } from '../shared/hooks/useAsyncData';
 import { Badge, Button, Card, InlineError, PageHeader, Skeleton } from '../shared/ui';
 import { ScrapbookCover } from '../features/scrapbooks/components/ScrapbookCover';
+import { ScrapbookMediaImage } from '../features/scrapbooks/components/ScrapbookMediaImage';
 import { ScrapbookPageNavigation } from '../features/scrapbooks/components/ScrapbookPageNavigation';
+import { ScrapbookViewer } from '../features/scrapbooks/components/ScrapbookViewer';
 
 const THEME_LABELS: Record<ScrapbookThemeId, string> = {
   classic: 'クラシック',
@@ -94,20 +95,20 @@ export function ScrapbookPage() {
 
   return (
     <>
-      <PageHeader
-        title="旅行スクラップブック"
-        description={data?.tripDetail ? `${data.tripDetail.trip.title} / ${formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}` : '旅行の思い出を1冊にまとめます。'}
-        backTo={tripId ? `/trips/${tripId}` : '/trips'}
-        backLabel="旅行詳細へ"
-        actions={scrapbookDetail && (
-          <div className="scrapbook-mode-actions">
-            <Badge variant={mode === 'edit' ? 'warning' : 'success'}>{mode === 'edit' ? '編集中' : '閲覧中'}</Badge>
-            <Button variant={mode === 'edit' ? 'primary' : 'secondary'} onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}>
-              {mode === 'view' ? '編集する' : '閲覧に戻る'}
-            </Button>
-          </div>
-        )}
-      />
+      {(!scrapbookDetail || mode === 'edit') && (
+        <PageHeader
+          title="旅行スクラップブック"
+          description={data?.tripDetail ? `${data.tripDetail.trip.title} / ${formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}` : '旅行の思い出を1冊にまとめます。'}
+          backTo={tripId ? `/trips/${tripId}` : '/trips'}
+          backLabel="旅行詳細へ"
+          actions={scrapbookDetail && (
+            <div className="scrapbook-mode-actions">
+              <Badge variant="warning">編集中</Badge>
+              <Button variant="primary" onClick={() => setMode('view')}>閲覧に戻る</Button>
+            </div>
+          )}
+        />
+      )}
 
       {loading && <ScrapbookLoadingState />}
       {error && <ErrorState error={error} />}
@@ -130,7 +131,15 @@ export function ScrapbookPage() {
         />
       )}
 
-      {scrapbookDetail && data?.tripDetail && (
+      {scrapbookDetail && data?.tripDetail && mode === 'view' && (
+        <ScrapbookViewer
+          detail={scrapbookDetail}
+          tripDetail={data.tripDetail}
+          onEdit={() => setMode('edit')}
+        />
+      )}
+
+      {scrapbookDetail && data?.tripDetail && mode === 'edit' && (
         <div className={`scrapbook scrapbook-theme-${scrapbookDetail.scrapbook.themeId}`}>
           <ScrapbookCover
             scrapbook={scrapbookDetail.scrapbook}
@@ -605,34 +614,7 @@ function BlockTextContent({
 }
 
 function MediaImage({ asset, alt }: { asset: MediaAsset; alt: string }) {
-  const [url, setUrl] = useState<string>();
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let objectUrl: string | undefined;
-    let cancelled = false;
-    setUrl(undefined);
-    setError('');
-    void createMediaObjectUrl(asset, 'thumbnail')
-      .then((nextUrl) => {
-        if (cancelled) {
-          if (nextUrl) URL.revokeObjectURL(nextUrl);
-          return;
-        }
-        objectUrl = nextUrl;
-        setUrl(nextUrl);
-      })
-      .catch((loadError) => {
-        if (!cancelled) setError(loadError instanceof Error ? loadError.message : '写真を読み込めません。');
-      });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [asset]);
-
-  if (error) return <div className="scrapbook-media-placeholder scrapbook-media-placeholder--error" role="img" aria-label={alt}>{error}</div>;
-  if (!url) return <div className="scrapbook-media-placeholder" aria-label="写真を読み込み中"><Skeleton variant="block" /></div>;
-  return <img src={url} alt={alt} loading="lazy" decoding="async" />;
+  return <ScrapbookMediaImage asset={asset} alt={alt} />;
 }
 
 function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
