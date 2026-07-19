@@ -373,10 +373,10 @@ function BlockForm({
       try {
         if (input.type === 'photo') {
           if (!files[0]) throw new Error('写真を1枚選択してください。');
-          await addPhotoBlockFromFile(page.id, tripId, files[0], input.note);
+          await addPhotoBlockFromFile(page.id, tripId, files[0], input.note, input.text);
         } else if (input.type === 'photo_grid') {
           if (files.length === 0) throw new Error('写真を1枚以上選択してください。');
-          await addPhotoGridBlockFromFiles(page.id, tripId, files, input.note);
+          await addPhotoGridBlockFromFiles(page.id, tripId, files, input.note, input.text);
         } else {
           await addScrapbookBlock(page.id, input);
         }
@@ -577,13 +577,14 @@ function BlockContent({
       <div>
         <h3>{block.titleOverride || place?.name || block.snapshotName}</h3>
         <p className="muted">{place?.visitedAt ? isoDateTimeToDateInput(place.visitedAt) : '訪問日未設定'}</p>
-        <p>{block.caption || place?.memo || '訪問メモはありません。'}</p>
+        <p>{block.body || block.caption || place?.memo || '訪問メモはありません。'}</p>
+        {block.body && block.caption && <p className="muted">{block.caption}</p>}
       </div>
     );
   }
-  if (block.type === 'meal') return <div><h3>{block.name}</h3><p>{block.note || '食事のメモを追加できます。'}</p></div>;
-  if (block.type === 'ticket') return <div><h3>{block.title}</h3><p>{block.note || 'チケットや紙ものの記録です。'}</p></div>;
-  if (block.type === 'purchase') return <div><h3>{block.name}</h3><p>{block.note || '買ったものの記録です。'}</p></div>;
+  if (block.type === 'meal') return <BlockTextContent title={block.name} body={block.body} note={block.note} fallback="食事のメモを追加できます。" />;
+  if (block.type === 'ticket') return <BlockTextContent title={block.title} body={block.body} note={block.note} fallback="チケットや紙ものの記録です。" />;
+  if (block.type === 'purchase') return <BlockTextContent title={block.name} body={block.body} note={block.note} fallback="買ったものの記録です。" />;
   if (block.type === 'quote') return <blockquote>{block.text}{block.cite ? <cite>{block.cite}</cite> : null}</blockquote>;
   if (block.type === 'divider') return <hr aria-label={block.label || '区切り'} />;
   if (block.type === 'trip_summary') return <div><h3>{block.title || '旅のまとめ'}</h3><p>{block.body || '旅全体の感想を書けます。'}</p></div>;
@@ -593,6 +594,7 @@ function BlockContent({
     return (
       <figure className="scrapbook-photo">
         {asset ? <MediaImage asset={asset} alt={block.altText || block.caption || asset.originalFileName || 'スクラップブック写真'} /> : <div className="empty-state">写真データが見つかりません。</div>}
+        {block.body && <p>{block.body}</p>}
         {block.caption && <figcaption>{block.caption}</figcaption>}
       </figure>
     );
@@ -606,11 +608,32 @@ function BlockContent({
             return asset ? <MediaImage key={assetId} asset={asset} alt={asset.originalFileName || 'スクラップブック写真'} /> : <div key={assetId} className="empty-state">写真なし</div>;
           })}
         </div>
+        {block.body && <p>{block.body}</p>}
         {block.caption && <figcaption>{block.caption}</figcaption>}
       </figure>
     );
   }
   return <p>{block.text}</p>;
+}
+
+function BlockTextContent({
+  title,
+  body,
+  note,
+  fallback,
+}: {
+  title: string;
+  body?: string;
+  note?: string;
+  fallback: string;
+}) {
+  return (
+    <div>
+      <h3>{title}</h3>
+      <p>{body || note || fallback}</p>
+      {body && note && <p className="muted">{note}</p>}
+    </div>
+  );
 }
 
 function MediaImage({ asset, alt }: { asset: MediaAsset; alt: string }) {
@@ -646,14 +669,14 @@ function MediaImage({ asset, alt }: { asset: MediaAsset; alt: string }) {
 
 function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {
   if (block.type === 'heading') return { ...EMPTY_BLOCK, type: 'heading', text: block.text };
-  if (block.type === 'place') return { ...EMPTY_BLOCK, type: 'place', locationId: block.locationId, title: block.snapshotName, note: block.caption ?? '' };
-  if (block.type === 'meal') return { ...EMPTY_BLOCK, type: 'meal', title: block.name, note: block.note ?? '' };
-  if (block.type === 'ticket') return { ...EMPTY_BLOCK, type: 'ticket', title: block.title, note: block.note ?? '' };
-  if (block.type === 'purchase') return { ...EMPTY_BLOCK, type: 'purchase', title: block.name, note: block.note ?? '' };
+  if (block.type === 'place') return { ...EMPTY_BLOCK, type: 'place', locationId: block.locationId, title: block.snapshotName, text: block.body ?? '', note: block.caption ?? '' };
+  if (block.type === 'meal') return { ...EMPTY_BLOCK, type: 'meal', title: block.name, text: block.body ?? '', note: block.note ?? '' };
+  if (block.type === 'ticket') return { ...EMPTY_BLOCK, type: 'ticket', title: block.title, text: block.body ?? '', note: block.note ?? '' };
+  if (block.type === 'purchase') return { ...EMPTY_BLOCK, type: 'purchase', title: block.name, text: block.body ?? '', note: block.note ?? '' };
   if (block.type === 'quote') return { ...EMPTY_BLOCK, type: 'quote', text: block.text, title: block.cite ?? '' };
   if (block.type === 'divider') return { ...EMPTY_BLOCK, type: 'divider', title: block.label ?? '' };
-  if (block.type === 'photo') return { ...EMPTY_BLOCK, type: 'photo', title: block.altText ?? '', note: block.caption ?? '', assetId: block.assetId };
-  if (block.type === 'photo_grid') return { ...EMPTY_BLOCK, type: 'photo_grid', note: block.caption ?? '', assetIds: block.assetIds };
+  if (block.type === 'photo') return { ...EMPTY_BLOCK, type: 'photo', title: block.altText ?? '', text: block.body ?? '', note: block.caption ?? '', assetId: block.assetId };
+  if (block.type === 'photo_grid') return { ...EMPTY_BLOCK, type: 'photo_grid', text: block.body ?? '', note: block.caption ?? '', assetIds: block.assetIds };
   if (block.type === 'trip_summary') return { ...EMPTY_BLOCK, type: 'trip_summary', title: block.title ?? '', text: block.body ?? '' };
   if (block.type === 'rpg_result') return { ...EMPTY_BLOCK, type: 'rpg_result', locationId: block.tripId || tripId, title: block.title ?? '' };
   return { ...EMPTY_BLOCK, type: 'text', text: block.type === 'text' ? block.text : '' };

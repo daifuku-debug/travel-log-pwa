@@ -238,12 +238,13 @@ export async function addPhotoBlockFromFile(
   tripId: EntityId,
   file: File,
   caption: string,
+  body = '',
 ): Promise<ScrapbookBlock> {
   try {
     const asset = await saveLocalMediaAsset(tripId, file);
     return addScrapbookBlock(pageId, {
       type: 'photo',
-      text: '',
+      text: body,
       locationId: '',
       title: '',
       note: caption,
@@ -259,12 +260,13 @@ export async function addPhotoGridBlockFromFiles(
   tripId: EntityId,
   files: File[],
   caption: string,
+  body = '',
 ): Promise<ScrapbookBlock> {
   try {
     const assets = await Promise.all(files.map((file) => saveLocalMediaAsset(tripId, file)));
     return addScrapbookBlock(pageId, {
       type: 'photo_grid',
-      text: '',
+      text: body,
       locationId: '',
       title: '',
       note: caption,
@@ -460,14 +462,42 @@ function buildBlock({
     syncStatus: 'pending' as const,
   };
   if (input.type === 'heading') return { ...base, type: 'heading', text: input.text.trim() || '見出し', level: 2 };
-  if (input.type === 'place') return { ...base, type: 'place', locationId: input.locationId, snapshotName: input.title.trim() || '訪問場所', caption: optionalText(input.note) };
+  if (input.type === 'place') {
+    return {
+      ...base,
+      type: 'place',
+      locationId: input.locationId,
+      snapshotName: input.title.trim() || '訪問場所',
+      body: optionalText(input.text),
+      caption: optionalText(input.note),
+    };
+  }
   if (input.type === 'quote') return { ...base, type: 'quote', text: input.text.trim() || '印象に残った言葉', cite: optionalText(input.title) };
   if (input.type === 'divider') return { ...base, type: 'divider', label: optionalText(input.title) };
-  if (input.type === 'photo') return { ...base, type: 'photo', assetId: input.assetId || input.locationId, caption: optionalText(input.note), altText: optionalText(input.title), displaySize: 'large' };
-  if (input.type === 'photo_grid') return { ...base, type: 'photo_grid', assetIds: input.assetIds ?? [], caption: optionalText(input.note), columns: 2 };
-  if (input.type === 'meal') return { ...base, type: 'meal', name: input.title.trim() || '食事', note: optionalText(input.note), assetIds: [], isBestMeal: false };
-  if (input.type === 'ticket') return { ...base, type: 'ticket', itemType: 'ticket', title: input.title.trim() || 'チケット', note: optionalText(input.note) };
-  if (input.type === 'purchase') return { ...base, type: 'purchase', name: input.title.trim() || '買ったもの', note: optionalText(input.note), assetIds: [] };
+  if (input.type === 'photo') {
+    return {
+      ...base,
+      type: 'photo',
+      assetId: input.assetId || input.locationId,
+      body: optionalText(input.text),
+      caption: optionalText(input.note),
+      altText: optionalText(input.title),
+      displaySize: 'large',
+    };
+  }
+  if (input.type === 'photo_grid') {
+    return {
+      ...base,
+      type: 'photo_grid',
+      assetIds: input.assetIds ?? [],
+      body: optionalText(input.text),
+      caption: optionalText(input.note),
+      columns: 2,
+    };
+  }
+  if (input.type === 'meal') return { ...base, type: 'meal', name: input.title.trim() || '食事', body: optionalText(input.text), note: optionalText(input.note), assetIds: [], isBestMeal: false };
+  if (input.type === 'ticket') return { ...base, type: 'ticket', itemType: 'ticket', title: input.title.trim() || 'チケット', body: optionalText(input.text), note: optionalText(input.note) };
+  if (input.type === 'purchase') return { ...base, type: 'purchase', name: input.title.trim() || '買ったもの', body: optionalText(input.text), note: optionalText(input.note), assetIds: [] };
   if (input.type === 'trip_summary') return { ...base, type: 'trip_summary', title: optionalText(input.title), body: optionalText(input.text) };
   if (input.type === 'rpg_result') return { ...base, type: 'rpg_result', tripId: input.locationId || 'unknown-trip', title: optionalText(input.title) };
   return { ...base, type: 'text', text: input.text.trim() || 'メモを書く', textStyle: 'body' };

@@ -74,7 +74,9 @@ export interface HeadingBlock extends ScrapbookBlockBase {
 export interface PhotoBlock extends ScrapbookBlockBase {
   type: 'photo';
   assetId: EntityId;
+  body?: string;
   caption?: string;
+  note?: string;
   altText?: string;
   displaySize: 'large' | 'medium' | 'small';
 }
@@ -82,7 +84,9 @@ export interface PhotoBlock extends ScrapbookBlockBase {
 export interface PhotoGridBlock extends ScrapbookBlockBase {
   type: 'photo_grid';
   assetIds: EntityId[];
+  body?: string;
   caption?: string;
+  note?: string;
   columns: 2 | 3 | 4;
 }
 
@@ -90,13 +94,16 @@ export interface PlaceBlock extends ScrapbookBlockBase {
   type: 'place';
   locationId: EntityId;
   titleOverride?: string;
+  body?: string;
   caption?: string;
+  note?: string;
   snapshotName: string;
 }
 
 export interface MealBlock extends ScrapbookBlockBase {
   type: 'meal';
   name: string;
+  body?: string;
   restaurantName?: string;
   eatenAt?: IsoDateTimeString;
   locationId?: EntityId;
@@ -112,6 +119,7 @@ export interface TicketBlock extends ScrapbookBlockBase {
   assetId?: EntityId;
   itemType: 'ticket' | 'receipt' | 'pamphlet' | 'stamp' | 'goshuin' | 'castle_stamp' | 'other';
   title: string;
+  body?: string;
   issuedAt?: IsoDateString;
   note?: string;
   relatedLocationId?: EntityId;
@@ -121,6 +129,7 @@ export interface TicketBlock extends ScrapbookBlockBase {
 export interface PurchaseBlock extends ScrapbookBlockBase {
   type: 'purchase';
   name: string;
+  body?: string;
   shopName?: string;
   price?: number;
   purchasedAt?: IsoDateString;

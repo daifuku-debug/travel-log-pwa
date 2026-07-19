@@ -604,6 +604,18 @@ await test('スクラップブックは写真と写真グリッドを端末内Bl
   assert.match(scrapbookPage, /<MediaImage/);
 });
 
+await test('スクラップブックの写真や記録ブロックは本文と補足メモを保持して表示する', () => {
+  assert.match(scrapbookModel, /interface PhotoBlock[\s\S]*body\?: string/);
+  assert.match(scrapbookModel, /interface PhotoGridBlock[\s\S]*body\?: string/);
+  assert.match(scrapbookModel, /interface MealBlock[\s\S]*body\?: string/);
+  assert.match(scrapbookService, /body: optionalText\(input\.text\)/);
+  assert.match(scrapbookService, /note: optionalText\(input\.note\)/);
+  assert.match(scrapbookPage, /addPhotoBlockFromFile\(page\.id, tripId, files\[0\], input\.note, input\.text\)/);
+  assert.match(scrapbookPage, /block\.body && <p>\{block\.body\}<\/p>/);
+  assert.match(scrapbookPage, /BlockTextContent/);
+  assert.match(scrapbookPage, /text: block\.body \?\? ''/);
+});
+
 await test('GitHub Pagesのベースパス配下でも地図データを読み込む設定になっている', () => {
   assert.match(mapComponent, /import\.meta\.env\.BASE_URL\}maps\/japan-prefectures\.geojson/);
 });
