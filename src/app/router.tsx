@@ -21,6 +21,7 @@ const RpgExperiencePage = lazyPage(() => import('../pages/RpgExperiencePage'), '
 const CollectionPage = lazyPage(() => import('../pages/CollectionPage'), 'CollectionPage');
 const WishlistPage = lazyPage(() => import('../pages/WishlistPage'), 'WishlistPage');
 const SettingsPage = lazyPage(() => import('../pages/SettingsPage'), 'SettingsPage');
+const MorePage = lazyPage(() => import('../pages/MorePage'), 'MorePage');
 
 export const router = createBrowserRouter(
   [
@@ -47,6 +48,7 @@ export const router = createBrowserRouter(
         { path: 'collections', element: page(<CollectionPage />) },
         { path: 'wishlist', element: page(<WishlistPage />) },
         { path: 'settings', element: page(<SettingsPage />) },
+        { path: 'more', element: page(<MorePage />) },
         { path: '*', element: <Navigate to="/" replace /> },
       ],
     },

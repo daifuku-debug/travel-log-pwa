@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { MediaAsset, Scrapbook, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel, ScrapbookThemeId } from '../domain/models/scrapbook';
 import {
   addPhotoBlockFromFile,
@@ -21,9 +21,12 @@ import {
   type ScrapbookPageInput,
 } from '../features/scrapbooks/scrapbookService';
 import { getTripDetail } from '../features/trips/tripService';
-import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
+import { EmptyState, ErrorState } from '../shared/components/PageState';
 import { formatDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
+import { Badge, Button, Card, InlineError, PageHeader, Skeleton } from '../shared/ui';
+import { ScrapbookCover } from '../features/scrapbooks/components/ScrapbookCover';
+import { ScrapbookPageNavigation } from '../features/scrapbooks/components/ScrapbookPageNavigation';
 
 const THEME_LABELS: Record<ScrapbookThemeId, string> = {
   classic: 'クラシック',
@@ -91,54 +94,49 @@ export function ScrapbookPage() {
 
   return (
     <>
-      <section className="page-heading">
-        <div className="page-heading__row">
-          <div>
-            <h1>旅行スクラップブック</h1>
-            <p>{data?.tripDetail ? `${data.tripDetail.trip.title} / ${formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}` : '旅行の思い出を1冊にまとめます。'}</p>
+      <PageHeader
+        title="旅行スクラップブック"
+        description={data?.tripDetail ? `${data.tripDetail.trip.title} / ${formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}` : '旅行の思い出を1冊にまとめます。'}
+        backTo={tripId ? `/trips/${tripId}` : '/trips'}
+        backLabel="旅行詳細へ"
+        actions={scrapbookDetail && (
+          <div className="scrapbook-mode-actions">
+            <Badge variant={mode === 'edit' ? 'warning' : 'success'}>{mode === 'edit' ? '編集中' : '閲覧中'}</Badge>
+            <Button variant={mode === 'edit' ? 'primary' : 'secondary'} onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}>
+              {mode === 'view' ? '編集する' : '閲覧に戻る'}
+            </Button>
           </div>
-          <div className="inline-actions">
-            <Link className="button" to={tripId ? `/trips/${tripId}` : '/trips'}>旅行詳細</Link>
-            {scrapbookDetail && (
-              <button className="button" type="button" onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}>
-                {mode === 'view' ? '編集' : '閲覧'}
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
+        )}
+      />
 
-      {loading && <LoadingState />}
+      {loading && <ScrapbookLoadingState />}
       {error && <ErrorState error={error} />}
-      {formError && <div className="form-errors">{formError}</div>}
+      {formError && <InlineError message={formError} />}
 
       {!loading && !error && data && !data.tripDetail && (
-        <EmptyState>旅行が見つかりません。<Link to="/trips">旅行一覧へ戻る</Link></EmptyState>
+        <EmptyState
+          title="旅行が見つかりません"
+          description="旅行一覧からスクラップブックを開き直してください。"
+          action={<Button to="/trips">旅行一覧へ戻る</Button>}
+        />
       )}
 
       {data?.tripDetail && !scrapbookDetail && (
-        <section className="card">
-          <h2>まだスクラップブックがありません</h2>
-          <p className="muted">旅行の日程と訪問場所から、表紙・日付ページ・場所ブロックを自動生成します。</p>
-          <button className="button button--primary" type="button" onClick={() => void handleCreate()}>
-            スクラップブックを作成
-          </button>
-        </section>
+        <EmptyState
+          title="まだスクラップブックがありません"
+          description="旅行の日程と訪問場所から、表紙・日付ページ・場所ブロックを自動生成します。"
+          action={<Button variant="primary" onClick={() => void handleCreate()}>スクラップブックを作成</Button>}
+          secondaryAction={<Button to={`/trips/${data.tripDetail.trip.id}`}>旅行詳細へ戻る</Button>}
+        />
       )}
 
       {scrapbookDetail && data?.tripDetail && (
         <div className={`scrapbook scrapbook-theme-${scrapbookDetail.scrapbook.themeId}`}>
-          <section className="card scrapbook-cover">
-            <div>
-              <div className="list-item__meta">旅行スクラップブック</div>
-              <h2>{scrapbookDetail.scrapbook.title}</h2>
-              <p>{scrapbookDetail.scrapbook.subtitle || data.tripDetail.trip.purpose || '旅の記録'}</p>
-              <p className="muted">{formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}</p>
-            </div>
-            <span className={`status-badge ${scrapbookDetail.scrapbook.status === 'completed' ? 'achievement-unlocked' : ''}`}>
-              {scrapbookDetail.scrapbook.status === 'completed' ? '完成' : scrapbookDetail.scrapbook.status === 'archived' ? 'アーカイブ' : '下書き'}
-            </span>
-          </section>
+          <ScrapbookCover
+            scrapbook={scrapbookDetail.scrapbook}
+            subtitle={scrapbookDetail.scrapbook.subtitle || data.tripDetail.trip.purpose || '旅の記録'}
+            dateRange={formatDateRange(data.tripDetail.trip.startDate, data.tripDetail.trip.endDate)}
+          />
 
           {mode === 'edit' && (
             <ScrapbookSettingsForm
@@ -148,35 +146,16 @@ export function ScrapbookPage() {
           )}
 
           <div className="scrapbook-layout">
-            <section className="card scrapbook-pages">
-              <div className="section-head">
-                <h2>ページ</h2>
-                {mode === 'edit' && <PageForm scrapbookId={scrapbookDetail.scrapbook.id} onSaved={() => setReloadKey((value) => value + 1)} />}
-              </div>
-              <div className="prefecture-list">
-                {scrapbookDetail.pages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className={`prefecture-row ${selectedPage?.id === page.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedPageId(page.id)}
-                  >
-                    <div>
-                      <strong>{page.title}</strong>
-                      <div className="list-item__meta">{page.date || page.layoutType} / {page.blocks.length}ブロック</div>
-                    </div>
-                    {mode === 'edit' && (
-                      <span className="inline-actions">
-                        <button className="button" type="button" onClick={(event) => { event.stopPropagation(); void moveScrapbookPage(page.id, -1).then(() => setReloadKey((value) => value + 1)); }}>上</button>
-                        <button className="button" type="button" onClick={(event) => { event.stopPropagation(); void moveScrapbookPage(page.id, 1).then(() => setReloadKey((value) => value + 1)); }}>下</button>
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </section>
+            <ScrapbookPageNavigation
+              pages={scrapbookDetail.pages}
+              selectedPageId={selectedPage?.id}
+              editing={mode === 'edit'}
+              addPageAction={mode === 'edit' ? <PageForm scrapbookId={scrapbookDetail.scrapbook.id} onSaved={() => setReloadKey((value) => value + 1)} /> : undefined}
+              onSelect={setSelectedPageId}
+              onMove={(pageId, direction) => void moveScrapbookPage(pageId, direction).then(() => setReloadKey((value) => value + 1))}
+            />
 
-            <section className="card scrapbook-page-view">
+            <Card className="scrapbook-page-view">
               {selectedPage ? (
                 <>
                   <div className="section-head">
@@ -206,7 +185,10 @@ export function ScrapbookPage() {
 
                   <div className="scrapbook-blocks">
                     {selectedPage.blocks.length === 0 ? (
-                      <EmptyState>このページにはまだブロックがありません。</EmptyState>
+                      <EmptyState
+                        title="このページはまだ空です"
+                        description={mode === 'edit' ? '下の入力欄から文章や写真を追加できます。' : '編集モードに切り替えると内容を追加できます。'}
+                      />
                     ) : (
                       selectedPage.blocks.map((block) => (
                         <ScrapbookBlockView
@@ -231,21 +213,31 @@ export function ScrapbookPage() {
                     />
                   )}
                 </>
-              ) : (
-                <EmptyState>ページを選択してください。</EmptyState>
-              )}
-            </section>
+              ) : <EmptyState title="ページを選択してください" />}
+            </Card>
           </div>
 
-          <section className="card">
-            <h2>写真について</h2>
+          <Card title="写真について" variant="subtle">
             <p className="muted">
               写真本体とサムネイルはこの端末のIndexedDBに保存します。GitHub PagesやJSONバックアップには画像本体を含めず、メタデータだけを保存します。
             </p>
-          </section>
+          </Card>
         </div>
       )}
     </>
+  );
+}
+
+function ScrapbookLoadingState() {
+  return (
+    <div className="scrapbook-loading" aria-live="polite" aria-busy="true">
+      <span className="sr-only">スクラップブックを読み込み中...</span>
+      <Skeleton variant="block" className="scrapbook-loading__cover" />
+      <div className="scrapbook-loading__body">
+        <Skeleton variant="card" />
+        <Skeleton variant="card" />
+      </div>
+    </div>
   );
 }
 
@@ -386,7 +378,7 @@ function BlockForm({
       }
     }}>
       <h3>ブロック追加</h3>
-      {error && <div className="form-errors">{error}</div>}
+      {error && <InlineError message={error} compact />}
       <label className="field">
         <span>関連場所</span>
         <select value={input.locationId} onChange={(event) => setInput({ ...input, locationId: event.target.value })}>
@@ -638,9 +630,9 @@ function MediaImage({ asset, alt }: { asset: MediaAsset; alt: string }) {
     };
   }, [asset]);
 
-  if (error) return <div className="empty-state">{error}</div>;
-  if (!url) return <div className="empty-state">写真を読み込み中...</div>;
-  return <img src={url} alt={alt} loading="lazy" />;
+  if (error) return <div className="scrapbook-media-placeholder scrapbook-media-placeholder--error" role="img" aria-label={alt}>{error}</div>;
+  if (!url) return <div className="scrapbook-media-placeholder" aria-label="写真を読み込み中"><Skeleton variant="block" /></div>;
+  return <img src={url} alt={alt} loading="lazy" decoding="async" />;
 }
 
 function blockToInput(block: ScrapbookBlock, tripId = ''): ScrapbookBlockInput {

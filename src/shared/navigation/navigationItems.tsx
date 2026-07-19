@@ -4,21 +4,28 @@ export interface BottomNavigationItem {
   to: string;
   label: string;
   icon: ReactNode;
-  match?: 'exact' | 'prefix';
+  activePaths: string[];
 }
 
 export const bottomNavigationItems: BottomNavigationItem[] = [
-  { to: '/', label: 'ホーム', icon: <HomeIcon />, match: 'exact' },
-  { to: '/trips', label: '旅行', icon: <SuitcaseIcon /> },
-  { to: '/japan-map', label: '地図', icon: <MapIcon /> },
-  { to: '/castles', label: '城', icon: <CastleIcon /> },
-  { to: '/time-machine', label: '時間', icon: <ClockIcon /> },
-  { to: '/travel-gacha', label: 'ガチャ', icon: <GachaIcon /> },
-  { to: '/rpg', label: 'RPG', icon: <HeroIcon /> },
-  { to: '/collections', label: '収集', icon: <CollectionIcon /> },
-  { to: '/wishlist', label: '欲しいもの', icon: <BagIcon /> },
-  { to: '/settings', label: '設定', icon: <SettingsIcon /> },
+  { to: '/', label: 'ホーム', icon: <HomeIcon />, activePaths: ['/'] },
+  { to: '/trips', label: '旅行', icon: <SuitcaseIcon />, activePaths: ['/trips'] },
+  { to: '/japan-map', label: '地図', icon: <MapIcon />, activePaths: ['/japan-map'] },
+  { to: '/collections', label: 'コレクション', icon: <CollectionIcon />, activePaths: ['/collections', '/castles'] },
+  {
+    to: '/more',
+    label: 'その他',
+    icon: <MoreIcon />,
+    activePaths: ['/more', '/time-machine', '/travel-gacha', '/rpg', '/wishlist', '/settings'],
+  },
 ];
+
+export function isBottomNavigationItemActive(pathname: string, item: BottomNavigationItem): boolean {
+  return item.activePaths.some((path) => {
+    if (path === '/') return pathname === '/';
+    return pathname === path || pathname.startsWith(`${path}/`);
+  });
+}
 
 function NavSvg({ children }: { children: ReactNode }) {
   return (
@@ -55,46 +62,6 @@ function MapIcon() {
   );
 }
 
-function CastleIcon() {
-  return (
-    <NavSvg>
-      <path className="nav-fill-soft" d="M6.5 26.5h19l-1.4-9.2H7.9Z" />
-      <path className="nav-fill-accent" d="M10 13.5h12l-2.2-5.2h-7.6Z" />
-      <path className="nav-stroke" d="M6.5 26.5h19M8 17.3h16M10 13.5h12l-2.2-5.2h-7.6ZM11.2 17.3l-.9 9.2m10.5-9.2.9 9.2M13 22h6M15 8.3V5.8h3.5" />
-    </NavSvg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <NavSvg>
-      <circle className="nav-fill-soft" cx="16" cy="16" r="10.5" />
-      <path className="nav-stroke" d="M16 9.5V16l5 3M7.5 7.5l-2 3M24.5 7.5l2 3" />
-    </NavSvg>
-  );
-}
-
-function GachaIcon() {
-  return (
-    <NavSvg>
-      <rect className="nav-fill-soft" x="8" y="12.5" width="16" height="13.5" rx="3.5" />
-      <circle className="nav-fill-accent" cx="16" cy="10.5" r="6" />
-      <circle className="nav-fill-soft" cx="16" cy="19" r="2.7" />
-      <path className="nav-stroke" d="M10.5 12.5h11M8 16h16M8 12.5h16V26H8ZM10 26v2m12-2v2M16 4.5a6 6 0 0 1 6 6v2h-12v-2a6 6 0 0 1 6-6ZM13.2 19h5.6" />
-    </NavSvg>
-  );
-}
-
-function HeroIcon() {
-  return (
-    <NavSvg>
-      <path className="nav-fill-soft" d="M9 27v-6.2a7 7 0 0 1 14 0V27Z" />
-      <path className="nav-fill-accent" d="M11.2 9.4 16 4.8l4.8 4.6-1.2 5.2h-7.2Z" />
-      <path className="nav-stroke" d="M9 27v-6.2a7 7 0 0 1 14 0V27M12.4 14.6h7.2l1.2-5.2L16 4.8l-4.8 4.6ZM13 20.5h6M16 14.6v3.2M8.3 11.2l3.4 1.6m12-1.6-3.4 1.6" />
-    </NavSvg>
-  );
-}
-
 function CollectionIcon() {
   return (
     <NavSvg>
@@ -107,22 +74,14 @@ function CollectionIcon() {
   );
 }
 
-function BagIcon() {
+function MoreIcon() {
   return (
     <NavSvg>
-      <path className="nav-fill-soft" d="M8 12h16l-1.2 14.5H9.2Z" />
-      <path className="nav-stroke" d="M8 12h16l-1.2 14.5H9.2ZM12 12a4 4 0 0 1 8 0M13 19h6" />
-      <path className="nav-fill-accent" d="M19 18.5h3.2v3.2H19Z" />
-    </NavSvg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <NavSvg>
-      <path className="nav-fill-soft" d="M17.8 5.5 19 8.2l2.9.6 1.6 2.7-1.9 2.2.2 2.3 2.1 2.1-1.5 2.8-3-.1-1.8 1.3-.8 2.9h-3.2l-.8-2.9-1.8-1.3-3 .1-1.5-2.8L8.6 16l.2-2.3-1.9-2.2 1.6-2.7 2.9-.6 1.2-2.7Z" />
-      <circle className="nav-fill-accent" cx="16" cy="15.5" r="3.6" />
-      <path className="nav-stroke" d="M17.8 5.5 19 8.2l2.9.6 1.6 2.7-1.9 2.2.2 2.3 2.1 2.1-1.5 2.8-3-.1-1.8 1.3-.8 2.9h-3.2l-.8-2.9-1.8-1.3-3 .1-1.5-2.8L8.6 16l.2-2.3-1.9-2.2 1.6-2.7 2.9-.6 1.2-2.7Z" />
+      <rect className="nav-fill-soft" x="5.5" y="6" width="9" height="9" rx="3" />
+      <rect className="nav-fill-accent" x="17.5" y="6" width="9" height="9" rx="3" />
+      <rect className="nav-fill-accent" x="5.5" y="18" width="9" height="9" rx="3" />
+      <rect className="nav-fill-soft" x="17.5" y="18" width="9" height="9" rx="3" />
+      <path className="nav-stroke" d="M10 9.5v2m-1-1h2M22 9.5v2m-1-1h2M10 21.5v2m-1-1h2M22 21.5v2m-1-1h2" />
     </NavSvg>
   );
 }
