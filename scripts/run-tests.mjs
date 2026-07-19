@@ -65,7 +65,6 @@ const localTravelGachaRepository = await readFile(new URL('../src/infrastructure
 const stylesSource = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const appLayoutSource = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
-const appHeaderSource = await readFile(new URL('../src/shared/layout/AppHeader.tsx', import.meta.url), 'utf8');
 const bottomNavigationSource = await readFile(new URL('../src/shared/navigation/BottomNavigation.tsx', import.meta.url), 'utf8');
 const navigationItemsSource = await readFile(new URL('../src/shared/navigation/navigationItems.tsx', import.meta.url), 'utf8');
 const buttonSource = await readFile(new URL('../src/shared/ui/Button.tsx', import.meta.url), 'utf8');
@@ -1031,15 +1030,11 @@ await test('UI Phase2のDesign TokensとSafe Areaが定義されている', () =
   assert.match(indexHtml, /viewport-fit=cover/);
 });
 
-await test('AppShellはHeader、Outlet、BottomNavigationを分離して保持する', () => {
-  assert.match(appLayoutSource, /<AppHeader \/>/);
+await test('AppShellは常時Headerを描画せずOutletとBottomNavigationを保持する', () => {
+  assert.doesNotMatch(appLayoutSource, /AppHeader/);
   assert.match(appLayoutSource, /<Outlet \/>/);
   assert.match(appLayoutSource, /<BottomNavigation \/>/);
-  assert.match(appHeaderSource, /端末内保存/);
-  assert.match(appHeaderSource, /useLocation/);
-  assert.match(appHeaderSource, /location\.pathname === '\/'/);
-  assert.match(appHeaderSource, /!isHome/);
-  assert.match(appHeaderSource, /aria-label="端末内に保存されています"/);
+  assert.doesNotMatch(appLayoutSource, /旅ログ|端末内保存/);
   assert.match(stylesSource, /padding-bottom: calc\(var\(--bottom-nav-height\) \+ env\(safe-area-inset-bottom\)\)/);
 });
 

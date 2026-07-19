@@ -1,17 +1,15 @@
 import { Link } from 'react-router-dom';
 import type { Trip } from '../../../domain/models/trip';
-import { formatDateRange } from '../../../shared/date/dateUtils';
+import { formatCompactDateRange } from '../../../shared/date/dateUtils';
 import type { TripMediaLoadState } from '../useTripMedia';
 import { TripMedia } from './TripMedia';
 
 export function TripPreviewCard({
   trip,
   media,
-  tone,
 }: {
   trip: Trip;
   media?: TripMediaLoadState;
-  tone: 'teal' | 'blue' | 'mist';
 }) {
   const src = media?.status === 'ready' ? media.src : undefined;
   return (
@@ -22,13 +20,13 @@ export function TripPreviewCard({
           alt={`${trip.title}の旅の写真`}
           loading={media?.status === 'loading'}
           ratio="card"
-          tone={tone}
+          fallbackKey={`${trip.id}:${trip.title}:${trip.tripType}:${trip.startDate}`}
         />
         <span className="trip-preview-card__badge">{trip.tripType === 'dayTrip' ? '日帰り' : '宿泊'}</span>
       </div>
       <span className="trip-preview-card__body">
         <strong>{trip.title}</strong>
-        <small>{formatDateRange(trip.startDate, trip.endDate)}</small>
+        <small title={`${trip.startDate} - ${trip.endDate}`}>{formatCompactDateRange(trip.startDate, trip.endDate)}</small>
       </span>
     </Link>
   );

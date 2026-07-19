@@ -16,10 +16,10 @@ export function JapanMapPreview({
           <span className="home-section-heading__eyebrow">旅の広がり</span>
           <h2 id="home-map-title">日本制覇マップ</h2>
         </div>
-        <div className="home-map-preview__rate"><strong>{summary.visitRate.toFixed(1)}%</strong><span>訪問制覇率</span></div>
       </div>
-      <JapanGeoMap views={views} interactive={false} ariaLabel="都道府県の訪問状況プレビュー" />
-      <div className="home-map-preview__footer">
+      <div className="home-map-preview__canvas">
+        <JapanGeoMap views={views} interactive={false} ariaLabel="都道府県の訪問状況プレビュー" />
+        <div className="home-map-preview__rate"><strong>{summary.visitRate.toFixed(1)}%</strong><span>訪問制覇率</span></div>
         <div className="home-map-preview__legend" aria-label="地図プレビューの凡例">
           <span><i className="status-visited" aria-hidden="true" />訪問済み</span>
           <span><i className="status-passed" aria-hidden="true" />通過・到達</span>

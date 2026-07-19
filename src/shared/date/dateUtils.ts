@@ -23,6 +23,14 @@ export function formatDateRange(startDate: string, endDate: string): string {
   return startDate === endDate ? startDate : `${startDate} - ${endDate}`;
 }
 
+export function formatCompactDateRange(startDate: string, endDate: string): string {
+  if (startDate === endDate) return startDate.replaceAll('-', '.');
+  const compactEnd = startDate.slice(0, 4) === endDate.slice(0, 4)
+    ? endDate.slice(5).replace('-', '.')
+    : endDate.replaceAll('-', '.');
+  return `${startDate.replaceAll('-', '.')} - ${compactEnd}`;
+}
+
 export function dateInputToIsoDateTime(value: string): string | undefined {
   if (!value) return undefined;
   return new Date(`${value}T12:00:00`).toISOString();

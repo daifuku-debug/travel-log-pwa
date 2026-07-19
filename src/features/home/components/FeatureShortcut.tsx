@@ -6,16 +6,16 @@ export function FeatureShortcut({
   title,
   description,
   icon,
-  accent = false,
+  variant,
 }: {
   to: string;
   title: string;
   description: string;
   icon: ReactNode;
-  accent?: boolean;
+  variant: 'time-machine' | 'gacha' | 'castle' | 'scrapbook';
 }) {
   return (
-    <Link className={`feature-shortcut ${accent ? 'feature-shortcut--accent' : ''}`} to={to} aria-label={`${title}: ${description}`}>
+    <Link className={`feature-shortcut feature-shortcut--${variant}`} to={to} aria-label={`${title}: ${description}`}>
       <span className="feature-shortcut__icon" aria-hidden="true">{icon}</span>
       <span><strong>{title}</strong><small>{description}</small></span>
     </Link>

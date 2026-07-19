@@ -7,21 +7,22 @@ export function TripMedia({
   loading = false,
   ratio = 'card',
   eager = false,
-  tone = 'teal',
+  fallbackKey = 'travel-journal',
 }: {
   src?: string;
   alt: string;
   loading?: boolean;
   ratio?: 'hero' | 'card';
   eager?: boolean;
-  tone?: 'teal' | 'blue' | 'mist';
+  fallbackKey?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const fallbackVariant = stableVariant(fallbackKey);
 
   useEffect(() => setFailed(false), [src]);
 
   return (
-    <div className={`trip-media trip-media--${ratio} trip-media--${tone}`}>
+    <div className={`trip-media trip-media--${ratio} trip-media--variant-${fallbackVariant}`}>
       {loading ? (
         <Skeleton variant="block" className="trip-media__skeleton" />
       ) : src && !failed ? (
@@ -42,4 +43,10 @@ export function TripMedia({
       )}
     </div>
   );
+}
+
+function stableVariant(value: string): number {
+  let hash = 0;
+  for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return hash % 4;
 }

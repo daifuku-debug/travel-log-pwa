@@ -38,34 +38,34 @@ export function HomePage() {
         <EmptyHomeHero />
       )}
 
-      {data.recentTrips.length > 0 && (
-        <section className="home-section" aria-labelledby="recent-trips-title">
-          <SectionHeading id="recent-trips-title" eyebrow="旅のアルバム" title="最近の旅行" to="/trips" />
-          <div className="home-recent-trips">
-            {data.recentTrips.map((trip, index) => (
-              <TripPreviewCard
-                key={trip.id}
-                trip={trip}
-                media={mediaByTripId[trip.id]}
-                tone={index % 3 === 0 ? 'teal' : index % 3 === 1 ? 'blue' : 'mist'}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="home-content-surface">
+        {data.recentTrips.length > 0 && (
+          <section className="home-section" aria-labelledby="recent-trips-title">
+            <SectionHeading id="recent-trips-title" eyebrow="旅のアルバム" title="最近の旅行" to="/trips" />
+            <div className="home-recent-trips">
+              {data.recentTrips.map((trip) => (
+                <TripPreviewCard
+                  key={trip.id}
+                  trip={trip}
+                  media={mediaByTripId[trip.id]}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {conquest.loading && (
-        <section className="home-map-preview home-map-preview--loading" aria-label="日本制覇マップを読み込み中">
-          <Skeleton variant="line" className="home-map-preview__title-skeleton" />
-          <Skeleton variant="block" className="home-map-preview__map-skeleton" />
-        </section>
-      )}
-      {conquest.error && (
-        <section className="home-section" aria-label="日本制覇マップの読み込みエラー">
-          <InlineError title="日本制覇マップを表示できません" message={conquest.error.message} />
-        </section>
-      )}
-      {conquest.data && <JapanMapPreview views={conquest.data.allViews} summary={conquest.data.summary} />}
+        {conquest.loading && (
+          <section className="home-map-preview home-map-preview--loading" aria-label="日本制覇マップを読み込み中">
+            <Skeleton variant="line" className="home-map-preview__title-skeleton" />
+            <Skeleton variant="block" className="home-map-preview__map-skeleton" />
+          </section>
+        )}
+        {conquest.error && (
+          <section className="home-section" aria-label="日本制覇マップの読み込みエラー">
+            <InlineError title="日本制覇マップを表示できません" message={conquest.error.message} />
+          </section>
+        )}
+        {conquest.data && <JapanMapPreview views={conquest.data.allViews} summary={conquest.data.summary} />}
 
       <section className="home-section" aria-labelledby="home-features-title">
         <SectionHeading id="home-features-title" eyebrow="次の旅につながる" title="よく使う機能" />
@@ -75,48 +75,52 @@ export function HomePage() {
             title="タイムマシン"
             description="過去の旅を日付から探す"
             icon={<FeatureIcon kind="clock" />}
+            variant="time-machine"
           />
           <FeatureShortcut
             to="/travel-gacha"
             title="旅ガチャ"
             description="次の旅先候補を抽選"
             icon={<FeatureIcon kind="gacha" />}
-            accent
+            variant="gacha"
           />
           <FeatureShortcut
             to="/castles"
             title="城コレクション"
             description="日本の名城を集める"
             icon={<FeatureIcon kind="castle" />}
+            variant="castle"
           />
           <FeatureShortcut
             to={scrapbookPath}
             title="スクラップブック"
             description="旅の思い出を編集"
             icon={<FeatureIcon kind="book" />}
+            variant="scrapbook"
           />
         </div>
-      </section>
+        </section>
 
-      <section className="home-section home-stats-section" aria-labelledby="home-progress-title">
-        <SectionHeading id="home-progress-title" eyebrow="積み重ね" title="旅の記録" to="/rpg" linkLabel="RPGを見る" />
-        <div className="home-stats">
-          <Stat icon={<FeatureIcon kind="suitcase" />} value={data.tripCount} label="旅行" />
-          <Stat icon={<FeatureIcon kind="pin" />} value={data.placeVisitCount} label="訪問場所" />
-          <Stat icon={<FeatureIcon kind="hero" />} value={`Lv.${data.rpg.level}`} label={data.rpg.mainTitleName} />
-        </div>
-        <ProgressBar
-          label="コレクション達成率"
-          value={data.collectionAchievementRate}
-          valueText={`${data.collectionAchievementRate}%`}
-        />
-        {(data.rpg.questTitles.length > 0 || data.rpg.recentAchievementNames.length > 0) && (
-          <div className="home-achievement-list">
-            {data.rpg.questTitles.length > 0 && <p><strong>進行中</strong><span>{data.rpg.questTitles.join(' / ')}</span></p>}
-            {data.rpg.recentAchievementNames.length > 0 && <p><strong>最近の実績</strong><span>{data.rpg.recentAchievementNames.join(' / ')}</span></p>}
+        <section className="home-section home-stats-section" aria-labelledby="home-progress-title">
+          <SectionHeading id="home-progress-title" eyebrow="積み重ね" title="旅の記録" to="/rpg" linkLabel="RPGを見る" />
+          <div className="home-stats">
+            <Stat icon={<FeatureIcon kind="suitcase" />} value={data.tripCount} label="旅行" />
+            <Stat icon={<FeatureIcon kind="pin" />} value={data.placeVisitCount} label="訪問場所" />
+            <Stat icon={<FeatureIcon kind="hero" />} value={`Lv.${data.rpg.level}`} label={data.rpg.mainTitleName} />
           </div>
-        )}
-      </section>
+          <ProgressBar
+            label="コレクション達成率"
+            value={data.collectionAchievementRate}
+            valueText={`${data.collectionAchievementRate}%`}
+          />
+          {(data.rpg.questTitles.length > 0 || data.rpg.recentAchievementNames.length > 0) && (
+            <div className="home-achievement-list">
+              {data.rpg.questTitles.length > 0 && <p><strong>進行中</strong><span>{data.rpg.questTitles.join(' / ')}</span></p>}
+              {data.rpg.recentAchievementNames.length > 0 && <p><strong>最近の実績</strong><span>{data.rpg.recentAchievementNames.join(' / ')}</span></p>}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -124,7 +128,7 @@ export function HomePage() {
 function EmptyHomeHero() {
   return (
     <section className="home-hero home-hero--empty" aria-labelledby="home-hero-title">
-      <TripMedia alt="旅の記録を始めるための風景" ratio="hero" eager tone="mist" />
+      <TripMedia alt="旅の記録を始めるための風景" ratio="hero" eager fallbackKey="empty-travel-journal" />
       <div className="home-hero__shade" aria-hidden="true" />
       <div className="home-hero__content">
         <span className="home-hero__eyebrow">Travel Journal</span>
