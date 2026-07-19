@@ -5,6 +5,7 @@ export type ScrapbookLayoutMode = 'timeline' | 'pages' | 'freeform';
 export type ScrapbookThemeId = 'classic' | 'journal' | 'minimal' | 'adventure';
 export type ScrapbookCoverLayout = 'magazine' | 'journal' | 'photo';
 export type ScrapbookPageLayoutType = 'cover' | 'day' | 'section' | 'summary';
+export type ScrapbookPageKind = 'cover' | 'story' | 'timeline' | 'photo' | 'place' | 'feature' | 'ending' | 'custom';
 export type MediaStorageType = 'local' | 'remote' | 'external';
 export type MediaSyncStatus = 'local_only' | 'pending' | 'synced' | 'failed';
 export type ScrapbookContentOrigin = 'generated' | 'manual';
@@ -13,6 +14,9 @@ export interface ScrapbookCoverSettings {
   photoId?: EntityId;
   titlePosition?: string;
   layout?: string;
+  showDate?: boolean;
+  showLocation?: boolean;
+  showSubtitle?: boolean;
 }
 
 export interface Scrapbook extends BaseEntity {
@@ -48,6 +52,7 @@ export interface ScrapbookPage extends BaseEntity {
   date?: IsoDateString;
   dayNumber?: number;
   sortOrder: number;
+  pageKind: ScrapbookPageKind;
   layoutType: ScrapbookPageLayoutType;
   layoutVariant?: string;
   backgroundStyle?: string;

@@ -1,7 +1,7 @@
 import { AppError } from '../../shared/errors';
 
 const DB_NAME = 'travel-log-local-db';
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 
 export type StoreName =
   | 'trips'

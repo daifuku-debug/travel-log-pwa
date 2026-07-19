@@ -183,6 +183,7 @@ export async function addScrapbookPage(scrapbookId: EntityId, input: ScrapbookPa
       date: optionalText(input.date),
       dayNumber: input.dayNumber > 0 ? Math.floor(input.dayNumber) : undefined,
       sortOrder: nextSortOrder(pages),
+      pageKind: 'custom',
       layoutType: input.layoutType,
       backgroundStyle: optionalText(input.backgroundStyle),
       createdAt: now,
@@ -215,6 +216,7 @@ export async function updateScrapbookPage(pageId: EntityId, input: ScrapbookPage
       title: nextTitle,
       date: nextDate,
       dayNumber: nextDayNumber,
+      pageKind: current.pageKind,
       layoutType: input.layoutType,
       backgroundStyle: nextBackgroundStyle,
       userEditedFields: appendEditedFields(current.userEditedFields, changedFields),
@@ -390,7 +392,7 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
   const now = new Date().toISOString();
 
   if (!existingPageKeys.has(`cover:${trip.id}`)) {
-    const coverPage = await repositories.scrapbookPages.save({
+    await repositories.scrapbookPages.save({
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
       scrapbookId,
@@ -399,6 +401,7 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       userEditedFields: [],
       title: '表紙',
       sortOrder: 10,
+      pageKind: 'cover',
       layoutType: 'cover',
       sourceType: 'trip',
       sourceId: trip.id,
@@ -408,10 +411,32 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       updatedAt: now,
       syncStatus: 'pending',
     });
+  }
+
+  if (!existingPageKeys.has(`story:${trip.id}`)) {
+    const storyPage = await repositories.scrapbookPages.save({
+      id: createId('scrapbook-page'),
+      userId: LOCAL_USER_ID,
+      scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
+      title: '旅のはじまり',
+      sortOrder: 20,
+      pageKind: 'story',
+      layoutType: 'section',
+      sourceType: 'trip',
+      sourceId: trip.id,
+      sourceKey: `story:${trip.id}`,
+      generatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 'pending',
+    });
     await repositories.scrapbookBlocks.save({
       id: createId('scrapbook-block'),
       userId: LOCAL_USER_ID,
-      pageId: coverPage.id,
+      pageId: storyPage.id,
       origin: 'generated',
       sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
       userEditedFields: [],
@@ -429,11 +454,36 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
     });
   }
 
+  if (!existingPageKeys.has(`timeline:${trip.id}`)) {
+    await repositories.scrapbookPages.save({
+      id: createId('scrapbook-page'),
+      userId: LOCAL_USER_ID,
+      scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
+      title: '旅の流れ',
+      sortOrder: 30,
+      pageKind: 'timeline',
+      layoutType: 'section',
+      sourceType: 'trip',
+      sourceId: trip.id,
+      sourceKey: `timeline:${trip.id}`,
+      generatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 'pending',
+    });
+  }
+
   const tripDates = enumerateDates(trip.startDate, trip.endDate);
-  let pageSortOrder = 20;
+  let pageSortOrder = 40;
   for (const [index, date] of tripDates.entries()) {
     const sourceKey = `day:${trip.id}:${date}`;
-    if (existingPageKeys.has(sourceKey)) continue;
+    if (existingPageKeys.has(sourceKey)) {
+      pageSortOrder += 10;
+      continue;
+    }
     const page = await repositories.scrapbookPages.save({
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
@@ -445,6 +495,7 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       date,
       dayNumber: index + 1,
       sortOrder: pageSortOrder,
+      pageKind: 'place',
       layoutType: 'day',
       sourceType: 'trip',
       sourceId: trip.id,
@@ -482,7 +533,7 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
     pageSortOrder += 10;
   }
 
-  if (!existingPageKeys.has(`summary:${trip.id}`)) {
+  if (!existingPageKeys.has(`photo:${trip.id}`)) {
     await repositories.scrapbookPages.save({
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
@@ -490,12 +541,36 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       origin: 'generated',
       sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
       userEditedFields: [],
-      title: '旅のまとめ',
+      title: '旅の景色',
       sortOrder: pageSortOrder,
+      pageKind: 'photo',
+      layoutType: 'section',
+      sourceType: 'trip',
+      sourceId: trip.id,
+      sourceKey: `photo:${trip.id}`,
+      generatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 'pending',
+    });
+    pageSortOrder += 10;
+  }
+
+  if (!existingPageKeys.has(`ending:${trip.id}`)) {
+    await repositories.scrapbookPages.save({
+      id: createId('scrapbook-page'),
+      userId: LOCAL_USER_ID,
+      scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
+      title: '旅の余韻',
+      sortOrder: pageSortOrder,
+      pageKind: 'ending',
       layoutType: 'summary',
       sourceType: 'trip',
       sourceId: trip.id,
-      sourceKey: `summary:${trip.id}`,
+      sourceKey: `ending:${trip.id}`,
       generatedAt: now,
       createdAt: now,
       updatedAt: now,

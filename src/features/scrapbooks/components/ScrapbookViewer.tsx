@@ -1,12 +1,25 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { MediaAsset, ScrapbookBlock } from '../../../domain/models/scrapbook';
-import type { TripDetail } from '../../trips/tripService';
+import type { MediaAsset, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel } from '../../../domain/models/scrapbook';
+import { formatCompactDateRange, isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
 import { TripJournalTimeline } from '../../trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
-import { formatCompactDateRange, isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
+import type { TripDetail } from '../../trips/tripService';
 import type { ScrapbookDetail } from '../scrapbookService';
+import { sortVisibleScrapbookPages } from '../scrapbookPageLogic';
 import { ScrapbookMediaImage } from './ScrapbookMediaImage';
+
+type ViewerPage = ScrapbookDetail['pages'][number];
+
+interface PageRendererProps {
+  detail: ScrapbookDetail;
+  page: ViewerPage;
+  tripDetail: TripDetail;
+  assetsById: Map<string, MediaAsset>;
+  onEdit: () => void;
+  showLegacyStory?: boolean;
+  showLegacyPhotoFallback?: boolean;
+}
 
 export function ScrapbookViewer({
   detail,
@@ -18,99 +31,53 @@ export function ScrapbookViewer({
   onEdit: () => void;
 }) {
   const { scrapbook, mediaAssets } = detail;
-  const pages = detail.pages.filter((page) => !page.isHidden);
-  const blocks = pages.flatMap((page) => page.blocks.filter((block) => !block.isHidden));
+  const pages = sortVisibleScrapbookPages(detail.pages);
   const assetsById = new Map(mediaAssets.map((asset) => [asset.id, asset]));
-  const coverAsset = resolveCoverAsset(detail, assetsById);
-  const photoBlocks = blocks.filter((block): block is Extract<ScrapbookBlock, { type: 'photo' | 'photo_grid' }> => block.type === 'photo' || block.type === 'photo_grid');
-  const storyBlocks = blocks.filter(isStoryBlock);
-  const placeBlocks = blocks.filter((block): block is Extract<ScrapbookBlock, { type: 'place' }> => block.type === 'place');
-  const photoCount = new Set(photoBlocks.flatMap((block) => block.type === 'photo' ? [block.assetId] : block.assetIds)).size;
-  const castleCount = tripDetail.places.filter((place) => place.castleId).length;
   const layout = scrapbook.layoutVariant || scrapbook.coverSettings?.layout || scrapbook.coverLayout;
+  const hasStoryPage = pages.some((page) => page.pageKind === 'story');
+  const hasPhotoPage = pages.some((page) => page.pageKind === 'photo');
+  const firstContentPageId = pages.find((page) => page.pageKind !== 'cover')?.id;
+  const endingPageId = [...pages].reverse().find((page) => page.pageKind === 'ending')?.id;
 
   return (
     <article className={`scrapbook-viewer scrapbook-viewer--${scrapbook.themeId} scrapbook-viewer--layout-${toClassName(layout)}`}>
-      <ScrapbookMagazineCover
-        detail={detail}
-        tripDetail={tripDetail}
-        coverAsset={coverAsset}
-        onEdit={onEdit}
-      />
-
-      <div className="scrapbook-viewer__paper">
-        <ScrapbookSection eyebrow="Story" title="旅のはじまり" className="scrapbook-viewer__story">
-          <p className="scrapbook-viewer__lead">{buildStoryLead(detail, tripDetail, storyBlocks)}</p>
-          {storyBlocks.map((block) => <StoryBlock key={block.id} block={block} />)}
-        </ScrapbookSection>
-
-        <ScrapbookSection eyebrow="Journey" title="旅の流れ" className="scrapbook-viewer__timeline">
-          <TripJournalTimeline places={tripDetail.places} transportLegs={tripDetail.transportLegs} />
-        </ScrapbookSection>
-
-        <ScrapbookSection eyebrow="Scenes" title="旅の景色" className="scrapbook-viewer__photos">
-          {photoBlocks.length > 0 ? (
-            <div className="scrapbook-viewer__photo-sequence">
-              {photoBlocks.map((block, index) => (
-                <PhotoStory key={block.id} block={block} index={index} assetsById={assetsById} />
-              ))}
-            </div>
-          ) : (
-            <div className="scrapbook-viewer__photo-fallback">
-              <TripJournalVisual trip={tripDetail.trip} placeNames={tripDetail.places.map((place) => place.name)} alt="" />
-              <p>写真の代わりに、旅の記録から生まれた景色を添えています。</p>
-            </div>
-          )}
-        </ScrapbookSection>
-
-        <ScrapbookSection eyebrow="Places" title="旅の舞台" className="scrapbook-viewer__places">
-          <div className="scrapbook-viewer__place-list">
-            {buildPlaceEntries(placeBlocks, tripDetail).map((entry, index) => (
-              <article key={entry.id} className="scrapbook-viewer__place">
-                <span className="scrapbook-viewer__place-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <div>
-                  <h3>{entry.name}</h3>
-                  <time dateTime={entry.date}>{formatDisplayDate(entry.date)}</time>
-                  <p>{entry.note || 'この旅で訪れた場所。'}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </ScrapbookSection>
-
-        <ScrapbookSection eyebrow="Keepsakes" title="旅の余韻" className="scrapbook-viewer__achievements">
-          <div className="scrapbook-viewer__achievement-grid">
-            <Achievement value={`${tripDetail.places.length}`} label="訪問した場所" />
-            <Achievement value={`${photoCount}`} label="残した写真" />
-            <Achievement value={`${pages.length}`} label="旅のページ" />
-            <Achievement value={castleCount > 0 ? `+${castleCount}` : '—'} label="城コレクション" />
-          </div>
-          <p>{scrapbook.status === 'completed' ? 'この一冊は、旅の記憶として完成しています。' : 'この旅の続きは、いつでもこの一冊に書き足せます。'}</p>
-          <div className="scrapbook-viewer__closing-actions">
-            <Link to={`/trips/${tripDetail.trip.id}/result`}>旅行リザルトを見る <span aria-hidden="true">→</span></Link>
-            <button type="button" onClick={onEdit}>この一冊を編集する</button>
-          </div>
-        </ScrapbookSection>
-      </div>
+      {pages.map((page) => (
+        <ScrapbookPageRenderer
+          key={page.id}
+          detail={detail}
+          page={page}
+          tripDetail={tripDetail}
+          assetsById={assetsById}
+          onEdit={onEdit}
+          showLegacyStory={!hasStoryPage && page.id === firstContentPageId}
+          showLegacyPhotoFallback={!hasPhotoPage && page.id === endingPageId}
+        />
+      ))}
     </article>
   );
 }
 
-function ScrapbookMagazineCover({
-  detail,
-  tripDetail,
-  coverAsset,
-  onEdit,
-}: {
-  detail: ScrapbookDetail;
-  tripDetail: TripDetail;
-  coverAsset?: MediaAsset;
-  onEdit: () => void;
-}) {
-  const { scrapbook } = detail;
-  const titlePosition = toClassName(scrapbook.coverSettings?.titlePosition || 'bottom-left');
+function ScrapbookPageRenderer(props: PageRendererProps) {
+  if (props.page.pageKind === 'cover') return <ScrapbookCoverPage {...props} />;
   return (
-    <header className={`scrapbook-viewer__cover scrapbook-viewer__cover--${titlePosition}`}>
+    <div className={`scrapbook-viewer__paper scrapbook-viewer__page scrapbook-viewer__page--${props.page.pageKind}`} data-page-kind={props.page.pageKind}>
+      {props.page.pageKind === 'story' && <StoryPage {...props} />}
+      {props.page.pageKind === 'timeline' && <TimelinePage {...props} />}
+      {props.page.pageKind === 'photo' && <PhotoPage {...props} />}
+      {props.page.pageKind === 'place' && <PlacePage {...props} />}
+      {props.page.pageKind === 'ending' && <EndingPage {...props} />}
+      {(props.page.pageKind === 'feature' || props.page.pageKind === 'custom') && <FeaturePage {...props} />}
+    </div>
+  );
+}
+
+function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit }: PageRendererProps) {
+  const { scrapbook } = detail;
+  const coverAsset = resolveCoverAsset(detail, assetsById);
+  const settings = scrapbook.coverSettings;
+  const titlePosition = toClassName(settings?.titlePosition || 'bottom-left');
+  return (
+    <header className={`scrapbook-viewer__cover scrapbook-viewer__cover--${titlePosition}`} data-page-kind="cover">
       {coverAsset ? (
         <ScrapbookMediaImage asset={coverAsset} alt={`${scrapbook.title}の表紙写真`} className="scrapbook-viewer__cover-image" loading="eager" />
       ) : (
@@ -122,39 +89,132 @@ function ScrapbookMagazineCover({
       <div className="scrapbook-viewer__cover-copy">
         <span className="scrapbook-viewer__edition">Travel journal · {tripDetail.trip.tripType === 'dayTrip' ? 'Day trip' : 'Journey'}</span>
         <h1>{scrapbook.title}</h1>
-        <p>{scrapbook.subtitle || tripDetail.trip.purpose || tripDetail.trip.memo || '旅の記録'}</p>
-        <div className="scrapbook-viewer__cover-meta">
-          <time dateTime={tripDetail.trip.startDate}>{formatCompactDateRange(tripDetail.trip.startDate, tripDetail.trip.endDate)}</time>
-          {tripDetail.places[0]?.name && <span>{tripDetail.places[0].name}</span>}
-        </div>
+        {settings?.showSubtitle !== false && <p>{scrapbook.subtitle || tripDetail.trip.purpose || tripDetail.trip.memo || '旅の記録'}</p>}
+        {(settings?.showDate !== false || settings?.showLocation !== false) && (
+          <div className="scrapbook-viewer__cover-meta">
+            {settings?.showDate !== false && <time dateTime={tripDetail.trip.startDate}>{formatCompactDateRange(tripDetail.trip.startDate, tripDetail.trip.endDate)}</time>}
+            {settings?.showLocation !== false && tripDetail.places[0]?.name && <span>{tripDetail.places[0].name}</span>}
+          </div>
+        )}
       </div>
     </header>
   );
 }
 
-function ScrapbookSection({
-  eyebrow,
-  title,
-  className,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  className: string;
-  children: ReactNode;
-}) {
+function StoryPage({ detail, page, tripDetail, assetsById }: PageRendererProps) {
+  const blocks = visibleBlocks(page);
   return (
-    <section className={`scrapbook-viewer__section ${className}`}>
-      <header><span>{eyebrow}</span><h2>{title}</h2></header>
-      {children}
-    </section>
+    <ScrapbookSection eyebrow="Story" title={page.title} className="scrapbook-viewer__story">
+      <p className="scrapbook-viewer__lead">{buildStoryLead(detail, tripDetail, blocks)}</p>
+      <PageBlocks blocks={blocks.filter((block) => block.type !== 'trip_summary')} tripDetail={tripDetail} assetsById={assetsById} />
+    </ScrapbookSection>
   );
+}
+
+function TimelinePage({ detail, page, tripDetail, assetsById, showLegacyStory }: PageRendererProps) {
+  const blocks = visibleBlocks(page);
+  return (
+    <>
+      {showLegacyStory && (
+        <ScrapbookSection eyebrow="Story" title="旅のはじまり" className="scrapbook-viewer__story">
+          <p className="scrapbook-viewer__lead">{buildStoryLead(detail, tripDetail, blocks)}</p>
+        </ScrapbookSection>
+      )}
+      <ScrapbookSection eyebrow="Journey" title={page.title} className="scrapbook-viewer__timeline">
+        <TripJournalTimeline places={tripDetail.places} transportLegs={tripDetail.transportLegs} />
+        <PageBlocks blocks={blocks} tripDetail={tripDetail} assetsById={assetsById} />
+      </ScrapbookSection>
+    </>
+  );
+}
+
+function PhotoPage({ page, tripDetail, assetsById }: PageRendererProps) {
+  const photoBlocks = visibleBlocks(page).filter(isPhotoBlock);
+  return (
+    <ScrapbookSection eyebrow="Scenes" title={page.title} className="scrapbook-viewer__photos">
+      {photoBlocks.length > 0 ? (
+        <div className="scrapbook-viewer__photo-sequence">
+          {photoBlocks.map((block, index) => <PhotoStory key={block.id} block={block} index={index} assetsById={assetsById} />)}
+        </div>
+      ) : (
+        <div className="scrapbook-viewer__photo-fallback">
+          <TripJournalVisual trip={tripDetail.trip} placeNames={tripDetail.places.map((place) => place.name)} alt="" />
+          <p>写真の代わりに、旅の記録から生まれた景色を添えています。</p>
+        </div>
+      )}
+    </ScrapbookSection>
+  );
+}
+
+function PlacePage({ page, tripDetail, assetsById }: PageRendererProps) {
+  const blocks = visibleBlocks(page);
+  const placeBlocks = blocks.filter(isPlaceBlock);
+  return (
+    <ScrapbookSection eyebrow="Places" title={page.title} className="scrapbook-viewer__places">
+      <PlaceList entries={buildPlaceEntries(placeBlocks, tripDetail, page)} />
+      <PageBlocks blocks={blocks.filter((block) => block.type !== 'place')} tripDetail={tripDetail} assetsById={assetsById} />
+    </ScrapbookSection>
+  );
+}
+
+function EndingPage({ detail, page, tripDetail, assetsById, onEdit, showLegacyPhotoFallback }: PageRendererProps) {
+  const photoCount = countPhotos(detail.pages);
+  const castleCount = tripDetail.places.filter((place) => place.castleId).length;
+  return (
+    <>
+      {showLegacyPhotoFallback && photoCount === 0 && (
+        <ScrapbookSection eyebrow="Scenes" title="旅の景色" className="scrapbook-viewer__photos">
+          <div className="scrapbook-viewer__photo-fallback">
+            <TripJournalVisual trip={tripDetail.trip} placeNames={tripDetail.places.map((place) => place.name)} alt="" />
+            <p>写真の代わりに、旅の記録から生まれた景色を添えています。</p>
+          </div>
+        </ScrapbookSection>
+      )}
+      <ScrapbookSection eyebrow="Keepsakes" title={page.title} className="scrapbook-viewer__achievements">
+        <PageBlocks blocks={visibleBlocks(page)} tripDetail={tripDetail} assetsById={assetsById} />
+        <div className="scrapbook-viewer__achievement-grid">
+          <Achievement value={`${tripDetail.places.length}`} label="訪問した場所" />
+          <Achievement value={`${photoCount}`} label="残した写真" />
+          <Achievement value={`${detail.pages.filter((item) => !item.isHidden).length}`} label="旅のページ" />
+          <Achievement value={castleCount > 0 ? `+${castleCount}` : '—'} label="城コレクション" />
+        </div>
+        <p>{detail.scrapbook.status === 'completed' ? 'この一冊は、旅の記憶として完成しています。' : 'この旅の続きは、いつでもこの一冊に書き足せます。'}</p>
+        <div className="scrapbook-viewer__closing-actions">
+          <Link to={`/trips/${tripDetail.trip.id}/result`}>旅行リザルトを見る <span aria-hidden="true">→</span></Link>
+          <button type="button" onClick={onEdit}>この一冊を編集する</button>
+        </div>
+      </ScrapbookSection>
+    </>
+  );
+}
+
+function FeaturePage({ page, tripDetail, assetsById }: PageRendererProps) {
+  return (
+    <ScrapbookSection eyebrow={page.pageKind === 'feature' ? 'Feature' : 'Journal'} title={page.title} className="scrapbook-viewer__feature">
+      <PageBlocks blocks={visibleBlocks(page)} tripDetail={tripDetail} assetsById={assetsById} />
+    </ScrapbookSection>
+  );
+}
+
+function ScrapbookSection({ eyebrow, title, className, children }: { eyebrow: string; title: string; className: string; children: ReactNode }) {
+  return <section className={`scrapbook-viewer__section ${className}`}><header><span>{eyebrow}</span><h2>{title}</h2></header>{children}</section>;
+}
+
+function PageBlocks({ blocks, tripDetail, assetsById }: { blocks: ScrapbookBlock[]; tripDetail: TripDetail; assetsById: Map<string, MediaAsset> }) {
+  let photoIndex = 0;
+  return blocks.length > 0 ? blocks.map((block) => {
+    if (isPhotoBlock(block)) return <PhotoStory key={block.id} block={block} index={photoIndex++} assetsById={assetsById} />;
+    if (isPlaceBlock(block)) return <PlaceList key={block.id} entries={buildPlaceEntries([block], tripDetail)} />;
+    if (block.type === 'divider') return <hr key={block.id} aria-label={block.label || '区切り'} />;
+    if (block.type === 'rpg_result') return <StoryNote key={block.id} title={block.title || '旅の成果'} body="旅行リザルトに残された、この旅の成果。" />;
+    return <StoryBlock key={block.id} block={block} />;
+  }) : null;
 }
 
 function StoryBlock({ block }: { block: ScrapbookBlock }) {
   if (block.type === 'heading') return <h3 className="scrapbook-viewer__story-heading">{block.text}</h3>;
   if (block.type === 'quote') return <blockquote>{block.text}{block.cite && <cite>{block.cite}</cite>}</blockquote>;
-  if (block.type === 'trip_summary') return null;
+  if (block.type === 'trip_summary') return <StoryNote title={block.title} body={block.body} />;
   if (block.type === 'meal') return <StoryNote title={block.name} body={block.body || block.note} />;
   if (block.type === 'ticket') return <StoryNote title={block.title} body={block.body || block.note} />;
   if (block.type === 'purchase') return <StoryNote title={block.name} body={block.body || block.note} />;
@@ -167,15 +227,7 @@ function StoryNote({ title, body }: { title?: string; body?: string }) {
   return <div className="scrapbook-viewer__story-note">{title && <h3>{title}</h3>}<p>{body}</p></div>;
 }
 
-function PhotoStory({
-  block,
-  index,
-  assetsById,
-}: {
-  block: Extract<ScrapbookBlock, { type: 'photo' | 'photo_grid' }>;
-  index: number;
-  assetsById: Map<string, MediaAsset>;
-}) {
+function PhotoStory({ block, index, assetsById }: { block: Extract<ScrapbookBlock, { type: 'photo' | 'photo_grid' }>; index: number; assetsById: Map<string, MediaAsset> }) {
   const assetIds = block.type === 'photo' ? [block.assetId] : block.assetIds;
   const assets = assetIds.map((id) => assetsById.get(id)).filter((asset): asset is MediaAsset => Boolean(asset));
   const variant = block.layoutVariant || (block.type === 'photo' ? block.displaySize : `grid-${Math.min(block.columns, 3)}`);
@@ -184,17 +236,23 @@ function PhotoStory({
     <figure className={`scrapbook-viewer__photo-story scrapbook-viewer__photo-story--${toClassName(variant)} scrapbook-viewer__photo-story--sequence-${index % 3}`}>
       {block.title && <h3>{block.title}</h3>}
       <div className="scrapbook-viewer__photo-grid">
-        {assets.map((asset, assetIndex) => (
-          <ScrapbookMediaImage key={asset.id} asset={asset} alt={asset.originalFileName || `${block.title || '旅の写真'} ${assetIndex + 1}`} />
-        ))}
+        {assets.map((asset, assetIndex) => <ScrapbookMediaImage key={asset.id} asset={asset} alt={asset.originalFileName || `${block.title || '旅の写真'} ${assetIndex + 1}`} />)}
       </div>
-      {(block.body || block.caption || block.note) && (
-        <figcaption>
-          {block.body && <p>{block.body}</p>}
-          {(block.caption || block.note) && <span>{block.caption || block.note}</span>}
-        </figcaption>
-      )}
+      {(block.body || block.caption || block.note) && <figcaption>{block.body && <p>{block.body}</p>}{(block.caption || block.note) && <span>{block.caption || block.note}</span>}</figcaption>}
     </figure>
+  );
+}
+
+function PlaceList({ entries }: { entries: ReturnType<typeof buildPlaceEntries> }) {
+  return (
+    <div className="scrapbook-viewer__place-list">
+      {entries.map((entry, index) => (
+        <article key={entry.id} className="scrapbook-viewer__place">
+          <span className="scrapbook-viewer__place-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+          <div><h3>{entry.name}</h3><time dateTime={entry.date}>{formatDisplayDate(entry.date)}</time><p>{entry.note || 'この旅で訪れた場所。'}</p></div>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -203,16 +261,10 @@ function Achievement({ value, label }: { value: string; label: string }) {
 }
 
 function resolveCoverAsset(detail: ScrapbookDetail, assetsById: Map<string, MediaAsset>): MediaAsset | undefined {
-  const preferredIds = [
-    detail.scrapbook.coverSettings?.photoId,
-    detail.scrapbook.coverAssetId,
-    ...(detail.scrapbook.highlightPhotoIds ?? []),
-  ];
-  for (const id of preferredIds) {
-    if (id && assetsById.has(id)) return assetsById.get(id);
-  }
-  for (const page of detail.pages) {
-    for (const block of page.blocks) {
+  const preferredIds = [detail.scrapbook.coverSettings?.photoId, detail.scrapbook.coverAssetId, ...(detail.scrapbook.highlightPhotoIds ?? [])];
+  for (const id of preferredIds) if (id && assetsById.has(id)) return assetsById.get(id);
+  for (const page of [...detail.pages].sort((left, right) => left.sortOrder - right.sortOrder)) {
+    for (const block of visibleBlocks(page)) {
       if (block.type === 'photo') return assetsById.get(block.assetId);
       if (block.type === 'photo_grid') {
         const asset = block.assetIds.map((id) => assetsById.get(id)).find(Boolean);
@@ -223,12 +275,20 @@ function resolveCoverAsset(detail: ScrapbookDetail, assetsById: Map<string, Medi
   return undefined;
 }
 
-function isStoryBlock(block: ScrapbookBlock): boolean {
-  return ['text', 'heading', 'meal', 'ticket', 'purchase', 'quote', 'trip_summary'].includes(block.type);
+function visibleBlocks(page: ViewerPage): ScrapbookBlock[] {
+  return [...page.blocks].filter((block) => !block.isHidden).sort((left, right) => left.sortOrder - right.sortOrder || left.id.localeCompare(right.id));
 }
 
-function buildStoryLead(detail: ScrapbookDetail, tripDetail: TripDetail, storyBlocks: ScrapbookBlock[]): string {
-  const summary = storyBlocks.find((block): block is Extract<ScrapbookBlock, { type: 'trip_summary' }> => block.type === 'trip_summary' && Boolean(block.body));
+function isPhotoBlock(block: ScrapbookBlock): block is Extract<ScrapbookBlock, { type: 'photo' | 'photo_grid' }> {
+  return block.type === 'photo' || block.type === 'photo_grid';
+}
+
+function isPlaceBlock(block: ScrapbookBlock): block is Extract<ScrapbookBlock, { type: 'place' }> {
+  return block.type === 'place';
+}
+
+function buildStoryLead(detail: ScrapbookDetail, tripDetail: TripDetail, blocks: ScrapbookBlock[]): string {
+  const summary = blocks.find((block): block is Extract<ScrapbookBlock, { type: 'trip_summary' }> => block.type === 'trip_summary' && Boolean(block.body));
   if (summary?.body) return summary.body;
   if (tripDetail.trip.memo) return tripDetail.trip.memo;
   if (tripDetail.trip.purpose) return tripDetail.trip.purpose;
@@ -236,31 +296,28 @@ function buildStoryLead(detail: ScrapbookDetail, tripDetail: TripDetail, storyBl
   return firstPlace ? `${firstPlace}から始まった、${detail.scrapbook.title}の記憶。` : `${detail.scrapbook.title}の記憶をたどる一冊。`;
 }
 
-function buildPlaceEntries(
-  placeBlocks: Array<Extract<ScrapbookBlock, { type: 'place' }>>,
-  tripDetail: TripDetail,
-) {
+function buildPlaceEntries(placeBlocks: Array<Extract<ScrapbookBlock, { type: 'place' }>>, tripDetail: TripDetail, page?: ScrapbookPageModel) {
   const byId = new Map(placeBlocks.map((block) => [block.locationId, block]));
-  const entries = tripDetail.places.map((place) => {
+  const sourcePlaces = placeBlocks.length > 0
+    ? tripDetail.places.filter((place) => byId.has(place.id))
+    : tripDetail.places.filter((place) => !page?.date || !place.visitedAt || place.visitedAt.slice(0, 10) === page.date);
+  const entries = sourcePlaces.map((place) => {
     const block = byId.get(place.id);
     return {
       id: place.id,
       name: block?.titleOverride || place.name || block?.snapshotName || '訪問場所',
-      date: isoDateTimeToDateInput(place.visitedAt) || tripDetail.trip.startDate,
+      date: isoDateTimeToDateInput(place.visitedAt) || page?.date || tripDetail.trip.startDate,
       note: block?.body || block?.caption || block?.note || place.memo || '',
     };
   });
   for (const block of placeBlocks) {
-    if (!entries.some((entry) => entry.id === block.locationId)) {
-      entries.push({
-        id: block.id,
-        name: block.titleOverride || block.snapshotName,
-        date: tripDetail.trip.startDate,
-        note: block.body || block.caption || block.note || '',
-      });
-    }
+    if (!entries.some((entry) => entry.id === block.locationId)) entries.push({ id: block.id, name: block.titleOverride || block.snapshotName, date: page?.date || tripDetail.trip.startDate, note: block.body || block.caption || block.note || '' });
   }
-  return entries.length > 0 ? entries : [{ id: 'empty', name: '旅の目的地', date: tripDetail.trip.startDate, note: '訪問場所を追加すると、この旅の舞台が並びます。' }];
+  return entries.length > 0 ? entries : [{ id: `empty-${page?.id || 'page'}`, name: '旅の目的地', date: page?.date || tripDetail.trip.startDate, note: '訪問場所を追加すると、この旅の舞台が並びます。' }];
+}
+
+function countPhotos(pages: ViewerPage[]): number {
+  return new Set(pages.flatMap((page) => visibleBlocks(page).flatMap((block) => block.type === 'photo' ? [block.assetId] : block.type === 'photo_grid' ? block.assetIds : []))).size;
 }
 
 function formatDisplayDate(value: string): string {

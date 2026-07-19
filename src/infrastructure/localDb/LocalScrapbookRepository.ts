@@ -8,9 +8,9 @@ import type {
   ScrapbookRepository,
 } from '../../domain/repositories/ScrapbookRepository';
 import {
-  migrateScrapbookBlockToV9,
-  migrateScrapbookPageToV9,
-  migrateScrapbookToV9,
+  migrateScrapbookBlockToV10,
+  migrateScrapbookPageToV10,
+  migrateScrapbookToV10,
 } from '../../domain/scrapbooks/scrapbookMigration';
 import { readAll, readById, putOne, clearStore } from './db';
 import { LocalBaseRepository } from './LocalBaseRepository';
@@ -21,12 +21,12 @@ export class LocalScrapbookRepository extends LocalBaseRepository<Scrapbook> imp
   }
 
   override async list(): Promise<Scrapbook[]> {
-    return (await super.list()).map(migrateScrapbookToV9);
+    return (await super.list()).map(migrateScrapbookToV10);
   }
 
   override async getById(id: EntityId): Promise<Scrapbook | undefined> {
     const scrapbook = await super.getById(id);
-    return scrapbook ? migrateScrapbookToV9(scrapbook) : undefined;
+    return scrapbook ? migrateScrapbookToV10(scrapbook) : undefined;
   }
 
   async getByTripId(tripId: EntityId): Promise<Scrapbook | undefined> {
@@ -52,12 +52,12 @@ export class LocalScrapbookPageRepository
   }
 
   override async list(): Promise<ScrapbookPage[]> {
-    return (await super.list()).map(migrateScrapbookPageToV9);
+    return (await super.list()).map(migrateScrapbookPageToV10);
   }
 
   override async getById(id: EntityId): Promise<ScrapbookPage | undefined> {
     const page = await super.getById(id);
-    return page ? migrateScrapbookPageToV9(page) : undefined;
+    return page ? migrateScrapbookPageToV10(page) : undefined;
   }
 
   async listByScrapbookId(scrapbookId: EntityId): Promise<ScrapbookPage[]> {
@@ -77,12 +77,12 @@ export class LocalScrapbookBlockRepository
   }
 
   override async list(): Promise<ScrapbookBlock[]> {
-    return (await super.list()).map(migrateScrapbookBlockToV9);
+    return (await super.list()).map(migrateScrapbookBlockToV10);
   }
 
   override async getById(id: EntityId): Promise<ScrapbookBlock | undefined> {
     const block = await super.getById(id);
-    return block ? migrateScrapbookBlockToV9(block) : undefined;
+    return block ? migrateScrapbookBlockToV10(block) : undefined;
   }
 
   async listByPageId(pageId: EntityId): Promise<ScrapbookBlock[]> {

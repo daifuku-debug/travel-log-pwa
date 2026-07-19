@@ -3301,6 +3301,24 @@ a {
   box-shadow: 0 -18px 50px rgba(17, 37, 35, .14);
 }
 
+.scrapbook-viewer__paper:first-child {
+  margin-top: 0;
+  border-radius: 0;
+}
+
+.scrapbook-viewer__paper + .scrapbook-viewer__paper {
+  margin-top: 0;
+  border-radius: 0;
+  padding-top: 0;
+  box-shadow: none;
+}
+
+.scrapbook-viewer__feature hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--scrapbook-ink) 16%, transparent);
+}
+
 .scrapbook-viewer__section {
   display: grid;
   width: min(100%, 850px);

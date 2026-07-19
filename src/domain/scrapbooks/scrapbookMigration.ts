@@ -1,8 +1,14 @@
-import type { Scrapbook, ScrapbookBlock, ScrapbookContentOrigin, ScrapbookPage } from '../models/scrapbook';
+import type {
+  Scrapbook,
+  ScrapbookBlock,
+  ScrapbookContentOrigin,
+  ScrapbookPage,
+  ScrapbookPageKind,
+} from '../models/scrapbook';
 
-export const SCRAPBOOK_SCHEMA_SOURCE_REVISION = 1;
+export const SCRAPBOOK_SCHEMA_SOURCE_REVISION = 2;
 
-export function migrateScrapbookToV9(value: Scrapbook): Scrapbook {
+export function migrateScrapbookToV10(value: Scrapbook): Scrapbook {
   const origin = normalizeOrigin(value.origin);
   return {
     ...value,
@@ -18,7 +24,7 @@ export function migrateScrapbookToV9(value: Scrapbook): Scrapbook {
   };
 }
 
-export function migrateScrapbookPageToV9(value: ScrapbookPage): ScrapbookPage {
+export function migrateScrapbookPageToV10(value: ScrapbookPage): ScrapbookPage {
   const origin = normalizeOrigin(value.origin);
   return {
     ...value,
@@ -26,11 +32,12 @@ export function migrateScrapbookPageToV9(value: ScrapbookPage): ScrapbookPage {
     sourceRevision: normalizeSourceRevision(value.sourceRevision, origin),
     userEditedFields: normalizeEditedFields(value.userEditedFields),
     isHidden: value.isHidden === true,
+    pageKind: normalizePageKind(value.pageKind, value),
     layoutVariant: normalizeOptionalString(value.layoutVariant),
   };
 }
 
-export function migrateScrapbookBlockToV9(value: ScrapbookBlock): ScrapbookBlock {
+export function migrateScrapbookBlockToV10(value: ScrapbookBlock): ScrapbookBlock {
   const origin = normalizeOrigin(value.origin);
   return {
     ...value,
@@ -73,6 +80,26 @@ function normalizeCoverSettings(value: unknown): Scrapbook['coverSettings'] {
     photoId: normalizeOptionalString(settings.photoId),
     titlePosition: normalizeOptionalString(settings.titlePosition),
     layout: normalizeOptionalString(settings.layout),
+    showDate: normalizeOptionalBoolean(settings.showDate),
+    showLocation: normalizeOptionalBoolean(settings.showLocation),
+    showSubtitle: normalizeOptionalBoolean(settings.showSubtitle),
   };
-  return Object.values(normalized).some(Boolean) ? normalized : undefined;
+  return Object.values(normalized).some((entry) => entry !== undefined) ? normalized : undefined;
+}
+
+function normalizeOptionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function normalizePageKind(value: unknown, page: ScrapbookPage): ScrapbookPageKind {
+  const kinds: ScrapbookPageKind[] = ['cover', 'story', 'timeline', 'photo', 'place', 'feature', 'ending', 'custom'];
+  if (typeof value === 'string' && kinds.includes(value as ScrapbookPageKind)) return value as ScrapbookPageKind;
+  if (page.layoutType === 'cover' || page.sourceKey?.startsWith('cover:')) return 'cover';
+  if (page.sourceKey?.startsWith('story:') || /旅のはじまり|物語/.test(page.title)) return 'story';
+  if (page.sourceKey?.startsWith('timeline:') || /旅の流れ|タイムライン/.test(page.title)) return 'timeline';
+  if (page.sourceKey?.startsWith('photo:') || /旅の景色|写真|フォト/.test(page.title)) return 'photo';
+  if (page.sourceKey?.startsWith('place:') || /旅の舞台|訪問場所/.test(page.title)) return 'place';
+  if (page.sourceKey?.startsWith('ending:') || page.layoutType === 'summary' || /旅のまとめ|旅の余韻|編集後記/.test(page.title)) return 'ending';
+  if (page.layoutType === 'day') return page.dayNumber === 1 ? 'timeline' : 'place';
+  return 'custom';
 }

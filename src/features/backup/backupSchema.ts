@@ -15,12 +15,12 @@ import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
 import {
-  migrateScrapbookBlockToV9,
-  migrateScrapbookPageToV9,
-  migrateScrapbookToV9,
+  migrateScrapbookBlockToV10,
+  migrateScrapbookPageToV10,
+  migrateScrapbookToV10,
 } from '../../domain/scrapbooks/scrapbookMigration.ts';
 
-export const BACKUP_SCHEMA_VERSION = 9;
+export const BACKUP_SCHEMA_VERSION = 10;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -214,7 +214,7 @@ function sanitizeCastleVisitEvents(value: unknown): CastleVisitEvent[] {
 
 function sanitizeScrapbooks(value: unknown): Scrapbook[] {
   return uniqueBy(
-    arrayOrEmpty<Scrapbook>(value).map(migrateScrapbookToV9).filter((scrapbook) =>
+    arrayOrEmpty<Scrapbook>(value).map(migrateScrapbookToV10).filter((scrapbook) =>
       Boolean(scrapbook.id)
       && Boolean(scrapbook.tripId)
       && ['draft', 'completed', 'archived'].includes(scrapbook.status)
@@ -227,7 +227,7 @@ function sanitizeScrapbooks(value: unknown): Scrapbook[] {
 
 function sanitizeScrapbookPages(value: unknown): ScrapbookPage[] {
   return uniqueBy(
-    arrayOrEmpty<ScrapbookPage>(value).map(migrateScrapbookPageToV9).filter((page) =>
+    arrayOrEmpty<ScrapbookPage>(value).map(migrateScrapbookPageToV10).filter((page) =>
       Boolean(page.id)
       && Boolean(page.scrapbookId)
       && Number.isFinite(page.sortOrder)
@@ -240,7 +240,7 @@ function sanitizeScrapbookPages(value: unknown): ScrapbookPage[] {
 function sanitizeScrapbookBlocks(value: unknown): ScrapbookBlock[] {
   const blockTypes = ['text', 'heading', 'photo', 'photo_grid', 'place', 'meal', 'ticket', 'purchase', 'quote', 'divider', 'trip_summary', 'rpg_result'];
   return uniqueBy(
-    arrayOrEmpty<ScrapbookBlock>(value).map(migrateScrapbookBlockToV9).filter((block) =>
+    arrayOrEmpty<ScrapbookBlock>(value).map(migrateScrapbookBlockToV10).filter((block) =>
       Boolean(block.id)
       && Boolean(block.pageId)
       && Number.isFinite(block.sortOrder)
