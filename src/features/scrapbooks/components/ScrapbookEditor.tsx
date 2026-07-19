@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import type { ScrapbookPage } from '../../../domain/models/scrapbook';
 import { BottomSheet, Button, ConfirmDialog, InlineError, useToast } from '../../../shared/ui';
@@ -16,7 +16,7 @@ import {
   type ScrapbookDetail,
 } from '../scrapbookService';
 import { PageEditorPanel } from './PageEditorPanel';
-import { PageNavigatorSheet } from './PageNavigatorSheet';
+import { PAGE_KIND_LABELS, PageNavigatorSheet } from './PageNavigatorSheet';
 import { SaveBar } from './SaveBar';
 import { ScrapbookPagePreview } from './ScrapbookViewer';
 
@@ -55,6 +55,8 @@ export function ScrapbookEditor({
   const [pendingAction, setPendingAction] = useState<PendingAction>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [pageTurnDirection, setPageTurnDirection] = useState<'next' | 'previous'>('next');
+  const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined);
   const { showToast } = useToast();
   const dirty = !areScrapbookPageDraftsEqual(draft, baseline);
   const blocker = useBlocker(dirty);
@@ -66,6 +68,11 @@ export function ScrapbookEditor({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [dirty]);
 
+  useEffect(() => {
+    document.body.classList.add('scrapbook-editor-active');
+    return () => document.body.classList.remove('scrapbook-editor-active');
+  }, []);
+
   if (!selectedPage) return null;
 
   const previewPage = applyScrapbookPageDraft(selectedPage, draft);
@@ -76,10 +83,15 @@ export function ScrapbookEditor({
       : detail.scrapbook,
     pages: detail.pages.map((page) => page.id === selectedPage.id ? previewPage : page),
   };
+  const selectedPageIndex = pages.findIndex((page) => page.id === selectedPage.id);
+  const canGoPrevious = selectedPageIndex > 0;
+  const canGoNext = selectedPageIndex < pages.length - 1;
 
   function selectPage(pageId: string) {
     const page = pages.find((item) => item.id === pageId);
     if (!page) return;
+    const nextIndex = pages.findIndex((item) => item.id === pageId);
+    setPageTurnDirection(nextIndex < selectedPageIndex ? 'previous' : 'next');
     const nextDraft = createScrapbookPageDraft(page, detail.scrapbook);
     setSelectedPageId(page.id);
     onSelectedPageChange(page.id);
@@ -99,6 +111,26 @@ export function ScrapbookEditor({
       return;
     }
     selectPage(pageId);
+  }
+
+  function requestAdjacentPage(direction: 'previous' | 'next') {
+    const offset = direction === 'previous' ? -1 : 1;
+    const page = pages[selectedPageIndex + offset];
+    if (page) requestPageSelection(page.id);
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLElement>) {
+    if (event.isPrimary) pointerStart.current = { x: event.clientX, y: event.clientY };
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLElement>) {
+    const start = pointerStart.current;
+    pointerStart.current = undefined;
+    if (!start || !event.isPrimary) return;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+    requestAdjacentPage(deltaX < 0 ? 'next' : 'previous');
   }
 
   function requestExit() {
@@ -200,27 +232,63 @@ export function ScrapbookEditor({
   return (
     <div className="scrapbook-editor-mode">
       <header className="scrapbook-editor-toolbar">
-        <Button variant="ghost" size="sm" onClick={requestExit}>閲覧に戻る</Button>
-        <div>
-          <span>編集中</span>
+        <div className="scrapbook-editor-toolbar__top">
+          <Button variant="ghost" size="sm" onClick={requestExit}>編集を終了</Button>
+          <span>スクラップブック編集中</span>
+        </div>
+        <div className="scrapbook-editor-toolbar__identity" aria-live="polite">
+          <span>{PAGE_KIND_LABELS[selectedPage.pageKind]} · {selectedPageIndex + 1}/{pages.length}</span>
           <strong>{draft.pageTitle || '名称未設定'}</strong>
         </div>
         <div className="scrapbook-editor-toolbar__actions">
-          <Button size="sm" onClick={() => setNavigatorOpen(true)}>ページ</Button>
-          <Button variant="primary" size="sm" onClick={() => setEditorOpen(true)}>編集</Button>
+          <Button size="sm" onClick={() => setNavigatorOpen(true)}>ページ切替</Button>
+          <Button variant="primary" size="sm" onClick={() => setEditorOpen(true)}>設定</Button>
         </div>
       </header>
 
       {saveError && <div className="scrapbook-editor-mode__error"><InlineError message={saveError} /></div>}
 
-      <main className="scrapbook-editor-preview" aria-label={`${draft.pageTitle || '選択中ページ'}のプレビュー`}>
+      <main
+        className="scrapbook-editor-preview"
+        aria-label={`${draft.pageTitle || '選択中ページ'}のプレビュー`}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => { pointerStart.current = undefined; }}
+      >
         <div className="scrapbook-editor-preview__label">
-          <span>{selectedPage.pageKind}</span>
-          <strong>{draft.isHidden && selectedPage.pageKind !== 'cover' ? '非表示ページを確認中' : '完成イメージ'}</strong>
+          <span>編集中</span>
+          <strong>{draft.isHidden && selectedPage.pageKind !== 'cover' ? '非表示ページを確認中' : `${PAGE_KIND_LABELS[selectedPage.pageKind]}の完成イメージ`}</strong>
         </div>
-        <div className="scrapbook-editor-preview__canvas">
+        <div key={selectedPage.id} className={`scrapbook-editor-preview__canvas is-turning-${pageTurnDirection}`}>
           <ScrapbookPagePreview detail={previewDetail} page={previewPage} tripDetail={tripDetail} />
         </div>
+        <nav className="scrapbook-editor-pager" aria-label="スクラップブックのページ移動">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canGoPrevious}
+            aria-label="前のページへ"
+            onClick={() => requestAdjacentPage('previous')}
+          >
+            <span aria-hidden="true">←</span>
+          </Button>
+          <div className="scrapbook-editor-pager__position">
+            <strong>{draft.pageTitle || '名称未設定'}</strong>
+            <span aria-hidden="true">
+              {pages.map((page) => <i key={page.id} className={page.id === selectedPage.id ? 'is-current' : ''} />)}
+            </span>
+            <small>{selectedPageIndex + 1} / {pages.length}</small>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canGoNext}
+            aria-label="次のページへ"
+            onClick={() => requestAdjacentPage('next')}
+          >
+            <span aria-hidden="true">→</span>
+          </Button>
+        </nav>
       </main>
 
       <SaveBar

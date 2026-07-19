@@ -3745,7 +3745,23 @@ a {
 .scrapbook-editor-mode {
   width: min(100%, 1280px);
   margin-inline: auto;
-  padding-bottom: 96px;
+  min-height: calc(100dvh - env(safe-area-inset-top));
+  padding-bottom: 104px;
+  color: #edf2f0;
+}
+
+body.scrapbook-editor-active .app-shell {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+body.scrapbook-editor-active .app-main--scrapbook {
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  padding-bottom: 0;
+  background: #0d1515;
+}
+
+body.scrapbook-editor-active .bottom-nav {
+  display: none;
 }
 
 .scrapbook-editor-mode .button {
@@ -3757,40 +3773,66 @@ a {
   top: 0;
   z-index: var(--z-header);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top top"
+    "identity actions";
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  min-height: 64px;
-  border-bottom: 1px solid rgba(229, 231, 230, .65);
-  background: rgba(250, 250, 248, .92);
-  padding: 8px var(--page-inline-padding);
-  backdrop-filter: blur(18px) saturate(1.08);
+  min-height: 118px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(13, 21, 21, .92);
+  padding: 8px var(--page-inline-padding) 12px;
+  backdrop-filter: blur(20px) saturate(1.12);
 }
 
-.scrapbook-editor-toolbar > div:not(.scrapbook-editor-toolbar__actions) {
+.scrapbook-editor-toolbar__top {
+  grid-area: top;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scrapbook-editor-toolbar__top > span {
+  color: rgba(237, 242, 240, .55);
+  font-size: .68rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: .06em;
+}
+
+.scrapbook-editor-toolbar__identity {
+  grid-area: identity;
   display: grid;
   min-width: 0;
-  justify-items: center;
-  gap: 1px;
+  justify-items: start;
+  gap: 2px;
 }
 
-.scrapbook-editor-toolbar > div > span {
-  color: var(--color-primary);
+.scrapbook-editor-toolbar__identity > span {
+  color: #74b9ae;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
-.scrapbook-editor-toolbar > div > strong {
+.scrapbook-editor-toolbar__identity > strong {
   max-width: 100%;
   overflow: hidden;
-  font-size: var(--font-size-sm);
+  color: #f7faf8;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .scrapbook-editor-toolbar__actions {
+  grid-area: actions;
   display: flex;
   gap: var(--space-2);
+}
+
+.scrapbook-editor-toolbar .button--ghost {
+  color: rgba(237, 242, 240, .78);
 }
 
 .scrapbook-editor-mode__error {
@@ -3801,7 +3843,8 @@ a {
 .scrapbook-editor-preview {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4) var(--page-inline-padding) var(--space-6);
+  padding: var(--space-4) var(--page-inline-padding) var(--space-7);
+  touch-action: pan-y;
 }
 
 .scrapbook-editor-preview__label {
@@ -3811,14 +3854,14 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  color: var(--color-text-muted);
+  color: rgba(237, 242, 240, .62);
   font-size: var(--font-size-xs);
 }
 
 .scrapbook-editor-preview__label span {
   border-radius: var(--radius-pill);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: rgba(82, 162, 150, .14);
+  color: #8ac9bf;
   padding: 5px 10px;
   font-weight: var(--font-weight-bold);
   text-transform: capitalize;
@@ -3828,20 +3871,99 @@ a {
   width: min(100%, 1120px);
   margin-inline: auto;
   overflow: hidden;
-  border: 2px solid color-mix(in srgb, var(--color-primary) 60%, transparent);
+  border: 1px solid rgba(112, 188, 176, .55);
   border-radius: 18px;
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgba(24, 47, 44, .14);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, .34), 0 0 0 5px rgba(78, 153, 143, .05);
+  transform-origin: center center;
+  animation: scrapbook-page-turn-next 180ms var(--ease-standard) both;
+}
+
+.scrapbook-editor-preview__canvas.is-turning-previous {
+  animation-name: scrapbook-page-turn-previous;
+}
+
+@keyframes scrapbook-page-turn-next {
+  from { opacity: .66; transform: translateX(14px) rotateY(-1deg); }
+}
+
+@keyframes scrapbook-page-turn-previous {
+  from { opacity: .66; transform: translateX(-14px) rotateY(1deg); }
 }
 
 .scrapbook-editor-preview__canvas .scrapbook-viewer {
   width: 100%;
 }
 
+.scrapbook-editor-pager {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  width: min(100%, 480px);
+  margin-inline: auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.scrapbook-editor-pager .button {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  border-radius: 50%;
+  color: rgba(237, 242, 240, .82);
+  font-size: 1.15rem;
+}
+
+.scrapbook-editor-pager__position {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 5px;
+}
+
+.scrapbook-editor-pager__position > strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(247, 250, 248, .88);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrapbook-editor-pager__position > span {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.scrapbook-editor-pager__position i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(237, 242, 240, .25);
+  transition: width var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+
+.scrapbook-editor-pager__position i.is-current {
+  width: 18px;
+  border-radius: var(--radius-pill);
+  background: #70bdb1;
+}
+
+.scrapbook-editor-pager__position > small {
+  color: rgba(237, 242, 240, .48);
+  font-size: .68rem;
+}
+
 .scrapbook-save-bar {
   position: fixed;
   right: max(var(--space-3), calc((100vw - 820px) / 2));
-  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + var(--space-3));
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
   left: max(var(--space-3), calc((100vw - 820px) / 2));
   z-index: 15;
   display: flex;
@@ -3849,22 +3971,23 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  border: 1px solid rgba(207, 213, 211, .72);
+  border: 1px solid rgba(255, 255, 255, .11);
   border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, .94);
+  background: rgba(20, 31, 30, .94);
   padding: 8px 10px 8px 16px;
-  box-shadow: var(--shadow-floating);
+  color: #edf2f0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .28);
   backdrop-filter: blur(18px);
 }
 
 .scrapbook-save-bar > span {
-  color: var(--color-text-muted);
+  color: rgba(237, 242, 240, .64);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
 
-.scrapbook-save-bar > span.is-dirty {
-  color: var(--color-warning);
+.scrapbook-save-bar.is-dirty > span {
+  color: #f1c77c;
 }
 
 .scrapbook-save-bar > div {
@@ -3889,9 +4012,10 @@ a {
   min-height: 108px;
   align-items: center;
   gap: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   cursor: pointer;
   padding: var(--space-3);
@@ -3900,8 +4024,8 @@ a {
 }
 
 .scrapbook-page-navigator__item:is(:hover, .is-selected) {
-  border-color: color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 36%, transparent);
 }
 
 .scrapbook-page-navigator__item:active {
@@ -3961,9 +4085,18 @@ a {
 }
 
 .scrapbook-page-navigator__copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.scrapbook-page-navigator__number {
+  color: var(--color-primary);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: .72rem;
 }
 
 .scrapbook-page-navigator__copy span,
@@ -3981,8 +4114,7 @@ a {
 
 @media (max-width: 680px) {
   .scrapbook-editor-toolbar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 6px;
+    gap: 8px 6px;
     padding-inline: 8px;
   }
 
@@ -4019,20 +4151,21 @@ a {
 }
 
 @media (max-width: 370px) {
-  .scrapbook-editor-toolbar > div:not(.scrapbook-editor-toolbar__actions) {
-    display: none;
-  }
-
   .scrapbook-editor-toolbar {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .scrapbook-editor-toolbar__actions {
     justify-content: end;
   }
 
+  .scrapbook-editor-toolbar__actions .button,
+  .scrapbook-editor-toolbar__top .button {
+    padding-inline: 8px;
+  }
+
   .scrapbook-save-bar > span {
-    max-width: 72px;
+    max-width: 92px;
     line-height: 1.2;
   }
 }
@@ -4053,5 +4186,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scrapbook-page-navigator__item { transition: none; }
+  .scrapbook-page-navigator__item,
+  .scrapbook-editor-pager__position i { transition: none; }
+  .scrapbook-editor-preview__canvas { animation: none; }
 }

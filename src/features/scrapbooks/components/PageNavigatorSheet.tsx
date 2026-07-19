@@ -2,7 +2,7 @@ import type { ScrapbookPageKind } from '../../../domain/models/scrapbook';
 import { BottomSheet } from '../../../shared/ui';
 import type { ScrapbookDetail } from '../scrapbookService';
 
-const PAGE_KIND_LABELS: Record<ScrapbookPageKind, string> = {
+export const PAGE_KIND_LABELS: Record<ScrapbookPageKind, string> = {
   cover: '表紙',
   story: '物語',
   timeline: '旅の流れ',
@@ -36,8 +36,8 @@ export function PageNavigatorSheet({
     <BottomSheet
       open={open}
       onClose={onClose}
-      title="ページを選ぶ"
-      description="編集するページを選択します。"
+      title="雑誌全体を見渡す"
+      description="ページの構成と公開状態を確認し、編集するページを選びます。"
       size="lg"
     >
       <div className="scrapbook-page-navigator" role="list">
@@ -57,7 +57,7 @@ export function PageNavigatorSheet({
                 <i /><i /><i />
               </span>
               <span className="scrapbook-page-navigator__copy">
-                <strong>{selected ? selectedPageTitle : page.title}</strong>
+                <strong><span className="scrapbook-page-navigator__number">{index + 1}</span>{selected ? selectedPageTitle : page.title}</strong>
                 <span>{PAGE_KIND_LABELS[page.pageKind]} · {page.origin === 'manual' ? '手動' : '自動生成'}</span>
                 <small>{hidden ? '非表示' : '表示中'}</small>
               </span>
