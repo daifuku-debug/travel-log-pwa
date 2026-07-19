@@ -184,13 +184,13 @@ export function ScrapbookEditor({
       };
       setDraft(savedDraft);
       setBaseline(savedDraft);
-      showToast({ title: 'ページを保存しました。', variant: 'success' });
+      showToast({ title: '旅行記を更新しました。', variant: 'success' });
       onSaved();
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'ページを保存できませんでした。';
+      const message = error instanceof Error ? error.message : '旅行記を更新できませんでした。';
       setSaveError(message);
-      showToast({ title: '保存に失敗しました。入力内容は残っています。', variant: 'error' });
+      showToast({ title: '更新に失敗しました。入力内容は残っています。', variant: 'error' });
       return false;
     } finally {
       setSaving(false);
@@ -232,17 +232,16 @@ export function ScrapbookEditor({
   return (
     <div className="scrapbook-editor-mode">
       <header className="scrapbook-editor-toolbar">
-        <div className="scrapbook-editor-toolbar__top">
+        <div className="scrapbook-editor-toolbar__exit">
           <Button variant="ghost" size="sm" onClick={requestExit}>編集を終了</Button>
-          <span>スクラップブック編集中</span>
         </div>
         <div className="scrapbook-editor-toolbar__identity" aria-live="polite">
-          <span>{PAGE_KIND_LABELS[selectedPage.pageKind]} · {selectedPageIndex + 1}/{pages.length}</span>
-          <strong>{draft.pageTitle || '名称未設定'}</strong>
+          <strong title={tripDetail.trip.title}>{tripDetail.trip.title}</strong>
+          <span title={draft.pageTitle}>{draft.pageTitle || '名称未設定'}</span>
         </div>
         <div className="scrapbook-editor-toolbar__actions">
-          <Button size="sm" onClick={() => setNavigatorOpen(true)}>ページ切替</Button>
-          <Button variant="primary" size="sm" onClick={() => setEditorOpen(true)}>設定</Button>
+          <Button variant="ghost" size="sm" onClick={() => setNavigatorOpen(true)}>ページ</Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>設定</Button>
         </div>
       </header>
 
@@ -270,7 +269,7 @@ export function ScrapbookEditor({
             aria-label="前のページへ"
             onClick={() => requestAdjacentPage('previous')}
           >
-            <span aria-hidden="true">←</span>
+            <span aria-hidden="true">‹</span>
           </Button>
           <div className="scrapbook-editor-pager__position">
             <strong>{draft.pageTitle || '名称未設定'}</strong>
@@ -286,7 +285,7 @@ export function ScrapbookEditor({
             aria-label="次のページへ"
             onClick={() => requestAdjacentPage('next')}
           >
-            <span aria-hidden="true">→</span>
+            <span aria-hidden="true">›</span>
           </Button>
         </nav>
       </main>
@@ -312,18 +311,18 @@ export function ScrapbookEditor({
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         title="ページを編集"
-        description="変更はプレビューへすぐ反映され、保存するまで端末には書き込まれません。"
+        description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
         size="md"
-        actions={<Button variant="primary" disabled={!dirty} loading={saving} onClick={() => void saveDraft()}>保存</Button>}
+        actions={<Button variant="primary" disabled={!dirty} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}
       >
         <PageEditorPanel page={selectedPage} draft={draft} onChange={setDraft} />
       </BottomSheet>
 
       <ConfirmDialog
         open={confirmOpen}
-        title="変更を保存しますか？"
-        description="このページには未保存の変更があります。保存して続けるか、変更を破棄してください。"
-        confirmLabel="保存する"
+        title="編集内容を記録しますか？"
+        description="このページには未記録の編集内容があります。記録を更新して続けるか、変更を破棄してください。"
+        confirmLabel="記録を更新"
         secondaryLabel="破棄する"
         cancelLabel="キャンセル"
         variant="primary"
