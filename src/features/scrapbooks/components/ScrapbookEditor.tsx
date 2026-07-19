@@ -16,6 +16,7 @@ import {
   type ScrapbookDetail,
 } from '../scrapbookService';
 import { PageEditorPanel } from './PageEditorPanel';
+import { CoverEditorPanel } from './CoverEditorPanel';
 import { PAGE_KIND_LABELS, PageNavigatorSheet } from './PageNavigatorSheet';
 import { SaveBar } from './SaveBar';
 import { ScrapbookPagePreview } from './ScrapbookViewer';
@@ -153,8 +154,22 @@ export function ScrapbookEditor({
     setSaveError('');
     try {
       const pageChanged = pageTitle !== baseline.pageTitle || draft.isHidden !== baseline.isHidden;
+      const coverSettingsChanged = selectedPage.pageKind === 'cover'
+        && (
+          draft.coverPhotoId !== baseline.coverPhotoId
+          || draft.coverShowDate !== baseline.coverShowDate
+          || draft.coverShowLocation !== baseline.coverShowLocation
+          || draft.coverShowSubtitle !== baseline.coverShowSubtitle
+          || draft.coverTitlePosition !== baseline.coverTitlePosition
+        );
       const coverChanged = selectedPage.pageKind === 'cover'
-        && (coverTitle !== baseline.coverTitle || draft.coverSubtitle !== baseline.coverSubtitle);
+        && (
+          coverTitle !== baseline.coverTitle
+          || draft.coverSubtitle !== baseline.coverSubtitle
+          || coverSettingsChanged
+          || draft.coverLayout !== baseline.coverLayout
+          || draft.coverThemeId !== baseline.coverThemeId
+        );
 
       if (pageChanged) {
         await updateScrapbookPage(selectedPage.id, {
@@ -170,9 +185,18 @@ export function ScrapbookEditor({
         await updateScrapbook(detail.scrapbook.id, {
           title: coverTitle,
           subtitle: draft.coverSubtitle,
-          themeId: detail.scrapbook.themeId,
+          themeId: draft.coverThemeId,
           status: detail.scrapbook.status,
           isFavorite: detail.scrapbook.isFavorite,
+          coverSettings: coverSettingsChanged ? {
+            ...detail.scrapbook.coverSettings,
+            photoId: draft.coverPhotoId,
+            showDate: draft.coverShowDate,
+            showLocation: draft.coverShowLocation,
+            showSubtitle: draft.coverShowSubtitle,
+            titlePosition: draft.coverTitlePosition,
+          } : undefined,
+          coverLayout: draft.coverLayout !== baseline.coverLayout ? draft.coverLayout : undefined,
         });
       }
 
@@ -241,7 +265,9 @@ export function ScrapbookEditor({
         </div>
         <div className="scrapbook-editor-toolbar__actions">
           <Button variant="ghost" size="sm" onClick={() => setNavigatorOpen(true)}>ページ</Button>
-          <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>設定</Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditorOpen(true)}>
+            {selectedPage.pageKind === 'cover' ? '表紙を編集' : '設定'}
+          </Button>
         </div>
       </header>
 
@@ -310,12 +336,21 @@ export function ScrapbookEditor({
       <BottomSheet
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
-        title="ページを編集"
+        title={selectedPage.pageKind === 'cover' ? '表紙を編集' : 'ページを編集'}
         description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
         size="md"
         actions={<Button variant="primary" disabled={!dirty} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}
       >
-        <PageEditorPanel page={selectedPage} draft={draft} onChange={setDraft} />
+        {selectedPage.pageKind === 'cover' ? (
+          <CoverEditorPanel
+            draft={draft}
+            mediaAssets={detail.mediaAssets}
+            tripDetail={tripDetail}
+            onChange={setDraft}
+          />
+        ) : (
+          <PageEditorPanel page={selectedPage} draft={draft} onChange={setDraft} />
+        )}
       </BottomSheet>
 
       <ConfirmDialog

@@ -799,6 +799,51 @@ await test('スクラップブック編集はページ単位Draftを保存まで
   assert.doesNotMatch(scrapbookEditorSource, /IndexedDB|repositories\./);
 });
 
+await test('表紙編集Draftは旧写真参照を引き継ぎ、設定変更をプレビューへ反映する', () => {
+  const scrapbook = {
+    id: 'book-cover',
+    title: '京都旅行',
+    subtitle: '喫茶店めぐり',
+    coverAssetId: 'legacy-cover',
+    coverLayout: 'journal',
+    themeId: 'journal',
+    coverSettings: { showDate: true, showLocation: true, showSubtitle: true },
+  };
+  const page = { id: 'cover-page', title: '表紙', pageKind: 'cover', isHidden: false };
+  const initial = createScrapbookPageDraft(page, scrapbook);
+  assert.equal(initial.coverPhotoId, 'legacy-cover');
+  const changed = {
+    ...initial,
+    coverPhotoId: 'new-cover',
+    coverShowDate: false,
+    coverShowLocation: false,
+    coverShowSubtitle: false,
+    coverTitlePosition: 'center',
+    coverLayout: 'magazine',
+    coverThemeId: 'minimal',
+  };
+  assert.equal(isScrapbookPageDraftDirty(changed, page, scrapbook), true);
+  const preview = applyScrapbookCoverDraft(scrapbook, changed);
+  assert.equal(preview.coverSettings.photoId, 'new-cover');
+  assert.equal(preview.coverSettings.showDate, false);
+  assert.equal(preview.coverSettings.showLocation, false);
+  assert.equal(preview.coverSettings.showSubtitle, false);
+  assert.equal(preview.coverSettings.titlePosition, 'center');
+  assert.equal(preview.coverLayout, 'magazine');
+  assert.equal(preview.themeId, 'minimal');
+});
+
+await test('表紙編集は専用Bottom Sheetと既存Rendererを使い保存までRepositoryへ触れない', () => {
+  assert.match(scrapbookEditorSource, /<CoverEditorPanel/);
+  assert.match(scrapbookEditorSource, /表紙を編集/);
+  assert.match(scrapbookEditorSource, /coverSettings: coverSettingsChanged \? \{/);
+  assert.match(scrapbookEditorSource, /coverLayout: draft\.coverLayout/);
+  assert.match(scrapbookEditorSource, /themeId: draft\.coverThemeId/);
+  assert.match(scrapbookService, /\['coverSettings', current\.coverSettings, nextCoverSettings\]/);
+  assert.match(scrapbookService, /\['coverLayout', current\.coverLayout, nextCoverLayout\]/);
+  assert.doesNotMatch(scrapbookEditorSource, /repositories\./);
+});
+
 await test('スクラップブック編集はページ選択、保存、失敗時保持、破棄確認を備える', () => {
   assert.match(scrapbookEditorSource, /<PageNavigatorSheet/);
   assert.match(scrapbookEditorSource, /<SaveBar/);

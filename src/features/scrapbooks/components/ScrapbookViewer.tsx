@@ -34,7 +34,7 @@ export function ScrapbookViewer({
   const { scrapbook, mediaAssets } = detail;
   const pages = sortVisibleScrapbookPages(detail.pages);
   const assetsById = new Map(mediaAssets.map((asset) => [asset.id, asset]));
-  const layout = scrapbook.layoutVariant || scrapbook.coverSettings?.layout || scrapbook.coverLayout;
+  const layout = resolveViewerLayout(scrapbook);
   const hasStoryPage = detail.pages.some((page) => page.pageKind === 'story');
   const hasPhotoPage = detail.pages.some((page) => page.pageKind === 'photo');
   const firstContentPageId = pages.find((page) => page.pageKind !== 'cover')?.id;
@@ -69,7 +69,7 @@ export function ScrapbookPagePreview({
   tripDetail: TripDetail;
 }) {
   const assetsById = new Map(detail.mediaAssets.map((asset) => [asset.id, asset]));
-  const layout = detail.scrapbook.layoutVariant || detail.scrapbook.coverSettings?.layout || detail.scrapbook.coverLayout;
+  const layout = resolveViewerLayout(detail.scrapbook);
   const hasStoryPage = detail.pages.some((item) => item.pageKind === 'story');
   const hasPhotoPage = detail.pages.some((item) => item.pageKind === 'photo');
   const firstContentPageId = detail.pages
@@ -364,4 +364,9 @@ function formatDisplayDate(value: string): string {
 
 function toClassName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default';
+}
+
+function resolveViewerLayout(scrapbook: ScrapbookDetail['scrapbook']): string {
+  if (scrapbook.userEditedFields?.includes('coverLayout')) return scrapbook.coverLayout;
+  return scrapbook.layoutVariant || scrapbook.coverSettings?.layout || scrapbook.coverLayout;
 }

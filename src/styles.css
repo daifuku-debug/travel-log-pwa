@@ -4023,6 +4023,147 @@ body.scrapbook-editor-active .bottom-nav {
   gap: var(--space-4);
 }
 
+.scrapbook-cover-editor {
+  display: grid;
+  gap: var(--space-7);
+}
+
+.scrapbook-cover-editor__section {
+  display: grid;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+  padding-bottom: var(--space-6);
+}
+
+.scrapbook-cover-editor__section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.scrapbook-cover-editor__section > header,
+.scrapbook-cover-editor__section > div,
+.scrapbook-cover-editor__control {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scrapbook-cover-editor__section h3,
+.scrapbook-cover-editor__section p {
+  margin: 0;
+}
+
+.scrapbook-cover-editor__section h3 {
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: var(--font-size-lg);
+}
+
+.scrapbook-cover-editor__section header p,
+.scrapbook-cover-editor__fallback p {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.scrapbook-cover-editor__control > span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-editor .segmented-control {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.scrapbook-cover-editor__photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.scrapbook-cover-editor__photo {
+  position: relative;
+  min-width: 0;
+  min-height: 112px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: #172322;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 10px 24px rgba(7, 18, 18, .1);
+  transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.scrapbook-cover-editor__photo:is(:hover, :focus-visible) {
+  border-color: color-mix(in srgb, var(--color-primary) 60%, white);
+  transform: translateY(-1px);
+}
+
+.scrapbook-cover-editor__photo.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 22%, transparent), 0 12px 30px rgba(7, 18, 18, .16);
+}
+
+.scrapbook-cover-editor__photo > img,
+.scrapbook-cover-editor__photo > .scrapbook-media-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 112px;
+  border: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.scrapbook-cover-editor__photo > span {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(13, 34, 33, .82);
+  color: #fff;
+  padding: 4px 8px;
+  font-size: .68rem;
+  font-weight: var(--font-weight-bold);
+  backdrop-filter: blur(8px);
+}
+
+.scrapbook-cover-editor__fallback {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-subtle);
+}
+
+.scrapbook-cover-editor__fallback .trip-journal-visual {
+  min-height: 220px;
+}
+
+.scrapbook-cover-editor__fallback p {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.scrapbook-cover-editor__toggles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.scrapbook-cover-editor__toggles .checkbox-field {
+  min-height: var(--tap-target-min);
+}
+
+.scrapbook-viewer--layout-photo .scrapbook-viewer__cover-copy {
+  max-width: 680px;
+}
+
+.scrapbook-viewer--layout-journal .scrapbook-viewer__cover-copy {
+  border-left: 2px solid rgba(255, 255, 255, .56);
+  padding-left: clamp(16px, 3vw, 28px);
+}
+
+.scrapbook-viewer--layout-magazine .scrapbook-viewer__edition {
+  border-bottom: 1px solid rgba(255, 255, 255, .52);
+  padding-bottom: 7px;
+}
+
 .scrapbook-page-navigator {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4164,6 +4305,14 @@ body.scrapbook-editor-active .bottom-nav {
   }
 
   .scrapbook-page-navigator {
+    grid-template-columns: 1fr;
+  }
+
+  .scrapbook-cover-editor__photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scrapbook-cover-editor__toggles {
     grid-template-columns: 1fr;
   }
 

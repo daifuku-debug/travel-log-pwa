@@ -3,6 +3,8 @@ import type {
   MediaAsset,
   Scrapbook,
   ScrapbookBlock,
+  ScrapbookCoverLayout,
+  ScrapbookCoverSettings,
   ScrapbookPage,
   ScrapbookStatus,
   ScrapbookThemeId,
@@ -31,6 +33,8 @@ export interface ScrapbookInput {
   themeId: ScrapbookThemeId;
   status: ScrapbookStatus;
   isFavorite: boolean;
+  coverSettings?: ScrapbookCoverSettings;
+  coverLayout?: ScrapbookCoverLayout;
 }
 
 export interface ScrapbookPageInput {
@@ -141,12 +145,18 @@ export async function updateScrapbook(scrapbookId: EntityId, input: ScrapbookInp
     const now = new Date().toISOString();
     const nextTitle = input.title.trim();
     const nextSubtitle = optionalText(input.subtitle);
+    const nextCoverSettings = input.coverSettings === undefined
+      ? current.coverSettings
+      : normalizeCoverSettingsInput(input.coverSettings);
+    const nextCoverLayout = input.coverLayout ?? current.coverLayout;
     const changedFields = collectChangedFields([
       ['title', current.title, nextTitle],
       ['subtitle', current.subtitle, nextSubtitle],
       ['themeId', current.themeId, input.themeId],
       ['status', current.status, input.status],
       ['isFavorite', current.isFavorite, input.isFavorite],
+      ['coverSettings', current.coverSettings, nextCoverSettings],
+      ['coverLayout', current.coverLayout, nextCoverLayout],
     ]);
     const saved = await repositories.scrapbooks.save({
       ...current,
@@ -155,6 +165,8 @@ export async function updateScrapbook(scrapbookId: EntityId, input: ScrapbookInp
       themeId: input.themeId,
       status: input.status,
       isFavorite: input.isFavorite,
+      coverSettings: nextCoverSettings,
+      coverLayout: nextCoverLayout,
       userEditedFields: appendEditedFields(current.userEditedFields, changedFields),
       publishedAt: input.status === 'completed' ? current.publishedAt ?? now : current.publishedAt,
       version: current.version + 1,
@@ -774,6 +786,15 @@ function assertNoValidationErrors(errors: string[]): void {
 function optionalText(value?: string): string | undefined {
   const trimmed = value?.trim() ?? '';
   return trimmed || undefined;
+}
+
+function normalizeCoverSettingsInput(settings: ScrapbookCoverSettings): ScrapbookCoverSettings {
+  return {
+    ...settings,
+    photoId: optionalText(settings.photoId),
+    titlePosition: optionalText(settings.titlePosition),
+    layout: optionalText(settings.layout),
+  };
 }
 
 function collectChangedFields(entries: Array<[string, unknown, unknown]>): string[] {
