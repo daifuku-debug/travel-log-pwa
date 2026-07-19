@@ -3,12 +3,14 @@ import { toAppError } from '../../shared/errors';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
 import { getRpgProfile } from '../rpg/rpgProfileService';
 import { listRecentTrips } from '../trips/tripService';
+import { selectFeaturedTrip, type FeaturedTrip } from './homeLogic';
 
 export interface HomeSummary {
   recentTrips: Awaited<ReturnType<typeof listRecentTrips>>;
   tripCount: number;
   placeVisitCount: number;
   collectionAchievementRate: number;
+  featuredTrip?: FeaturedTrip;
   rpg: {
     level: number;
     mainTitleName: string;
@@ -36,6 +38,7 @@ export async function getHomeSummary(): Promise<HomeSummary> {
       tripCount: trips.length,
       placeVisitCount: places.length,
       collectionAchievementRate: totalItems === 0 ? 0 : Math.round((visitedItems / totalItems) * 100),
+      featuredTrip: selectFeaturedTrip(trips),
       rpg: {
         level: rpgProfile.level.currentLevel,
         mainTitleName: rpgProfile.mainTitleName,

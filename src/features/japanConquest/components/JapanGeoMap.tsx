@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import type { PrefectureVisitStatus } from '../../../domain/models/japanConquest';
 import { STATUS_LABELS, type PrefectureView } from '../japanConquestLogic';
+import { InlineError, Skeleton } from '../../../shared/ui';
 
 interface GeoFeature {
   type: 'Feature';
@@ -83,8 +84,8 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
     };
   }, [geoJson]);
 
-  if (error) return <div className="status-banner">{error}</div>;
-  if (!geoJson || !projections) return <div className="status-banner">地図データを読み込み中...</div>;
+  if (error) return <InlineError title="地図を表示できません" message={error} />;
+  if (!geoJson || !projections) return <div className="map-loading" aria-live="polite" aria-busy="true"><span className="sr-only">地図データを読み込み中...</span><Skeleton variant="block" /></div>;
 
   function zoomAt(nextScale: number, centerX = MAP_WIDTH / 2, centerY = MAP_HEIGHT / 2) {
     setViewport((current) => {
@@ -236,6 +237,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
                 tabIndex={0}
                 role="button"
                 aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
+                aria-pressed={selectedCode === code}
                 onClick={() => handleShapeClick(code)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') onSelect(code);
@@ -336,6 +338,7 @@ function renderOkinawaInset(
         tabIndex={0}
         role="button"
         aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
+        aria-pressed={selectedCode === OKINAWA_CODE}
         onClick={() => handleShapeClick(OKINAWA_CODE)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);
@@ -351,6 +354,7 @@ function renderOkinawaInset(
         tabIndex={0}
         role="button"
         aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
+        aria-pressed={selectedCode === OKINAWA_CODE}
         onClick={() => handleShapeClick(OKINAWA_CODE)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);

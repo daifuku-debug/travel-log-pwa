@@ -443,10 +443,46 @@ a {
 
 .field {
   display: grid;
-  gap: 6px;
-  color: #4d5a5c;
-  font-size: 0.9rem;
-  font-weight: 750;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.field__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.field__required {
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  padding: 1px var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.field__helper,
+.field__error {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+.field__helper {
+  color: var(--color-text-muted);
+}
+
+.field__error {
+  color: var(--color-danger);
+}
+
+.field--error input,
+.field--error select,
+.field--error textarea {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
 }
 
 .field input,
@@ -473,6 +509,250 @@ a {
 
 .field textarea {
   resize: vertical;
+}
+
+.checkbox-field-shell {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.checkbox-field__content {
+  display: grid;
+  gap: 2px;
+}
+
+.checkbox-field__content span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+}
+
+.form-section {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  border-bottom: 1px solid var(--color-divider);
+  padding: 0 0 var(--space-6);
+}
+
+.form-section__header h2,
+.form-section__header p {
+  margin: 0;
+}
+
+.form-section__header h2 {
+  font-size: var(--font-size-lg);
+}
+
+.form-section__header p {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.form-section__body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.form-actions--grouped {
+  justify-content: space-between;
+}
+
+.form-actions__main,
+.form-actions__danger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.trip-edit-layout,
+.trip-form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.trip-edit-layout {
+  max-width: 820px;
+}
+
+.trip-edit-danger {
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-5);
+}
+
+.trip-edit-danger h2,
+.trip-edit-danger p {
+  margin-top: 0;
+}
+
+/* Shared progress */
+.progress-bar-wrap {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.progress-bar__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.progress-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-divider);
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+/* Home dashboard */
+.home-dashboard,
+.home-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.home-dashboard {
+  gap: var(--space-5);
+}
+
+.home-section h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.home-featured-trip {
+  padding: 0;
+  overflow: hidden;
+  border-color: var(--color-primary);
+}
+
+.home-featured-trip__link {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.home-featured-trip__link:hover {
+  background: var(--color-info-bg);
+}
+
+.home-featured-trip__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.home-featured-trip h2,
+.home-featured-trip p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-featured-trip h2 {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xl);
+}
+
+.home-featured-trip__eyebrow {
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.home-featured-trip__cta {
+  justify-self: end;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.home-progress {
+  display: grid;
+  gap: var(--space-4);
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-4) 0;
+}
+
+.home-progress__numbers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.home-progress__numbers div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.home-progress__numbers strong {
+  font-size: var(--font-size-xl);
+}
+
+.home-progress__numbers span {
+  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.home-quick-actions .navigation-list-item {
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 0;
+}
+
+.home-quick-actions .navigation-list-item:last-child {
+  border-right: 0;
+}
+
+.home-recent-trips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.home-recent-trip {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-3);
+}
+
+.home-recent-trip > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.home-recent-trip strong {
+  overflow-wrap: anywhere;
+}
+
+.home-recent-trip small {
+  color: var(--color-text-muted);
+}
+
+.home-achievement-list p {
+  margin: var(--space-2) 0;
 }
 
 .form-actions,
@@ -775,12 +1055,88 @@ a {
   overflow: hidden;
 }
 
+/* Japan conquest map */
+.map-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.map-progress,
+.collection-overview {
+  display: grid;
+  gap: var(--space-4);
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-4) 0;
+}
+
+.map-progress__head,
+.collection-overview__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.map-progress__head div,
+.collection-overview__head div {
+  display: grid;
+}
+
+.map-progress__head strong,
+.collection-overview__head strong {
+  font-size: 2rem;
+}
+
+.map-progress__head p,
+.collection-overview__head p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.map-progress__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.map-primary-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.map-selection-panel,
+.map-selection-empty {
+  position: sticky;
+  top: calc(var(--app-header-height) + var(--space-4));
+}
+
+.map-selection-empty p {
+  line-height: var(--line-height-normal);
+}
+
+.map-related-note {
+  margin: 0;
+}
+
+.map-loading {
+  min-height: 480px;
+}
+
+.map-loading .skeleton-block {
+  height: 100%;
+}
+
 .map-shell {
   width: 100%;
   overflow: hidden;
-  border: 1px solid #ded7cc;
-  border-radius: 8px;
-  background: #edf7f4;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
   touch-action: none;
   user-select: none;
 }
@@ -891,6 +1247,32 @@ a {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.legend-swatch--selected {
+  border: 2px solid var(--color-text);
+  background: var(--color-surface);
+}
+
+.map-prefecture-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.map-prefecture-section h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.map-prefecture-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .legend-item,
@@ -1077,6 +1459,34 @@ a {
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* Collection hub */
+.collection-page,
+.collection-section {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.collection-section {
+  gap: var(--space-3);
+}
+
+.collection-section h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.collection-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.collection-card {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .collection-actions {
@@ -1808,7 +2218,11 @@ a {
   .more-groups,
   .trip-card-grid,
   .trip-detail__forms,
-  .scrapbook-loading__body {
+  .scrapbook-loading__body,
+  .map-primary-layout,
+  .map-prefecture-list,
+  .collection-card-grid,
+  .home-recent-trips {
     grid-template-columns: 1fr;
   }
 
@@ -1861,6 +2275,61 @@ a {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .form-section {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: var(--tap-target-min);
+    font-size: 16px;
+  }
+
+  .checkbox-field {
+    min-height: var(--tap-target-min);
+  }
+
+  .form-actions__main,
+  .form-actions__main .button {
+    width: 100%;
+  }
+
+  .map-selection-panel,
+  .map-selection-empty {
+    position: static;
+  }
+
+  .map-progress__head,
+  .collection-overview__head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .map-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .japan-map {
+    min-height: 360px;
+    max-height: 68vh;
+  }
+
+  .home-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .home-quick-actions .navigation-list-item {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  .home-quick-actions .navigation-list-item:last-child {
+    border-bottom: 0;
   }
 
   .page-heading__row,

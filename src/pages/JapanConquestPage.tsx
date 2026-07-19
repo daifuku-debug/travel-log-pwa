@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { JapanRegion, PrefectureVisitStatus } from '../domain/models/japanConquest';
 import { JapanGeoMap } from '../features/japanConquest/components/JapanGeoMap';
 import { PrefectureDetailPanel } from '../features/japanConquest/components/PrefectureDetailPanel';
 import {
@@ -8,125 +9,109 @@ import {
   type JapanConquestFilters,
 } from '../features/japanConquest/japanConquestLogic';
 import { getJapanConquestData } from '../features/japanConquest/japanConquestService';
-import type { JapanRegion, PrefectureVisitStatus } from '../domain/models/japanConquest';
-import { ErrorState, LoadingState } from '../shared/components/PageState';
+import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
+import { Badge, Card, CheckboxField, PageHeader, ProgressBar, SelectField, TextInput } from '../shared/ui';
 
 const INITIAL_FILTERS: JapanConquestFilters = {
-  region: 'all',
-  status: 'all',
-  favoriteOnly: false,
-  query: '',
+  region: 'all', status: 'all', favoriteOnly: false, query: '',
 };
 
 export function JapanConquestPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [filters, setFilters] = useState<JapanConquestFilters>(INITIAL_FILTERS);
-  const [selectedCode, setSelectedCode] = useState<string | undefined>('01');
+  const [selectedCode, setSelectedCode] = useState<string>();
   const { data, error, loading } = useAsyncData(() => getJapanConquestData(), [reloadKey]);
-  const filteredViews = useMemo(
-    () => (data ? filterPrefectureViews(data.allViews, filters) : []),
-    [data, filters],
-  );
+  const filteredViews = useMemo(() => (data ? filterPrefectureViews(data.allViews, filters) : []), [data, filters]);
   const selectedView = data?.allViews.find((view) => view.master.code === selectedCode);
 
   return (
     <>
-      <section className="page-heading">
-        <h1>日本制覇マップ</h1>
-        <p>
-          訪問済み {data?.summary.visitedCount ?? 0} / 47・制覇率 {data?.summary.visitRate.toFixed(1) ?? '0.0'}%
-        </p>
-      </section>
+      <PageHeader
+        title="日本制覇マップ"
+        description="都道府県を選んで、旅の到達記録を残します。"
+        actions={data && <Badge variant="primary">訪問済み {data.summary.visitedCount} / 47</Badge>}
+      />
 
-      {loading && <LoadingState />}
+      {loading && <LoadingState variant="skeleton" message="日本地図を読み込み中..." />}
       {error && <ErrorState error={error} />}
 
       {data && (
-        <div className="grid">
-          <div className="grid grid--two summary-grid">
-            <SummaryCard label="訪問済み" value={`${data.summary.visitedCount}`} sub={`${data.summary.visitRate.toFixed(1)}%`} />
-            <SummaryCard label="宿泊済み" value={`${data.summary.stayedCount}`} sub={`${data.summary.stayRate.toFixed(1)}%`} />
-            <SummaryCard label="居住経験" value={`${data.summary.livedCount}`} sub={`${data.summary.livedRate.toFixed(1)}%`} />
-            <SummaryCard label="通過のみ" value={`${data.summary.passedOnlyCount}`} sub={`到達率 ${data.summary.reachedRate.toFixed(1)}%`} />
-            <SummaryCard label="降り立った" value={`${data.summary.landedOnlyCount}`} sub="通過より一歩先" />
-            <SummaryCard label="未訪問" value={`${data.summary.unvisitedCount}`} sub="これから" />
+        <div className="map-page">
+          <section className="map-progress" aria-labelledby="map-progress-title">
+            <div className="map-progress__head">
+              <div><span>訪問制覇率</span><strong id="map-progress-title">{data.summary.visitRate.toFixed(1)}%</strong></div>
+              <p>{data.summary.visitedCount}都道府県を訪問済み・未訪問 {data.summary.unvisitedCount}</p>
+            </div>
+            <ProgressBar
+              label="47都道府県の訪問制覇率"
+              value={data.summary.visitedCount}
+              max={47}
+              valueText={`${data.summary.visitRate.toFixed(1)}%`}
+            />
+            <div className="map-progress__details">
+              <span>宿泊 {data.summary.stayedCount}</span>
+              <span>居住 {data.summary.livedCount}</span>
+              <span>到達 {data.summary.reachedCount}</span>
+            </div>
+          </section>
+
+          <div className="map-primary-layout">
+            <Card className="map-card" title="日本地図" description="都道府県をタップすると、地図の下に詳細が表示されます。">
+              <JapanGeoMap views={data.allViews} selectedCode={selectedCode} onSelect={setSelectedCode} />
+              <MapLegend />
+            </Card>
+            <PrefectureDetailPanel view={selectedView} onSaved={() => setReloadKey((value) => value + 1)} />
           </div>
 
-          <section className="card map-card">
-            <div className="section-head">
-              <h2>地図</h2>
-              <span className="muted">タップで詳細を編集</span>
+          <Card title="都道府県を探す" description="地方・状態・名前から一覧を絞り込めます。">
+            <div className="filter-grid map-filter-grid">
+              <SelectField
+                label="地方"
+                value={filters.region}
+                onChange={(event) => setFilters({ ...filters, region: event.target.value as JapanRegion | 'all' })}
+              >
+                <option value="all">すべて</option>
+                {Object.entries(REGION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </SelectField>
+              <SelectField
+                label="状態"
+                value={filters.status}
+                onChange={(event) => setFilters({ ...filters, status: event.target.value as PrefectureVisitStatus | 'all' })}
+              >
+                <option value="all">すべて</option>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </SelectField>
+              <TextInput
+                label="検索"
+                value={filters.query}
+                onChange={(event) => setFilters({ ...filters, query: event.target.value })}
+                placeholder="都道府県名"
+                autoComplete="off"
+              />
+              <CheckboxField
+                label="お気に入りのみ"
+                checked={filters.favoriteOnly}
+                onChange={(event) => setFilters({ ...filters, favoriteOnly: event.target.checked })}
+              />
             </div>
-            <JapanGeoMap views={data.allViews} selectedCode={selectedCode} onSelect={setSelectedCode} />
-            <Legend />
-          </section>
+          </Card>
 
-          <PrefectureDetailPanel
-            view={selectedView}
-            onSaved={() => setReloadKey((value) => value + 1)}
-          />
-
-          <section className="card">
-            <h2>絞り込み</h2>
-            <div className="filter-grid">
-              <label className="field">
-                <span>地方</span>
-                <select
-                  value={filters.region}
-                  onChange={(event) => setFilters({ ...filters, region: event.target.value as JapanConquestFilters['region'] })}
-                >
-                  <option value="all">すべて</option>
-                  {Object.entries(REGION_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>状態</span>
-                <select
-                  value={filters.status}
-                  onChange={(event) => setFilters({ ...filters, status: event.target.value as JapanConquestFilters['status'] })}
-                >
-                  <option value="all">すべて</option>
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>検索</span>
-                <input
-                  value={filters.query}
-                  onChange={(event) => setFilters({ ...filters, query: event.target.value })}
-                  placeholder="都道府県名"
-                />
-              </label>
-              <label className="checkbox-field filter-checkbox">
-                <input
-                  type="checkbox"
-                  checked={filters.favoriteOnly}
-                  onChange={(event) => setFilters({ ...filters, favoriteOnly: event.target.checked })}
-                />
-                お気に入りのみ
-              </label>
-            </div>
-          </section>
-
-          <section className="card">
+          <section className="map-prefecture-section" aria-labelledby="prefecture-list-title">
             <div className="section-head">
-              <h2>都道府県一覧</h2>
+              <h2 id="prefecture-list-title">都道府県一覧</h2>
               <span className="muted">{filteredViews.length}件</span>
             </div>
-            <div className="prefecture-list">
-              {filteredViews.length === 0 ? (
-                <div className="empty-state">条件に合う都道府県はありません。</div>
-              ) : (
-                filteredViews.map((view) => (
+            {filteredViews.length === 0 ? (
+              <EmptyState title="条件に合う都道府県はありません" description="絞り込み条件を変更してください。" />
+            ) : (
+              <div className="prefecture-list map-prefecture-list">
+                {filteredViews.map((view) => (
                   <button
                     type="button"
                     key={view.master.code}
                     className={`prefecture-row ${selectedCode === view.master.code ? 'selected' : ''}`}
+                    aria-pressed={selectedCode === view.master.code}
                     onClick={() => setSelectedCode(view.master.code)}
                   >
                     <div>
@@ -135,14 +120,12 @@ export function JapanConquestPage() {
                     </div>
                     <div className="prefecture-row__right">
                       <span className={`status-badge status-${view.visit.status}`}>{STATUS_LABELS[view.visit.status]}</span>
-                      <span className="list-item__meta">
-                        初回 {view.visit.firstVisitedAt || '-'} / {view.visit.visitCount}回
-                      </span>
+                      <span className="list-item__meta">初回 {view.visit.firstVisitedAt || '-'} / {view.visit.visitCount}回</span>
                     </div>
                   </button>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -150,25 +133,16 @@ export function JapanConquestPage() {
   );
 }
 
-function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function MapLegend() {
   return (
-    <div className="card">
-      <h2>{label}</h2>
-      <div className="stat-value">{value}</div>
-      <div className="muted">{sub}</div>
-    </div>
-  );
-}
-
-function Legend() {
-  return (
-    <div className="legend">
+    <div className="map-legend" aria-label="訪問状態の凡例">
       {(Object.keys(STATUS_LABELS) as PrefectureVisitStatus[]).map((status) => (
         <span key={status} className="legend-item">
-          <span className={`legend-swatch status-${status}`} />
-          {STATUS_LABELS[status]}
+          <span className={`legend-swatch status-${status}`} aria-hidden="true" />
+          <span>{STATUS_LABELS[status]}</span>
         </span>
       ))}
+      <span className="legend-item"><span className="legend-swatch legend-swatch--selected" aria-hidden="true" /><span>選択中</span></span>
     </div>
   );
 }
