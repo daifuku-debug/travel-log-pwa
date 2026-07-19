@@ -62,6 +62,20 @@ const travelGachaModel = await readFile(new URL('../src/domain/models/travelGach
 const travelGachaService = await readFile(new URL('../src/features/travelGacha/travelGachaService.ts', import.meta.url), 'utf8');
 const travelGachaPage = await readFile(new URL('../src/pages/TravelGachaPage.tsx', import.meta.url), 'utf8');
 const localTravelGachaRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTravelGachaRepository.ts', import.meta.url), 'utf8');
+const stylesSource = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const appLayoutSource = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
+const appHeaderSource = await readFile(new URL('../src/shared/layout/AppHeader.tsx', import.meta.url), 'utf8');
+const bottomNavigationSource = await readFile(new URL('../src/shared/navigation/BottomNavigation.tsx', import.meta.url), 'utf8');
+const navigationItemsSource = await readFile(new URL('../src/shared/navigation/navigationItems.tsx', import.meta.url), 'utf8');
+const buttonSource = await readFile(new URL('../src/shared/ui/Button.tsx', import.meta.url), 'utf8');
+const cardSource = await readFile(new URL('../src/shared/ui/Card.tsx', import.meta.url), 'utf8');
+const badgeSource = await readFile(new URL('../src/shared/ui/Badge.tsx', import.meta.url), 'utf8');
+const pageHeaderSource = await readFile(new URL('../src/shared/ui/PageHeader.tsx', import.meta.url), 'utf8');
+const skeletonSource = await readFile(new URL('../src/shared/ui/Skeleton.tsx', import.meta.url), 'utf8');
+const inlineErrorSource = await readFile(new URL('../src/shared/ui/InlineError.tsx', import.meta.url), 'utf8');
+const pageStateSource = await readFile(new URL('../src/shared/components/PageState.tsx', import.meta.url), 'utf8');
+const tripsPageSource = await readFile(new URL('../src/pages/TripsPage.tsx', import.meta.url), 'utf8');
 
 async function test(name, fn) {
   try {
@@ -675,22 +689,20 @@ await test('日本制覇マップは状態によって海岸線や県境線の�
 });
 
 await test('下部ナビゲーションにタブアイコンがある', async () => {
-  const appLayout = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
-  assert.match(appLayout, /bottom-nav__icon/);
-  assert.match(appLayout, /icon:/);
+  assert.match(bottomNavigationSource, /bottom-nav__icon/);
+  assert.match(navigationItemsSource, /icon:/);
 });
 
 await test('下部ナビゲーションは意味が伝わるSVGイラストを使う', async () => {
-  const appLayout = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
-  assert.match(appLayout, /function NavSvg/);
-  assert.match(appLayout, /function GachaIcon/);
-  assert.match(appLayout, /function MapIcon/);
-  assert.match(appLayout, /function CastleIcon/);
-  assert.match(appLayout, /function StarIcon/);
-  assert.match(appLayout, /circle className="nav-fill-accent" cx="16" cy="10\.5"/);
-  assert.match(appLayout, /M10 13\.5h12l-2\.2-5\.2/);
-  assert.match(appLayout, /M9 27v-6\.2a7 7 0 0 1 14 0V27/);
-  assert.doesNotMatch(appLayout, /icon: '◎'|icon: '◇'/);
+  assert.match(navigationItemsSource, /function NavSvg/);
+  assert.match(navigationItemsSource, /function GachaIcon/);
+  assert.match(navigationItemsSource, /function MapIcon/);
+  assert.match(navigationItemsSource, /function CastleIcon/);
+  assert.match(navigationItemsSource, /function HeroIcon/);
+  assert.match(navigationItemsSource, /circle className="nav-fill-accent" cx="16" cy="10\.5"/);
+  assert.match(navigationItemsSource, /M10 13\.5h12l-2\.2-5\.2/);
+  assert.match(navigationItemsSource, /M9 27v-6\.2a7 7 0 0 1 14 0V27/);
+  assert.doesNotMatch(navigationItemsSource, /icon: '◎'|icon: '◇'/);
 });
 
 
@@ -982,6 +994,70 @@ await test('画面単位で遅延読み込みして初期JSを軽くする', () 
   assert.match(routerSource, /Suspense/);
   assert.match(routerSource, /import\('\.\.\/pages\/TravelGachaPage'\)/);
   assert.doesNotMatch(routerSource, /import \{ TravelGachaPage \} from '\.\.\/pages\/TravelGachaPage'/);
+});
+
+await test('UI Phase2のDesign TokensとSafe Areaが定義されている', () => {
+  assert.match(stylesSource, /--color-bg:/);
+  assert.match(stylesSource, /--color-primary:/);
+  assert.match(stylesSource, /--space-4:/);
+  assert.match(stylesSource, /--radius-md:/);
+  assert.match(stylesSource, /--shadow-card:/);
+  assert.match(stylesSource, /--duration-fast:/);
+  assert.match(stylesSource, /--bottom-nav-height:/);
+  assert.match(stylesSource, /env\(safe-area-inset-bottom\)/);
+  assert.match(stylesSource, /prefers-reduced-motion/);
+  assert.match(indexHtml, /viewport-fit=cover/);
+});
+
+await test('AppShellはHeader、Outlet、BottomNavigationを分離して保持する', () => {
+  assert.match(appLayoutSource, /<AppHeader \/>/);
+  assert.match(appLayoutSource, /<Outlet \/>/);
+  assert.match(appLayoutSource, /<BottomNavigation \/>/);
+  assert.match(appHeaderSource, /端末内保存/);
+  assert.match(stylesSource, /padding-bottom: calc\(var\(--bottom-nav-height\) \+ env\(safe-area-inset-bottom\)\)/);
+});
+
+await test('BottomNavigationは設定配列から生成しactive状態を持つ', () => {
+  assert.match(bottomNavigationSource, /items = bottomNavigationItems/);
+  assert.match(bottomNavigationSource, /aria-label=\{label\}/);
+  assert.match(bottomNavigationSource, /aria-current=\{active \? 'page' : undefined\}/);
+  assert.match(bottomNavigationSource, /isActiveRoute/);
+  assert.match(navigationItemsSource, /BottomNavigationItem/);
+  assert.equal((navigationItemsSource.match(/\{ to: '[^']+', label:/g) ?? []).length, 10);
+  assert.match(navigationItemsSource, /to: '\/travel-gacha'/);
+  assert.match(navigationItemsSource, /to: '\/settings'/);
+});
+
+await test('Button、Card、Badge、PageHeaderの共通UIが利用可能', () => {
+  assert.match(buttonSource, /variant = 'secondary'/);
+  assert.match(buttonSource, /variant === 'primary'/);
+  assert.match(buttonSource, /variant === 'danger'/);
+  assert.match(buttonSource, /variant === 'ghost'/);
+  assert.match(buttonSource, /aria-busy=\{loading \|\| undefined\}/);
+  assert.match(buttonSource, /aria-disabled=\{disabled \|\| loading \? true : undefined\}/);
+  assert.match(cardSource, /title\?: string/);
+  assert.match(cardSource, /actions\?: ReactNode/);
+  assert.match(badgeSource, /BadgeVariant = 'neutral' \| 'primary' \| 'success' \| 'warning' \| 'danger' \| 'info'/);
+  assert.match(pageHeaderSource, /backTo\?: string/);
+  assert.match(pageHeaderSource, /actions\?: ReactNode/);
+});
+
+await test('Loading、Skeleton、EmptyState、InlineErrorがアクセシブルに整備されている', () => {
+  assert.match(pageStateSource, /aria-live="polite"/);
+  assert.match(pageStateSource, /aria-busy="true"/);
+  assert.match(pageStateSource, /empty-state--rich/);
+  assert.match(skeletonSource, /aria-hidden="true"/);
+  assert.match(inlineErrorSource, /role="alert"/);
+  assert.match(stylesSource, /skeleton-shimmer/);
+});
+
+await test('旅行一覧はPhase2共通UIの見本として導入されている', () => {
+  assert.match(tripsPageSource, /<PageHeader/);
+  assert.match(tripsPageSource, /<Button variant="primary" to="\/trips\/new">/);
+  assert.match(tripsPageSource, /<Card>/);
+  assert.match(tripsPageSource, /<Badge variant=\{trip\.tripType === 'dayTrip' \? 'info' : 'primary'\}>/);
+  assert.match(tripsPageSource, /<EmptyState\s+title=/);
+  assert.match(tripsPageSource, /<LoadingState variant="skeleton"/);
 });
 
 await test('RPGマスターに実績、称号、クエストが存在する', () => {
