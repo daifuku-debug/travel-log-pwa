@@ -16,7 +16,8 @@ interface PageRendererProps {
   page: ViewerPage;
   tripDetail: TripDetail;
   assetsById: Map<string, MediaAsset>;
-  onEdit: () => void;
+  onEdit?: () => void;
+  showControls?: boolean;
   showLegacyStory?: boolean;
   showLegacyPhotoFallback?: boolean;
 }
@@ -34,8 +35,8 @@ export function ScrapbookViewer({
   const pages = sortVisibleScrapbookPages(detail.pages);
   const assetsById = new Map(mediaAssets.map((asset) => [asset.id, asset]));
   const layout = scrapbook.layoutVariant || scrapbook.coverSettings?.layout || scrapbook.coverLayout;
-  const hasStoryPage = pages.some((page) => page.pageKind === 'story');
-  const hasPhotoPage = pages.some((page) => page.pageKind === 'photo');
+  const hasStoryPage = detail.pages.some((page) => page.pageKind === 'story');
+  const hasPhotoPage = detail.pages.some((page) => page.pageKind === 'photo');
   const firstContentPageId = pages.find((page) => page.pageKind !== 'cover')?.id;
   const endingPageId = [...pages].reverse().find((page) => page.pageKind === 'ending')?.id;
 
@@ -49,6 +50,7 @@ export function ScrapbookViewer({
           tripDetail={tripDetail}
           assetsById={assetsById}
           onEdit={onEdit}
+          showControls
           showLegacyStory={!hasStoryPage && page.id === firstContentPageId}
           showLegacyPhotoFallback={!hasPhotoPage && page.id === endingPageId}
         />
@@ -57,7 +59,43 @@ export function ScrapbookViewer({
   );
 }
 
-function ScrapbookPageRenderer(props: PageRendererProps) {
+export function ScrapbookPagePreview({
+  detail,
+  page,
+  tripDetail,
+}: {
+  detail: ScrapbookDetail;
+  page: ViewerPage;
+  tripDetail: TripDetail;
+}) {
+  const assetsById = new Map(detail.mediaAssets.map((asset) => [asset.id, asset]));
+  const layout = detail.scrapbook.layoutVariant || detail.scrapbook.coverSettings?.layout || detail.scrapbook.coverLayout;
+  const hasStoryPage = detail.pages.some((item) => item.pageKind === 'story');
+  const hasPhotoPage = detail.pages.some((item) => item.pageKind === 'photo');
+  const firstContentPageId = detail.pages
+    .filter((item) => !item.isHidden)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .find((item) => item.pageKind !== 'cover')?.id;
+  const endingPageId = [...detail.pages]
+    .filter((item) => !item.isHidden)
+    .sort((left, right) => right.sortOrder - left.sortOrder)
+    .find((item) => item.pageKind === 'ending')?.id;
+
+  return (
+    <article className={`scrapbook-viewer scrapbook-viewer--${detail.scrapbook.themeId} scrapbook-viewer--layout-${toClassName(layout)}`}>
+      <ScrapbookPageRenderer
+        detail={detail}
+        page={page}
+        tripDetail={tripDetail}
+        assetsById={assetsById}
+        showLegacyStory={!hasStoryPage && page.id === firstContentPageId}
+        showLegacyPhotoFallback={!hasPhotoPage && page.id === endingPageId}
+      />
+    </article>
+  );
+}
+
+export function ScrapbookPageRenderer(props: PageRendererProps) {
   if (props.page.pageKind === 'cover') return <ScrapbookCoverPage {...props} />;
   return (
     <div className={`scrapbook-viewer__paper scrapbook-viewer__page scrapbook-viewer__page--${props.page.pageKind}`} data-page-kind={props.page.pageKind}>
@@ -71,7 +109,7 @@ function ScrapbookPageRenderer(props: PageRendererProps) {
   );
 }
 
-function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit }: PageRendererProps) {
+function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit, showControls }: PageRendererProps) {
   const { scrapbook } = detail;
   const coverAsset = resolveCoverAsset(detail, assetsById);
   const settings = scrapbook.coverSettings;
@@ -84,8 +122,8 @@ function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit }: PageRend
         <TripJournalVisual trip={tripDetail.trip} placeNames={tripDetail.places.map((place) => place.name)} alt="" className="scrapbook-viewer__cover-fallback" />
       )}
       <div className="scrapbook-viewer__cover-shade" aria-hidden="true" />
-      <Link className="scrapbook-viewer__cover-back" to={`/trips/${tripDetail.trip.id}`} aria-label="旅行詳細へ戻る"><span aria-hidden="true">←</span></Link>
-      <button className="scrapbook-viewer__cover-edit" type="button" onClick={onEdit} aria-label="スクラップブックを編集する">編集</button>
+      {showControls && <Link className="scrapbook-viewer__cover-back" to={`/trips/${tripDetail.trip.id}`} aria-label="旅行詳細へ戻る"><span aria-hidden="true">←</span></Link>}
+      {showControls && onEdit && <button className="scrapbook-viewer__cover-edit" type="button" onClick={onEdit} aria-label="スクラップブックを編集する">編集</button>}
       <div className="scrapbook-viewer__cover-copy">
         <span className="scrapbook-viewer__edition">Travel journal · {tripDetail.trip.tripType === 'dayTrip' ? 'Day trip' : 'Journey'}</span>
         <h1>{scrapbook.title}</h1>
@@ -157,7 +195,7 @@ function PlacePage({ page, tripDetail, assetsById }: PageRendererProps) {
   );
 }
 
-function EndingPage({ detail, page, tripDetail, assetsById, onEdit, showLegacyPhotoFallback }: PageRendererProps) {
+function EndingPage({ detail, page, tripDetail, assetsById, onEdit, showControls, showLegacyPhotoFallback }: PageRendererProps) {
   const photoCount = countPhotos(detail.pages);
   const castleCount = tripDetail.places.filter((place) => place.castleId).length;
   return (
@@ -179,10 +217,10 @@ function EndingPage({ detail, page, tripDetail, assetsById, onEdit, showLegacyPh
           <Achievement value={castleCount > 0 ? `+${castleCount}` : '—'} label="城コレクション" />
         </div>
         <p>{detail.scrapbook.status === 'completed' ? 'この一冊は、旅の記憶として完成しています。' : 'この旅の続きは、いつでもこの一冊に書き足せます。'}</p>
-        <div className="scrapbook-viewer__closing-actions">
+        {showControls && <div className="scrapbook-viewer__closing-actions">
           <Link to={`/trips/${tripDetail.trip.id}/result`}>旅行リザルトを見る <span aria-hidden="true">→</span></Link>
-          <button type="button" onClick={onEdit}>この一冊を編集する</button>
-        </div>
+          {onEdit && <button type="button" onClick={onEdit}>この一冊を編集する</button>}
+        </div>}
       </ScrapbookSection>
     </>
   );

@@ -39,6 +39,7 @@ export interface ScrapbookPageInput {
   dayNumber: number;
   layoutType: ScrapbookPage['layoutType'];
   backgroundStyle: string;
+  isHidden?: boolean;
 }
 
 export interface ScrapbookBlockInput {
@@ -204,12 +205,14 @@ export async function updateScrapbookPage(pageId: EntityId, input: ScrapbookPage
     const nextDate = optionalText(input.date);
     const nextDayNumber = input.dayNumber > 0 ? Math.floor(input.dayNumber) : undefined;
     const nextBackgroundStyle = optionalText(input.backgroundStyle);
+    const nextIsHidden = input.isHidden ?? current.isHidden ?? false;
     const changedFields = collectChangedFields([
       ['title', current.title, nextTitle],
       ['date', current.date, nextDate],
       ['dayNumber', current.dayNumber, nextDayNumber],
       ['layoutType', current.layoutType, input.layoutType],
       ['backgroundStyle', current.backgroundStyle, nextBackgroundStyle],
+      ['isHidden', current.isHidden ?? false, nextIsHidden],
     ]);
     return repositories.scrapbookPages.save({
       ...current,
@@ -219,6 +222,7 @@ export async function updateScrapbookPage(pageId: EntityId, input: ScrapbookPage
       pageKind: current.pageKind,
       layoutType: input.layoutType,
       backgroundStyle: nextBackgroundStyle,
+      isHidden: nextIsHidden,
       userEditedFields: appendEditedFields(current.userEditedFields, changedFields),
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending',
