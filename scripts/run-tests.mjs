@@ -8,6 +8,10 @@ import {
   resolveStatus,
 } from '../src/features/japanConquest/japanConquestLogic.ts';
 import { normalizeBackupPayload } from '../src/features/backup/backupSchema.ts';
+import {
+  collectScrapbookMediaAssetIds,
+  mergeGeneratedScrapbookFields,
+} from '../src/features/scrapbooks/scrapbookRevision.ts';
 import { calculateLevelProgress, expRequiredForNextLevel } from '../src/features/rpg/rpgLevel.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
@@ -295,6 +299,98 @@ await test('JSONエクスポート/インポートでスクラップブック情
   assert.equal(normalized.data.mediaAssets.length, 1);
 });
 
+await test('v8スクラップブックを既存情報を保ったままv9へ移行する', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 8,
+    exportedAt: '2026-07-19T00:00:00.000Z',
+    data: {
+      scrapbooks: [{
+        id: 'scrapbook-v8',
+        tripId: 'trip-v8',
+        title: '既存の旅',
+        subtitle: '残したい説明',
+        status: 'draft',
+        layoutMode: 'pages',
+        themeId: 'journal',
+      }],
+      scrapbookPages: [{
+        id: 'page-v8',
+        scrapbookId: 'scrapbook-v8',
+        title: '表紙',
+        sortOrder: 10,
+        layoutType: 'cover',
+      }],
+      scrapbookBlocks: [{
+        id: 'block-v8',
+        pageId: 'page-v8',
+        type: 'text',
+        sortOrder: 10,
+        text: '消してはいけない本文',
+      }],
+    },
+  });
+
+  assert.equal(normalized.schemaVersion, 9);
+  assert.equal(normalized.data.scrapbooks[0].title, '既存の旅');
+  assert.equal(normalized.data.scrapbooks[0].subtitle, '残したい説明');
+  assert.equal(normalized.data.scrapbooks[0].origin, 'generated');
+  assert.equal(normalized.data.scrapbooks[0].sourceRevision, 1);
+  assert.deepEqual(normalized.data.scrapbooks[0].userEditedFields, []);
+  assert.equal(normalized.data.scrapbookPages[0].origin, 'generated');
+  assert.deepEqual(normalized.data.scrapbookPages[0].userEditedFields, []);
+  assert.equal(normalized.data.scrapbookBlocks[0].text, '消してはいけない本文');
+  assert.equal(normalized.data.scrapbookBlocks[0].origin, 'generated');
+});
+
+await test('再生成候補はユーザー編集済みのタイトルを上書きしない', () => {
+  const current = {
+    id: 'scrapbook-1',
+    tripId: 'trip-1',
+    title: '京都日帰り散歩',
+    subtitle: '古い説明',
+    origin: 'generated',
+    sourceRevision: 1,
+    userEditedFields: ['title'],
+  };
+  const merged = mergeGeneratedScrapbookFields(
+    current,
+    { title: '京都旅行', subtitle: '新しい旅行データの説明' },
+    2,
+  );
+  assert.equal(merged.title, '京都日帰り散歩');
+  assert.equal(merged.subtitle, '新しい旅行データの説明');
+  assert.equal(merged.sourceRevision, 2);
+});
+
+await test('表紙写真とハイライト写真の参照を保存・復元できる', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 9,
+    data: {
+      scrapbooks: [{
+        id: 'scrapbook-photo',
+        tripId: 'trip-photo',
+        origin: 'generated',
+        title: '写真の旅',
+        status: 'draft',
+        layoutMode: 'pages',
+        themeId: 'journal',
+        coverSettings: { photoId: 'asset-cover', titlePosition: 'bottom', layout: 'magazine' },
+        highlightPhotoIds: ['asset-highlight-1', 'asset-highlight-2'],
+      }],
+    },
+  });
+  const scrapbook = normalized.data.scrapbooks[0];
+  assert.equal(scrapbook.coverSettings?.photoId, 'asset-cover');
+  assert.deepEqual(scrapbook.highlightPhotoIds, ['asset-highlight-1', 'asset-highlight-2']);
+  assert.deepEqual(collectScrapbookMediaAssetIds(scrapbook), [
+    'asset-cover',
+    'asset-highlight-1',
+    'asset-highlight-2',
+  ]);
+});
+
 await test('JSONエクスポート/インポートでタイムマシン手動補完が復元できる', () => {
   const normalized = normalizeBackupPayload({
     app: 'travel-log-pwa',
@@ -312,7 +408,7 @@ await test('JSONエクスポート/インポートでタイムマシン手動補
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 6);
+  assert.equal(normalized.schemaVersion, 9);
   assert.equal(normalized.data.manualTimelineEntries.length, 1);
 });
 
@@ -390,7 +486,7 @@ await test('JSONエクスポート/インポートで旅ガチャ履歴が復元
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 7);
+  assert.equal(normalized.schemaVersion, 9);
   assert.equal(normalized.data.travelGachaDraws.length, 1);
   assert.equal(normalized.data.travelGachaDraws[0].selectedCandidateId, 'prefecture:13');
 });
@@ -422,7 +518,7 @@ await test('JSONエクスポート/インポートで旅行の移動区間が復
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 8);
+  assert.equal(normalized.schemaVersion, 9);
   assert.equal(normalized.data.tripTransportLegs.length, 1);
   assert.equal(normalized.data.tripTransportLegs[0].transportMode, 'shinkansen');
 });

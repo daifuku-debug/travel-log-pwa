@@ -7,12 +7,26 @@ import type {
   ScrapbookPageRepository,
   ScrapbookRepository,
 } from '../../domain/repositories/ScrapbookRepository';
+import {
+  migrateScrapbookBlockToV9,
+  migrateScrapbookPageToV9,
+  migrateScrapbookToV9,
+} from '../../domain/scrapbooks/scrapbookMigration';
 import { readAll, readById, putOne, clearStore } from './db';
 import { LocalBaseRepository } from './LocalBaseRepository';
 
 export class LocalScrapbookRepository extends LocalBaseRepository<Scrapbook> implements ScrapbookRepository {
   constructor() {
     super('scrapbooks');
+  }
+
+  override async list(): Promise<Scrapbook[]> {
+    return (await super.list()).map(migrateScrapbookToV9);
+  }
+
+  override async getById(id: EntityId): Promise<Scrapbook | undefined> {
+    const scrapbook = await super.getById(id);
+    return scrapbook ? migrateScrapbookToV9(scrapbook) : undefined;
   }
 
   async getByTripId(tripId: EntityId): Promise<Scrapbook | undefined> {
@@ -37,6 +51,15 @@ export class LocalScrapbookPageRepository
     super('scrapbookPages');
   }
 
+  override async list(): Promise<ScrapbookPage[]> {
+    return (await super.list()).map(migrateScrapbookPageToV9);
+  }
+
+  override async getById(id: EntityId): Promise<ScrapbookPage | undefined> {
+    const page = await super.getById(id);
+    return page ? migrateScrapbookPageToV9(page) : undefined;
+  }
+
   async listByScrapbookId(scrapbookId: EntityId): Promise<ScrapbookPage[]> {
     const pages = await this.list();
     return pages
@@ -51,6 +74,15 @@ export class LocalScrapbookBlockRepository
 {
   constructor() {
     super('scrapbookBlocks');
+  }
+
+  override async list(): Promise<ScrapbookBlock[]> {
+    return (await super.list()).map(migrateScrapbookBlockToV9);
+  }
+
+  override async getById(id: EntityId): Promise<ScrapbookBlock | undefined> {
+    const block = await super.getById(id);
+    return block ? migrateScrapbookBlockToV9(block) : undefined;
   }
 
   async listByPageId(pageId: EntityId): Promise<ScrapbookBlock[]> {

@@ -7,15 +7,31 @@ export type ScrapbookCoverLayout = 'magazine' | 'journal' | 'photo';
 export type ScrapbookPageLayoutType = 'cover' | 'day' | 'section' | 'summary';
 export type MediaStorageType = 'local' | 'remote' | 'external';
 export type MediaSyncStatus = 'local_only' | 'pending' | 'synced' | 'failed';
+export type ScrapbookContentOrigin = 'generated' | 'manual';
+
+export interface ScrapbookCoverSettings {
+  photoId?: EntityId;
+  titlePosition?: string;
+  layout?: string;
+}
 
 export interface Scrapbook extends BaseEntity {
   tripId: EntityId;
+  origin: ScrapbookContentOrigin;
+  sourceType?: 'trip';
+  sourceId?: EntityId;
+  sourceKey?: string;
+  sourceRevision?: number;
+  userEditedFields?: string[];
   title: string;
   subtitle?: string;
   coverAssetId?: EntityId;
+  coverSettings?: ScrapbookCoverSettings;
+  highlightPhotoIds?: EntityId[];
   coverLayout: ScrapbookCoverLayout;
   themeId: ScrapbookThemeId;
   layoutMode: ScrapbookLayoutMode;
+  layoutVariant?: string;
   status: ScrapbookStatus;
   isFavorite: boolean;
   publishedAt?: IsoDateTimeString;
@@ -24,11 +40,16 @@ export interface Scrapbook extends BaseEntity {
 
 export interface ScrapbookPage extends BaseEntity {
   scrapbookId: EntityId;
+  origin?: ScrapbookContentOrigin;
+  sourceRevision?: number;
+  userEditedFields?: string[];
+  isHidden?: boolean;
   title: string;
   date?: IsoDateString;
   dayNumber?: number;
   sortOrder: number;
   layoutType: ScrapbookPageLayoutType;
+  layoutVariant?: string;
   backgroundStyle?: string;
   sourceType?: 'manual' | 'trip';
   sourceId?: EntityId;
@@ -52,7 +73,12 @@ export type ScrapbookBlockType =
 
 interface ScrapbookBlockBase extends BaseEntity {
   pageId: EntityId;
+  origin?: ScrapbookContentOrigin;
+  sourceRevision?: number;
+  userEditedFields?: string[];
+  isHidden?: boolean;
   sortOrder: number;
+  layoutVariant?: string;
   sourceType?: 'manual' | 'trip' | 'place' | 'media' | 'rpg';
   sourceId?: EntityId;
   sourceKey?: string;

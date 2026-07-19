@@ -12,8 +12,10 @@ import { repositories } from '../../infrastructure/repositories/repositoryFactor
 import { compareDateInputValuesDesc } from '../../shared/date/dateUtils';
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
+import { SCRAPBOOK_SCHEMA_SOURCE_REVISION } from '../../domain/scrapbooks/scrapbookMigration';
 import { grantExperienceOnce } from '../rpg/experienceService';
 import { refreshRpgProgress } from '../rpg/rpgProgressService';
+import { appendEditedFields } from './scrapbookRevision';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -103,6 +105,12 @@ export async function createScrapbookForTrip(tripId: EntityId): Promise<Scrapboo
       id: createId('scrapbook'),
       userId: LOCAL_USER_ID,
       tripId,
+      origin: 'generated',
+      sourceType: 'trip',
+      sourceId: trip.id,
+      sourceKey: `trip:${trip.id}`,
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
       title: `${trip.title}のスクラップブック`,
       subtitle: trip.purpose,
       coverLayout: 'journal',
@@ -130,13 +138,23 @@ export async function updateScrapbook(scrapbookId: EntityId, input: ScrapbookInp
     const current = await repositories.scrapbooks.getById(scrapbookId);
     if (!current) throw new Error('スクラップブックが見つかりません。');
     const now = new Date().toISOString();
+    const nextTitle = input.title.trim();
+    const nextSubtitle = optionalText(input.subtitle);
+    const changedFields = collectChangedFields([
+      ['title', current.title, nextTitle],
+      ['subtitle', current.subtitle, nextSubtitle],
+      ['themeId', current.themeId, input.themeId],
+      ['status', current.status, input.status],
+      ['isFavorite', current.isFavorite, input.isFavorite],
+    ]);
     const saved = await repositories.scrapbooks.save({
       ...current,
-      title: input.title.trim(),
-      subtitle: optionalText(input.subtitle),
+      title: nextTitle,
+      subtitle: nextSubtitle,
       themeId: input.themeId,
       status: input.status,
       isFavorite: input.isFavorite,
+      userEditedFields: appendEditedFields(current.userEditedFields, changedFields),
       publishedAt: input.status === 'completed' ? current.publishedAt ?? now : current.publishedAt,
       version: current.version + 1,
       updatedAt: now,
@@ -159,6 +177,8 @@ export async function addScrapbookPage(scrapbookId: EntityId, input: ScrapbookPa
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
       scrapbookId,
+      origin: 'manual',
+      userEditedFields: [],
       title: input.title.trim(),
       date: optionalText(input.date),
       dayNumber: input.dayNumber > 0 ? Math.floor(input.dayNumber) : undefined,
@@ -179,13 +199,25 @@ export async function updateScrapbookPage(pageId: EntityId, input: ScrapbookPage
     assertNoValidationErrors(validatePageInput(input));
     const current = await repositories.scrapbookPages.getById(pageId);
     if (!current) throw new Error('ページが見つかりません。');
+    const nextTitle = input.title.trim();
+    const nextDate = optionalText(input.date);
+    const nextDayNumber = input.dayNumber > 0 ? Math.floor(input.dayNumber) : undefined;
+    const nextBackgroundStyle = optionalText(input.backgroundStyle);
+    const changedFields = collectChangedFields([
+      ['title', current.title, nextTitle],
+      ['date', current.date, nextDate],
+      ['dayNumber', current.dayNumber, nextDayNumber],
+      ['layoutType', current.layoutType, input.layoutType],
+      ['backgroundStyle', current.backgroundStyle, nextBackgroundStyle],
+    ]);
     return repositories.scrapbookPages.save({
       ...current,
-      title: input.title.trim(),
-      date: optionalText(input.date),
-      dayNumber: input.dayNumber > 0 ? Math.floor(input.dayNumber) : undefined,
+      title: nextTitle,
+      date: nextDate,
+      dayNumber: nextDayNumber,
       layoutType: input.layoutType,
-      backgroundStyle: optionalText(input.backgroundStyle),
+      backgroundStyle: nextBackgroundStyle,
+      userEditedFields: appendEditedFields(current.userEditedFields, changedFields),
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending',
     });
@@ -209,7 +241,10 @@ export async function moveScrapbookPage(pageId: EntityId, direction: -1 | 1): Pr
     const current = await repositories.scrapbookPages.getById(pageId);
     if (!current) throw new Error('ページが見つかりません。');
     const pages = await repositories.scrapbookPages.listByScrapbookId(current.scrapbookId);
-    await swapSortOrder(pages, pageId, direction, repositories.scrapbookPages.save.bind(repositories.scrapbookPages));
+    await swapSortOrder(pages, pageId, direction, (page) => repositories.scrapbookPages.save({
+      ...page,
+      userEditedFields: appendEditedFields(page.userEditedFields, ['sortOrder']),
+    }));
   } catch (error) {
     throw toAppError(error, 'ページの並び替えに失敗しました');
   }
@@ -283,14 +318,24 @@ export async function updateScrapbookBlock(blockId: EntityId, input: ScrapbookBl
   try {
     const current = await repositories.scrapbookBlocks.getById(blockId);
     if (!current) throw new Error('ブロックが見つかりません。');
+    const rebuilt = buildBlock({
+      id: current.id,
+      pageId: current.pageId,
+      sortOrder: current.sortOrder,
+      now: current.createdAt,
+      input,
+    });
     return repositories.scrapbookBlocks.save({
-      ...buildBlock({
-        id: current.id,
-        pageId: current.pageId,
-        sortOrder: current.sortOrder,
-        now: current.createdAt,
-        input,
-      }),
+      ...rebuilt,
+      origin: current.origin,
+      sourceRevision: current.sourceRevision,
+      sourceType: current.sourceType,
+      sourceId: current.sourceId,
+      sourceKey: current.sourceKey,
+      generatedAt: current.generatedAt,
+      userEditedFields: appendEditedFields(current.userEditedFields, collectBlockChangedFields(current, rebuilt)),
+      isHidden: current.isHidden,
+      layoutVariant: current.layoutVariant,
       createdAt: current.createdAt,
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending',
@@ -325,7 +370,10 @@ export async function moveScrapbookBlock(blockId: EntityId, direction: -1 | 1): 
     const current = await repositories.scrapbookBlocks.getById(blockId);
     if (!current) throw new Error('ブロックが見つかりません。');
     const blocks = await repositories.scrapbookBlocks.listByPageId(current.pageId);
-    await swapSortOrder(blocks, blockId, direction, repositories.scrapbookBlocks.save.bind(repositories.scrapbookBlocks));
+    await swapSortOrder(blocks, blockId, direction, (block) => repositories.scrapbookBlocks.save({
+      ...block,
+      userEditedFields: appendEditedFields(block.userEditedFields, ['sortOrder']),
+    }));
   } catch (error) {
     throw toAppError(error, 'ブロックの並び替えに失敗しました');
   }
@@ -346,6 +394,9 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
       scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
       title: '表紙',
       sortOrder: 10,
       layoutType: 'cover',
@@ -361,6 +412,9 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       id: createId('scrapbook-block'),
       userId: LOCAL_USER_ID,
       pageId: coverPage.id,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
       type: 'trip_summary',
       sortOrder: 10,
       title: trip.title,
@@ -384,6 +438,9 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
       scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
       title: `${index + 1}日目`,
       date,
       dayNumber: index + 1,
@@ -404,6 +461,9 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
         id: createId('scrapbook-block'),
         userId: LOCAL_USER_ID,
         pageId: page.id,
+        origin: 'generated',
+        sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+        userEditedFields: [],
         type: 'place',
         sortOrder: blockSortOrder,
         locationId: place.id,
@@ -427,6 +487,9 @@ async function generateInitialScrapbookContent(scrapbookId: EntityId): Promise<v
       id: createId('scrapbook-page'),
       userId: LOCAL_USER_ID,
       scrapbookId,
+      origin: 'generated',
+      sourceRevision: SCRAPBOOK_SCHEMA_SOURCE_REVISION,
+      userEditedFields: [],
       title: '旅のまとめ',
       sortOrder: pageSortOrder,
       layoutType: 'summary',
@@ -458,6 +521,8 @@ function buildBlock({
     id,
     userId: LOCAL_USER_ID,
     pageId,
+    origin: 'manual' as const,
+    userEditedFields: [],
     sortOrder,
     createdAt: now,
     updatedAt: now,
@@ -630,6 +695,45 @@ function assertNoValidationErrors(errors: string[]): void {
 function optionalText(value?: string): string | undefined {
   const trimmed = value?.trim() ?? '';
   return trimmed || undefined;
+}
+
+function collectChangedFields(entries: Array<[string, unknown, unknown]>): string[] {
+  return entries
+    .filter(([, current, next]) => !valuesEqual(current, next))
+    .map(([field]) => field);
+}
+
+function collectBlockChangedFields(current: ScrapbookBlock, next: ScrapbookBlock): string[] {
+  const ignoredFields = new Set([
+    'id',
+    'userId',
+    'pageId',
+    'origin',
+    'sourceRevision',
+    'userEditedFields',
+    'isHidden',
+    'sortOrder',
+    'layoutVariant',
+    'sourceType',
+    'sourceId',
+    'sourceKey',
+    'generatedAt',
+    'createdAt',
+    'updatedAt',
+    'deletedAt',
+    'syncStatus',
+  ]);
+  const currentFields = current as unknown as Record<string, unknown>;
+  const nextFields = next as unknown as Record<string, unknown>;
+  return [...new Set([...Object.keys(currentFields), ...Object.keys(nextFields)])]
+    .filter((field) => !ignoredFields.has(field) && !valuesEqual(currentFields[field], nextFields[field]));
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+  return left === right;
 }
 
 function nextSortOrder(values: Array<{ sortOrder: number }>): number {

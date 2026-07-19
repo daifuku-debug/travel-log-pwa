@@ -14,8 +14,13 @@ import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
+import {
+  migrateScrapbookBlockToV9,
+  migrateScrapbookPageToV9,
+  migrateScrapbookToV9,
+} from '../../domain/scrapbooks/scrapbookMigration.ts';
 
-export const BACKUP_SCHEMA_VERSION = 8;
+export const BACKUP_SCHEMA_VERSION = 9;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -53,7 +58,7 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
     const data = payload.data as Record<string, unknown>;
     return {
       app: 'travel-log-pwa',
-      schemaVersion: typeof payload.schemaVersion === 'number' ? payload.schemaVersion : 1,
+      schemaVersion: BACKUP_SCHEMA_VERSION,
       exportedAt: typeof payload.exportedAt === 'string' ? payload.exportedAt : new Date().toISOString(),
       data: {
         trips: arrayOrEmpty<Trip>(data.trips),
@@ -209,7 +214,7 @@ function sanitizeCastleVisitEvents(value: unknown): CastleVisitEvent[] {
 
 function sanitizeScrapbooks(value: unknown): Scrapbook[] {
   return uniqueBy(
-    arrayOrEmpty<Scrapbook>(value).filter((scrapbook) =>
+    arrayOrEmpty<Scrapbook>(value).map(migrateScrapbookToV9).filter((scrapbook) =>
       Boolean(scrapbook.id)
       && Boolean(scrapbook.tripId)
       && ['draft', 'completed', 'archived'].includes(scrapbook.status)
@@ -222,7 +227,7 @@ function sanitizeScrapbooks(value: unknown): Scrapbook[] {
 
 function sanitizeScrapbookPages(value: unknown): ScrapbookPage[] {
   return uniqueBy(
-    arrayOrEmpty<ScrapbookPage>(value).filter((page) =>
+    arrayOrEmpty<ScrapbookPage>(value).map(migrateScrapbookPageToV9).filter((page) =>
       Boolean(page.id)
       && Boolean(page.scrapbookId)
       && Number.isFinite(page.sortOrder)
@@ -235,7 +240,7 @@ function sanitizeScrapbookPages(value: unknown): ScrapbookPage[] {
 function sanitizeScrapbookBlocks(value: unknown): ScrapbookBlock[] {
   const blockTypes = ['text', 'heading', 'photo', 'photo_grid', 'place', 'meal', 'ticket', 'purchase', 'quote', 'divider', 'trip_summary', 'rpg_result'];
   return uniqueBy(
-    arrayOrEmpty<ScrapbookBlock>(value).filter((block) =>
+    arrayOrEmpty<ScrapbookBlock>(value).map(migrateScrapbookBlockToV9).filter((block) =>
       Boolean(block.id)
       && Boolean(block.pageId)
       && Number.isFinite(block.sortOrder)
