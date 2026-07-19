@@ -452,6 +452,7 @@ a {
 
 .field {
   display: grid;
+  min-width: 0;
   gap: var(--space-2);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -498,6 +499,8 @@ a {
 .field select,
 .field textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface-elevated);
@@ -1989,6 +1992,7 @@ a {
 }
 
 .option-fieldset {
+  min-width: 0;
   border: 1px solid #ded7cc;
   border-radius: 8px;
   margin: 0;

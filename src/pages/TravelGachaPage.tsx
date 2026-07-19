@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   TravelCandidate,
   TravelGachaDraw,
@@ -204,6 +204,12 @@ function TravelGachaForm({
   busy: boolean;
   showActions?: boolean;
 }) {
+  const [tripDurationInput, setTripDurationInput] = useState(String(settings.tripDurationDays));
+
+  useEffect(() => {
+    setTripDurationInput(String(settings.tripDurationDays));
+  }, [settings.tripDurationDays]);
+
   function submit(event: FormEvent) {
     event.preventDefault();
     onDraw();
@@ -233,7 +239,22 @@ function TravelGachaForm({
         </label>
         <label className="field">
           <span>旅行日数</span>
-          <input type="number" min="1" max="14" value={settings.tripDurationDays} onChange={(event) => onSettingsChange({ ...settings, tripDurationDays: Number(event.target.value) })} />
+          <input
+            type="number"
+            min="1"
+            max="14"
+            value={tripDurationInput}
+            onChange={(event) => {
+              const value = event.target.value;
+              setTripDurationInput(value);
+              if (value !== '') onSettingsChange({ ...settings, tripDurationDays: Number(value) });
+            }}
+            onBlur={() => {
+              if (tripDurationInput !== '') return;
+              setTripDurationInput('1');
+              onSettingsChange({ ...settings, tripDurationDays: 1 });
+            }}
+          />
         </label>
       </div>
       <div className="form-grid">

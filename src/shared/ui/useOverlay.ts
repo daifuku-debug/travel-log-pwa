@@ -14,6 +14,12 @@ export function useOverlay({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const onCloseRef = useRef(onClose);
+  const dismissibleRef = useRef(dismissible);
+  const initialFocusRefRef = useRef(initialFocusRef);
+  onCloseRef.current = onClose;
+  dismissibleRef.current = dismissible;
+  initialFocusRefRef.current = initialFocusRef;
 
   useEffect(() => {
     if (!open) return;
@@ -22,15 +28,15 @@ export function useOverlay({
     document.body.style.overflow = 'hidden';
 
     const frame = window.requestAnimationFrame(() => {
-      const target = initialFocusRef?.current
+      const target = initialFocusRefRef.current?.current
         ?? panelRef.current?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
       target?.focus();
     });
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && dismissible) {
+      if (event.key === 'Escape' && dismissibleRef.current) {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
@@ -56,7 +62,7 @@ export function useOverlay({
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [dismissible, initialFocusRef, onClose, open]);
+  }, [open]);
 
   return { panelRef, titleId, descriptionId };
 }

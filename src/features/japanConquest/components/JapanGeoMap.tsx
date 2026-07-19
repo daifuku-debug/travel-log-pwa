@@ -28,13 +28,14 @@ interface JapanGeoMapProps {
 
 const MAP_WIDTH = 640;
 const MAP_HEIGHT = 760;
-const PADDING = 10;
+const PADDING = 18;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const COORDINATE_PRECISION = 1;
 const DEFAULT_VIEWPORT = { scale: 1, x: 0, y: 0 };
 const OKINAWA_CODE = '47';
 const MAINLAND_MAX_LON = 146;
+const MAINLAND_MIN_LAT = 30.85;
 const OKINAWA_INSET = { x: 432, y: 590, width: 176, height: 116, padding: 14 };
 
 export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
@@ -76,7 +77,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
     const mainlandPoints = geoJson.features
       .filter((feature) => codeFromShapeIso(feature.properties.shapeISO) !== OKINAWA_CODE)
       .flatMap((feature) => collectPoints(feature.geometry))
-      .filter(([lon]) => lon < MAINLAND_MAX_LON);
+      .filter(([lon, lat]) => lon < MAINLAND_MAX_LON && lat >= MAINLAND_MIN_LAT);
     const okinawaFeature = geoJson.features.find((feature) => codeFromShapeIso(feature.properties.shapeISO) === OKINAWA_CODE);
     return {
       mainland: createProjection(mainlandPoints, { x: PADDING, y: PADDING, width: MAP_WIDTH - PADDING * 2, height: MAP_HEIGHT - PADDING * 2 }),

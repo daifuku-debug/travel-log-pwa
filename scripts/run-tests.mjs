@@ -1275,6 +1275,20 @@ await test('旅ガチャは条件、抽選、結果を段階表示しToastで通
   assert.match(travelGachaPage, /loading=\{busy\}/);
   assert.match(travelGachaPage, /旅先を抽選しました/);
   assert.match(travelGachaPage, /この旅を採用しました/);
+  assert.match(travelGachaPage, /tripDurationInput/);
+  assert.match(travelGachaPage, /if \(value !== ''\)/);
+  assert.match(travelGachaPage, /tripDurationDays: 1/);
+});
+
+await test('Bottom Sheet内の入力で初期フォーカスを繰り返さない', () => {
+  assert.match(overlaySource, /onCloseRef\.current = onClose/);
+  assert.match(overlaySource, /dismissibleRef\.current = dismissible/);
+  assert.match(overlaySource, /\}, \[open\]\);/);
+});
+
+await test('日本地図は鹿児島南方の離島を本土投影範囲から除外する', () => {
+  assert.match(mapComponent, /MAINLAND_MIN_LAT = 30\.85/);
+  assert.match(mapComponent, /lat >= MAINLAND_MIN_LAT/);
 });
 
 await test('城コレクションは進捗、検索、フィルター、詳細を共通UIで表示する', () => {
