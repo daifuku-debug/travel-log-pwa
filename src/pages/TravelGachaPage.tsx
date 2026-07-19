@@ -18,6 +18,7 @@ import {
 } from '../features/travelGacha/travelGachaService';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
+import { BottomSheet, Button, InlineError, PageHeader, useToast } from '../shared/ui';
 
 const MODE_LABELS: Record<TravelGachaMode, string> = {
   random: '完全ランダム',
@@ -67,6 +68,8 @@ export function TravelGachaPage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [historyKey, setHistoryKey] = useState(0);
+  const [conditionsOpen, setConditionsOpen] = useState(false);
+  const { showToast } = useToast();
   const { data: history, error: historyError, loading: historyLoading } = useAsyncData(() => listRecentTravelGachaDraws(8), [historyKey]);
 
   const selectedCandidate = result?.draw?.candidateSnapshot;
@@ -91,6 +94,7 @@ export function TravelGachaPage() {
       const next = await drawTravelGacha(mode, adjustSettingsForMode(mode, settings), rerolledFromDrawId);
       setResult(next);
       setHistoryKey((value) => value + 1);
+      showToast({ title: rerolledFromDrawId ? 'もう一度抽選しました' : '旅先を抽選しました', variant: 'success' });
     } catch (error) {
       setFormError(error instanceof Error ? error.message : '抽選に失敗しました。');
     } finally {
@@ -105,6 +109,7 @@ export function TravelGachaPage() {
       const accepted = await acceptTravelGachaDraw(draw.id);
       setResult((current) => current ? { ...current, draw: accepted } : current);
       setHistoryKey((value) => value + 1);
+      showToast({ title: 'この旅を採用しました', variant: 'success' });
     } catch (error) {
       setFormError(error instanceof Error ? error.message : '採用に失敗しました。');
     } finally {
@@ -114,28 +119,30 @@ export function TravelGachaPage() {
 
   return (
     <>
-      <section className="page-heading travel-gacha-hero">
-        <h1>旅ガチャ</h1>
-        <p>予算、移動時間、未訪問、行きたい場所、城コレクションから、次の旅先を楽しく抽選します。</p>
+      <PageHeader title="旅ガチャ" description="予算、移動時間、未訪問、行きたい場所、城コレクションから、次の旅先を楽しく抽選します。" />
+
+      <section className="card gacha-condition-summary" aria-label="現在の抽選条件">
+        <div className="section-head">
+          <div><h2>現在の条件</h2><p className="muted">{MODE_LABELS[mode]} / {settings.departureLabel || '出発地未設定'}</p></div>
+          <Button onClick={() => setConditionsOpen(true)}>条件を変更</Button>
+        </div>
+        <div className="filter-summary">
+          {settings.maxBudget !== undefined && <span>予算 {settings.maxBudget.toLocaleString()}円まで</span>}
+          {settings.maxOneWayTravelMinutes !== undefined && <span>片道 {settings.maxOneWayTravelMinutes}分まで</span>}
+          <span>{settings.stayType === 'dayTrip' ? '日帰り' : '宿泊'}・{settings.tripDurationDays}日</span>
+          <span>{RANDOMNESS_LABELS[settings.randomnessLevel]}</span>
+        </div>
+        <Button variant="primary" size="lg" fullWidth loading={busy} onClick={() => void runDraw()}>旅ガチャを引く</Button>
       </section>
 
-      <div className="travel-gacha-layout">
-        <section className="card">
-          <h2>条件</h2>
-          <TravelGachaForm
-            mode={mode}
-            settings={settings}
-            onModeChange={setMode}
-            onSettingsChange={setSettings}
-            onPreview={() => void runPreview()}
-            onDraw={() => void runDraw()}
-            busy={busy}
-          />
-          {formError && <div className="form-errors">{formError}</div>}
-        </section>
+      <BottomSheet open={conditionsOpen} onClose={() => setConditionsOpen(false)} title="旅ガチャの条件" description="今回の予算や移動時間、旅の気分を設定します。" size="lg" actions={<><Button onClick={() => { setMode('condition'); setSettings(defaultTravelGachaSettings); }}>リセット</Button><Button variant="primary" onClick={() => { setConditionsOpen(false); showToast({ title: '抽選条件を適用しました', variant: 'success' }); }}>条件を適用</Button></>}>
+        <TravelGachaForm mode={mode} settings={settings} onModeChange={setMode} onSettingsChange={setSettings} onPreview={() => void runPreview()} onDraw={() => void runDraw()} busy={busy} showActions={false} />
+      </BottomSheet>
 
+      <div className="travel-gacha-layout">
         <section className="card travel-gacha-result-card">
           <h2>抽選結果</h2>
+          {formError && <InlineError message={formError} />}
           {busy && <LoadingState />}
           {!busy && selectedCandidate ? (
             <GachaResultCard
@@ -186,6 +193,7 @@ function TravelGachaForm({
   onPreview,
   onDraw,
   busy,
+  showActions = true,
 }: {
   mode: TravelGachaMode;
   settings: TravelGachaSettings;
@@ -194,6 +202,7 @@ function TravelGachaForm({
   onPreview: () => void;
   onDraw: () => void;
   busy: boolean;
+  showActions?: boolean;
 }) {
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -306,10 +315,10 @@ function TravelGachaForm({
           最近の抽選も含める
         </label>
       </div>
-      <div className="inline-actions">
+      {showActions && <div className="inline-actions">
         <button className="button" type="button" onClick={onPreview} disabled={busy}>候補を見る</button>
         <button className="button button--primary travel-gacha-button" type="submit" disabled={busy}>旅ガチャを引く</button>
-      </div>
+      </div>}
     </form>
   );
 }

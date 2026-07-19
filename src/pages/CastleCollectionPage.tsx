@@ -18,6 +18,7 @@ import { filterCastleRows, type CastleFilter, type CastleRecordInput } from '../
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { formatDateRange } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
+import { BottomSheet, Button, InlineError, PageHeader, ProgressBar, SegmentedControl, useToast } from '../shared/ui';
 
 const ACQUISITION_LABELS: Record<CastleVisitSummary['stampStatus'], string> = {
   unknown: '未確認',
@@ -34,6 +35,9 @@ export function CastleCollectionPage() {
   }));
   const { data, error, loading } = useAsyncData(() => getCastleCollectionView(getDefaultCastleFilter()), [reloadKey]);
   const [selectedCastleId, setSelectedCastleId] = useState<string>();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { showToast } = useToast();
   const filteredRows = useMemo(() => (data ? filterCastleRows(data.rows, filter) : []), [data, filter]);
   const selectedRow = filteredRows.find((row) => row.castle.id === selectedCastleId) ?? filteredRows[0];
 
@@ -43,17 +47,14 @@ export function CastleCollectionPage() {
     }
   }, [filteredRows, selectedCastleId]);
 
+  function selectCastle(castleId: string) {
+    setSelectedCastleId(castleId);
+    setDetailsOpen(true);
+  }
+
   return (
     <>
-      <section className="page-heading">
-        <div className="page-heading__row">
-          <div>
-            <h1>城コレクション</h1>
-            <p>日本100名城・続日本100名城の訪問、スタンプ、御城印を管理します。</p>
-          </div>
-          <Link className="button" to="/collections">通常コレクション</Link>
-        </div>
-      </section>
+      <PageHeader title="城コレクション" description="日本100名城・続日本100名城の訪問、スタンプ、御城印を管理します。" actions={<Button to="/collections">通常コレクション</Button>} />
 
       {loading && <LoadingState />}
       {error && <ErrorState error={error} />}
@@ -64,24 +65,30 @@ export function CastleCollectionPage() {
           <p className="status-banner">
             この画面は個人の訪問記録です。日本城郭協会等による公式認定・公式証明ではありません。
           </p>
-          <CastleMap rows={data.rows} selectedCastleId={selectedRow?.castle.id} onSelect={setSelectedCastleId} />
-          <CastleFilters view={data} filter={filter} onChange={setFilter} />
+          <CastleMap rows={data.rows} selectedCastleId={selectedRow?.castle.id} onSelect={selectCastle} />
+          <section className="card castle-search-bar" aria-label="城の検索と絞り込み">
+            <SegmentedControl label="城シリーズ" value={filter.series} options={[{ value: 'all', label: 'すべて' }, { value: 'japanese_100_castles', label: '100名城' }, { value: 'continued_japanese_100_castles', label: '続100名城' }]} onChange={(series) => setFilter({ ...filter, series })} />
+            <div className="castle-search-row">
+              <label className="field"><span>城名・所在地を検索</span><input value={filter.query} placeholder="城名・所在地" onChange={(event) => setFilter({ ...filter, query: event.target.value })} /></label>
+              {filter.query && <Button onClick={() => setFilter({ ...filter, query: '' })}>クリア</Button>}
+              <Button onClick={() => setFiltersOpen(true)}>絞り込み</Button>
+            </div>
+            <div className="filter-summary"><span>{filteredRows.length}件</span><span>{filter.status === 'all' ? 'すべての状態' : CASTLE_STATUS_LABELS[filter.status]}</span>{filter.favoriteOnly && <span>お気に入りのみ</span>}</div>
+          </section>
+          <BottomSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="城を絞り込む" description="地方、都道府県、達成状態などを指定します。" size="lg" actions={<><Button onClick={() => setFilter(getDefaultCastleFilter())}>リセット</Button><Button variant="primary" onClick={() => { setFiltersOpen(false); showToast({ title: '絞り込み条件を適用しました', variant: 'success' }); }}>条件を適用</Button></>}>
+            <CastleFilters view={data} filter={filter} onChange={setFilter} />
+          </BottomSheet>
           <div className="castle-layout">
             <CastleList
               rows={filteredRows}
               selectedCastleId={selectedRow?.castle.id}
-              onSelect={(castleId) => setSelectedCastleId(castleId)}
+              onSelect={selectCastle}
             />
-            {selectedRow ? (
-              <CastleDetailPanel
-                key={selectedRow.castle.id}
-                row={selectedRow}
-                onSaved={() => setReloadKey((value) => value + 1)}
-              />
-            ) : (
-              <EmptyState>条件に合う城がありません。</EmptyState>
-            )}
+            {!selectedRow && <EmptyState title="条件に合う城がありません" description="検索語や絞り込み条件を変更してください。" action={<Button onClick={() => setFilter(getDefaultCastleFilter())}>条件をリセット</Button>} />}
           </div>
+          <BottomSheet open={detailsOpen && Boolean(selectedRow)} onClose={() => setDetailsOpen(false)} title={selectedRow?.castle.nameJa ?? '城の詳細'} description={selectedRow ? `${CASTLE_SERIES_LABELS[selectedRow.castle.series]} / ${selectedRow.castle.prefectureName}` : undefined} size="lg" dismissible>
+            {selectedRow && <CastleDetailPanel key={selectedRow.castle.id} row={selectedRow} onSaved={() => { setReloadKey((value) => value + 1); showToast({ title: `${selectedRow.castle.nameJa}の記録を保存しました`, variant: 'success' }); }} />}
+          </BottomSheet>
         </div>
       )}
     </>
@@ -141,7 +148,9 @@ function CastleMap({
 
 function CastleSummary({ view }: { view: CastleCollectionView }) {
   return (
-    <section className="grid summary-grid">
+    <section className="card castle-progress" aria-label="城コレクションの進捗">
+      <ProgressBar label="全200城の登城率" value={view.stats.visitedCount} max={200} valueText={`${view.stats.visitedCount} / 200城・${view.stats.visitedRate.toFixed(1)}%`} />
+      <div className="grid summary-grid">
       <div className="card">
         <h2>登城済み</h2>
         <div className="stat-value">{view.stats.visitedCount}</div>
@@ -161,6 +170,7 @@ function CastleSummary({ view }: { view: CastleCollectionView }) {
         <h2>スタンプ</h2>
         <div className="stat-value">{view.stats.stampCount}</div>
         <div className="muted">御城印 {view.stats.goshuinCount} / お気に入り {view.stats.favoriteCount}</div>
+      </div>
       </div>
     </section>
   );
@@ -182,7 +192,7 @@ function CastleFilters({
   );
 
   return (
-    <section className="card">
+    <div className="castle-filter-panel">
       <div className="filter-grid castle-filter-grid">
         <label className="field">
           <span>検索</span>
@@ -245,7 +255,7 @@ function CastleFilters({
           お気に入りのみ
         </label>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -331,7 +341,7 @@ function CastleDetailPanel({
         <span className={`status-badge castle-status-${input.status}`}>{CASTLE_STATUS_LABELS[input.status]}</span>
       </div>
 
-      {formError && <div className="form-errors">{formError}</div>}
+      {formError && <InlineError message={formError} />}
 
       <form className="form form--compact" onSubmit={handleSubmit}>
         <label className="field">

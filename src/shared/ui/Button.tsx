@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Link, type LinkProps } from 'react-router-dom';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -27,7 +27,7 @@ type LinkButtonProps = ButtonCommonProps &
 
 export type ButtonProps = NativeButtonProps | LinkButtonProps;
 
-export function Button(props: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(props, ref) {
   const {
     children,
     variant = 'secondary',
@@ -101,6 +101,7 @@ export function Button(props: ButtonProps) {
   return (
     <button
       {...buttonProps}
+      ref={ref}
       className={classes}
       disabled={disabled || loading}
       type={type}
@@ -109,7 +110,7 @@ export function Button(props: ButtonProps) {
       {content}
     </button>
   );
-}
+});
 
 function variantClassName(variant: ButtonVariant): string {
   if (variant === 'primary') return 'button--primary';

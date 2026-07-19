@@ -17,7 +17,12 @@ import { getTripDisplayStatus, getTripDisplayStatusLabel } from '../features/tri
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { formatDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
-import { Badge, Button, Card, InlineError, PageHeader } from '../shared/ui';
+import { Badge, Button, Card, ConfirmDialog, InlineError, PageHeader } from '../shared/ui';
+
+type PendingDelete =
+  | { kind: 'trip'; label: string }
+  | { kind: 'place'; id: string; label: string }
+  | { kind: 'leg'; id: string; label: string };
 
 export function TripDetailPage() {
   const { tripId } = useParams();
@@ -26,6 +31,8 @@ export function TripDetailPage() {
   const [editingPlace, setEditingPlace] = useState<PlaceVisit>();
   const [editingTransportLeg, setEditingTransportLeg] = useState<TripTransportLeg>();
   const [actionError, setActionError] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
+  const [deleting, setDeleting] = useState(false);
   const { data, error, loading } = useAsyncData(
     () => (tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
     [tripId, reloadKey],
@@ -42,7 +49,7 @@ export function TripDetailPage() {
   }
 
   async function handleDeleteTrip() {
-    if (!tripId || !window.confirm('この旅行と紐づく訪問場所を削除しますか？')) return;
+    if (!tripId) return;
     setActionError('');
     try {
       await deleteTrip(tripId);
@@ -50,6 +57,23 @@ export function TripDetailPage() {
     } catch (caughtError) {
       setActionError(caughtError instanceof Error ? caughtError.message : '旅行の削除に失敗しました。');
     }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    if (pendingDelete.kind === 'trip') {
+      await handleDeleteTrip();
+      setDeleting(false);
+      return;
+    }
+    const target = pendingDelete;
+    await runAction(
+      () => target.kind === 'leg' ? deleteTripTransportLeg(target.id) : deletePlaceVisit(target.id),
+      target.kind === 'leg' ? '移動区間の削除に失敗しました。' : '訪問場所の削除に失敗しました。',
+    );
+    setPendingDelete(undefined);
+    setDeleting(false);
   }
 
   return (
@@ -112,10 +136,7 @@ export function TripDetailPage() {
                     </div>
                     <div className="inline-actions">
                       <Button size="sm" onClick={() => setEditingTransportLeg(leg)}>編集</Button>
-                      <Button size="sm" variant="danger" onClick={() => {
-                        if (!window.confirm(`「${leg.fromName} → ${leg.toName}」を削除しますか？`)) return;
-                        void runAction(() => deleteTripTransportLeg(leg.id), '移動区間の削除に失敗しました。');
-                      }}>削除</Button>
+                      <Button size="sm" variant="danger" onClick={() => setPendingDelete({ kind: 'leg', id: leg.id, label: `${leg.fromName} → ${leg.toName}` })}>削除</Button>
                     </div>
                   </div>
                 ))}
@@ -139,10 +160,7 @@ export function TripDetailPage() {
                     </div>
                     <div className="inline-actions">
                       <Button size="sm" onClick={() => setEditingPlace(place)}>編集</Button>
-                      <Button size="sm" variant="danger" onClick={() => {
-                        if (!window.confirm(`「${place.name}」を削除しますか？`)) return;
-                        void runAction(() => deletePlaceVisit(place.id), '訪問場所の削除に失敗しました。');
-                      }}>削除</Button>
+                      <Button size="sm" variant="danger" onClick={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })}>削除</Button>
                     </div>
                   </div>
                 ))}
@@ -191,10 +209,19 @@ export function TripDetailPage() {
           <section className="trip-detail__danger" aria-labelledby="trip-management-title">
             <h2 id="trip-management-title">旅行の管理</h2>
             <p className="muted">この旅行と紐づく訪問場所・移動区間も削除されます。</p>
-            <Button variant="danger" onClick={() => void handleDeleteTrip()}>旅行を削除</Button>
+            <Button variant="danger" onClick={() => setPendingDelete({ kind: 'trip', label: data.trip.title })}>旅行を削除</Button>
           </section>
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={pendingDelete?.kind === 'trip' ? 'この旅行を削除しますか？' : 'この記録を削除しますか？'}
+        description={pendingDelete?.kind === 'trip' ? `「${pendingDelete.label}」と紐づく記録も削除され、元に戻せません。` : `「${pendingDelete?.label ?? ''}」を削除します。この操作は元に戻せません。`}
+        confirmLabel={pendingDelete?.kind === 'trip' ? '旅行を削除' : '記録を削除'}
+        processing={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(undefined)}
+      />
     </>
   );
 }

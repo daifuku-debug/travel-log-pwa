@@ -56,6 +56,15 @@
   --page-max-width: 960px;
   --page-inline-padding: 18px;
   --tap-target-min: 44px;
+  --z-header: 10;
+  --z-bottom-nav: 20;
+  --z-overlay: 40;
+  --z-dialog: 50;
+  --z-toast: 60;
+  --overlay-background: rgba(25, 34, 35, 0.48);
+  --sheet-max-height: 88dvh;
+  --dialog-max-width: 440px;
+  --toast-max-width: 420px;
   color: var(--color-text);
   background: var(--color-bg);
   font-family:
@@ -100,7 +109,7 @@ a {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-header);
   padding-top: env(safe-area-inset-top);
   border-bottom: 1px solid #d9d2c7;
   background: rgba(247, 244, 239, 0.92);
@@ -257,7 +266,7 @@ a {
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 20;
+  z-index: var(--z-bottom-nav);
   min-height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
   border-top: 1px solid #d9d2c7;
   background: rgba(255, 253, 249, 0.96);
@@ -1812,6 +1821,71 @@ a {
   z-index: 2;
 }
 
+.quick-search-actions,
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.quick-search-actions {
+  margin-top: var(--space-3);
+}
+
+.filter-summary {
+  margin-top: var(--space-3);
+}
+
+.filter-summary span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  padding: 3px var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.gacha-condition-summary {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.travel-gacha-result-card {
+  grid-column: 1 / -1;
+}
+
+.castle-progress {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.castle-progress .summary-card,
+.castle-progress .card {
+  box-shadow: none;
+}
+
+.castle-search-bar,
+.castle-filter-panel {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.castle-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.castle-layout:has(> .castle-list-card:only-child) {
+  grid-template-columns: 1fr;
+}
+
 .time-machine-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -2214,6 +2288,152 @@ a {
   }
 }
 
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--overlay-background);
+  padding-top: max(var(--space-5), env(safe-area-inset-top));
+  animation: overlay-in var(--duration-base) var(--ease-standard);
+}
+
+.overlay--dialog {
+  z-index: var(--z-dialog);
+  align-items: center;
+  padding: var(--space-4);
+}
+
+.bottom-sheet {
+  display: flex;
+  width: min(100%, 720px);
+  max-height: var(--sheet-max-height);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-floating);
+  animation: sheet-in var(--duration-slow) var(--ease-standard);
+}
+
+.bottom-sheet--sm { width: min(100%, 480px); }
+.bottom-sheet--lg { width: min(100%, 900px); }
+
+.bottom-sheet__handle {
+  width: 42px;
+  height: 4px;
+  flex: 0 0 auto;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+}
+
+.bottom-sheet__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-3) var(--space-4);
+}
+
+.bottom-sheet__header h2,
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.bottom-sheet__header p,
+.confirm-dialog p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+.bottom-sheet__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+}
+
+.bottom-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-surface-elevated);
+}
+
+.confirm-dialog {
+  width: min(100%, var(--dialog-max-width));
+  max-height: min(80dvh, 560px);
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-floating);
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.toast-host {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + var(--space-4));
+  z-index: var(--z-toast);
+  display: grid;
+  width: min(calc(100vw - (var(--space-4) * 2)), var(--toast-max-width));
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-left: 5px solid currentColor;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-elevated);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-floating);
+  pointer-events: auto;
+}
+
+.toast > div { display: grid; gap: 2px; }
+.toast strong { font-size: var(--font-size-xs); }
+.toast span { color: var(--color-text); }
+.toast button {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  font-weight: var(--font-weight-bold);
+}
+.toast--success { color: var(--color-success); }
+.toast--error { color: var(--color-danger); }
+.toast--warning { color: var(--color-warning); }
+.toast--info { color: var(--color-primary); }
+
+@keyframes overlay-in { from { opacity: 0; } }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
+
 @media (max-width: 680px) {
   .more-groups,
   .trip-card-grid,
@@ -2254,6 +2474,26 @@ a {
 
   .time-machine-controls {
     position: static;
+  }
+
+  .castle-search-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .castle-search-row .field {
+    grid-column: 1 / -1;
+  }
+
+  .bottom-sheet__actions .button {
+    flex: 1;
+  }
+
+  .confirm-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-dialog__actions .button {
+    width: 100%;
   }
 
   .timeline-row {

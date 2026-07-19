@@ -4,13 +4,15 @@ import { TripForm } from '../features/trips/components/TripForm';
 import { createTrip, deleteTrip, getTripDetail, updateTrip } from '../features/trips/tripService';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
-import { Button, InlineError, PageHeader } from '../shared/ui';
+import { Button, ConfirmDialog, InlineError, PageHeader } from '../shared/ui';
 
 export function TripEditPage({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate();
   const { tripId } = useParams();
   const isEdit = mode === 'edit';
   const [deleteError, setDeleteError] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { data, error, loading } = useAsyncData(
     () => (isEdit && tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
     [isEdit, tripId],
@@ -18,13 +20,17 @@ export function TripEditPage({ mode }: { mode: 'create' | 'edit' }) {
   const cancelTo = isEdit && tripId ? `/trips/${tripId}` : '/trips';
 
   async function handleDelete() {
-    if (!tripId || !window.confirm('この旅行と紐づく訪問場所を削除しますか？')) return;
+    if (!tripId || deleting) return;
+    setDeleting(true);
     setDeleteError('');
     try {
       await deleteTrip(tripId);
+      setDeleteOpen(false);
       navigate('/trips');
     } catch (caughtError) {
       setDeleteError(caughtError instanceof Error ? caughtError.message : '旅行の削除に失敗しました。');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -65,11 +71,12 @@ export function TripEditPage({ mode }: { mode: 'create' | 'edit' }) {
               <h2 id="trip-edit-management-title">旅行の管理</h2>
               <p className="muted">この旅行と紐づく訪問場所・移動区間も削除されます。</p>
               {deleteError && <InlineError message={deleteError} compact />}
-              <Button variant="danger" onClick={() => void handleDelete()}>旅行を削除</Button>
+              <Button variant="danger" onClick={() => setDeleteOpen(true)}>旅行を削除</Button>
             </section>
           )}
         </div>
       )}
+      <ConfirmDialog open={deleteOpen} title="この旅行を削除しますか？" description={`「${data?.trip.title ?? 'この旅行'}」と紐づく訪問場所・移動区間も削除され、元に戻せません。`} confirmLabel="旅行を削除" processing={deleting} onConfirm={handleDelete} onCancel={() => setDeleteOpen(false)} />
     </>
   );
 }

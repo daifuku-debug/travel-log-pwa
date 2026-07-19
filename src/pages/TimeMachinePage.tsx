@@ -15,6 +15,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { todayDateInputValue } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
+import { BottomSheet, Button, PageHeader, useToast } from '../shared/ui';
 
 const CONFIDENCE_LABELS: Record<TimelineConfidence, string> = {
   exact: '正確な記録',
@@ -37,6 +38,10 @@ export function TimeMachinePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [message, setMessage] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string>();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [draftQuery, setDraftQuery] = useState<TimeMachineQuery>(query);
+  const { showToast } = useToast();
   const { data, error, loading } = useAsyncData(() => getTimeMachineResult(query), [query, reloadKey]);
   const selectedEvent = data?.events.find((event) => event.id === selectedEventId);
 
@@ -55,61 +60,61 @@ export function TimeMachinePage() {
     setQuery((current) => ({ ...current, date: result.date }));
   }
 
+  function openFilters() {
+    setDraftQuery(query);
+    setFiltersOpen(true);
+  }
+
+  function selectEvent(eventId: string) {
+    setSelectedEventId(eventId);
+    setDetailsOpen(true);
+  }
+
   return (
     <>
-      <section className="page-heading time-machine-hero">
-        <div className="page-heading__row">
-          <div>
-            <h1>タイムマシン</h1>
-            <p>あの時どこにいた？旅行、写真、訪問場所、スクラップブック、達成記録を日付でたどります。</p>
-          </div>
-          <Link className="button" to="/">ホーム</Link>
-        </div>
-      </section>
+      <PageHeader
+        title="タイムマシン"
+        description="あの時どこにいた？旅行、写真、訪問場所、スクラップブック、達成記録を日付でたどります。"
+        actions={<Button to="/">ホーム</Button>}
+      />
 
-      <section className="card time-machine-controls">
-        <form className="form form--compact" onSubmit={(event) => event.preventDefault()}>
-          <div className="form-grid">
-            <label className="field">
-              <span>日付</span>
-              <input type="date" value={query.date} onChange={(event) => setQuery({ ...query, date: event.target.value })} />
-            </label>
-            <label className="field">
-              <span>時刻 任意</span>
-              <input type="time" value={query.time ?? ''} onChange={(event) => setQuery({ ...query, time: event.target.value || undefined })} />
-            </label>
-          </div>
-          <div className="inline-actions">
-            <button className="button" type="button" onClick={() => moveDate(-1)}>前日</button>
-            <button className="button" type="button" onClick={() => moveDate(1)}>翌日</button>
-            <button className="button" type="button" onClick={moveLastYear}>1年前へ</button>
-            <button className="button" type="button" onClick={() => {
+      <section className="card time-machine-controls" aria-label="検索条件">
+        <div className="section-head">
+          <div><h2>{query.date}</h2><p className="muted">{query.time ? `${query.time}ごろ` : 'この日の記録すべて'}</p></div>
+          <Button onClick={openFilters}>条件を変更</Button>
+        </div>
+        <div className="quick-search-actions" aria-label="クイック検索">
+            <Button onClick={() => moveDate(-1)}>前日</Button>
+            <Button onClick={() => moveDate(1)}>翌日</Button>
+            <Button variant="primary" onClick={() => {
               const result = getLastYearDate(todayDateInputValue());
               setMessage(result.adjustedReason ?? '');
               setQuery({ ...query, date: result.date });
-            }}>去年の今日</button>
-            <button className="button" type="button" onClick={() => {
+            }}>去年の今日</Button>
+            <Button onClick={() => {
               setMessage('');
               setQuery({ ...query, date: todayDateInputValue(), time: undefined });
-            }}>今日へ戻る</button>
-          </div>
-          <div className="inline-actions">
-            <label className="checkbox-field filter-checkbox">
-              <input type="checkbox" checked={query.includeEstimated ?? true} onChange={(event) => setQuery({ ...query, includeEstimated: event.target.checked })} />
-              推定を表示
-            </label>
-            <label className="checkbox-field filter-checkbox">
-              <input type="checkbox" checked={query.includeRpg ?? true} onChange={(event) => setQuery({ ...query, includeRpg: event.target.checked })} />
-              RPGを表示
-            </label>
-            <label className="checkbox-field filter-checkbox">
-              <input type="checkbox" checked={query.includeCollections ?? true} onChange={(event) => setQuery({ ...query, includeCollections: event.target.checked })} />
-              城・収集を表示
-            </label>
-          </div>
-        </form>
+            }}>今日へ戻る</Button>
+        </div>
+        <div className="filter-summary" aria-label="現在の条件">
+          <span>推定 {query.includeEstimated ?? true ? 'あり' : 'なし'}</span>
+          <span>RPG {query.includeRpg ?? true ? '表示' : '非表示'}</span>
+          <span>城・収集 {query.includeCollections ?? true ? '表示' : '非表示'}</span>
+        </div>
         {message && <p className="muted">{message}</p>}
       </section>
+
+      <BottomSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="検索条件" description="日付と表示する記録を指定します。" actions={<><Button onClick={() => setDraftQuery(getDefaultTimeMachineQuery())}>リセット</Button><Button variant="primary" onClick={() => { setQuery(draftQuery); setFiltersOpen(false); showToast({ title: '検索条件を適用しました', variant: 'success' }); }}>条件を適用</Button></>}>
+        <form className="form" onSubmit={(event) => event.preventDefault()}>
+          <div className="form-grid">
+            <label className="field"><span>日付</span><input type="date" value={draftQuery.date} onChange={(event) => setDraftQuery({ ...draftQuery, date: event.target.value })} /></label>
+            <label className="field"><span>時刻 任意</span><input type="time" value={draftQuery.time ?? ''} onChange={(event) => setDraftQuery({ ...draftQuery, time: event.target.value || undefined })} /></label>
+          </div>
+          <label className="checkbox-field"><input type="checkbox" checked={draftQuery.includeEstimated ?? true} onChange={(event) => setDraftQuery({ ...draftQuery, includeEstimated: event.target.checked })} />推定を表示</label>
+          <label className="checkbox-field"><input type="checkbox" checked={draftQuery.includeRpg ?? true} onChange={(event) => setDraftQuery({ ...draftQuery, includeRpg: event.target.checked })} />RPGを表示</label>
+          <label className="checkbox-field"><input type="checkbox" checked={draftQuery.includeCollections ?? true} onChange={(event) => setDraftQuery({ ...draftQuery, includeCollections: event.target.checked })} />城・収集を表示</label>
+        </form>
+      </BottomSheet>
 
       {loading && <LoadingState />}
       {error && <ErrorState error={error} />}
@@ -159,11 +164,10 @@ export function TimeMachinePage() {
             <TimelineMap
               events={data.mapPoints}
               selectedEventId={selectedEventId}
-              onSelectEvent={setSelectedEventId}
+              onSelectEvent={selectEvent}
             />
             <p className="muted">線はGPS軌跡ではなく、記録順を結んだ推定表示です。</p>
-            {selectedEvent && <SelectedEventPanel event={selectedEvent} />}
-            <MaplessEvents events={data.events.filter((event) => !data.mapPoints.some((point) => point.id === event.id))} onSelectEvent={setSelectedEventId} />
+            <MaplessEvents events={data.events.filter((event) => !data.mapPoints.some((point) => point.id === event.id))} onSelectEvent={selectEvent} />
           </section>
 
           <section className="card">
@@ -212,16 +216,19 @@ export function TimeMachinePage() {
             {data.empty ? (
               <EmptyState>この日の記録はまだありません。下のフォームから、いた場所やメモを補完できます。</EmptyState>
             ) : (
-              <TimelineList events={data.events} selectedEventId={selectedEventId} onSelectEvent={setSelectedEventId} />
+              <TimelineList events={data.events} selectedEventId={selectedEventId} onSelectEvent={selectEvent} />
             )}
           </section>
 
           <section className="card time-machine-wide">
             <h2>過去データを補完</h2>
-            <ManualEntryForm date={query.date} onSaved={() => setReloadKey((value) => value + 1)} />
+            <ManualEntryForm date={query.date} onSaved={() => { setReloadKey((value) => value + 1); showToast({ title: '補完記録を保存しました', variant: 'success' }); }} />
           </section>
         </div>
       )}
+      <BottomSheet open={detailsOpen && Boolean(selectedEvent)} onClose={() => setDetailsOpen(false)} title="思い出の詳細" description="選択した記録の場所と確度を確認します。">
+        {selectedEvent && <SelectedEventPanel event={selectedEvent} />}
+      </BottomSheet>
     </>
   );
 }
