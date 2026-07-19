@@ -23,7 +23,9 @@ interface GeoJson {
 interface JapanGeoMapProps {
   views: PrefectureView[];
   selectedCode?: string;
-  onSelect: (code: string) => void;
+  onSelect?: (code: string) => void;
+  interactive?: boolean;
+  ariaLabel?: string;
 }
 
 const MAP_WIDTH = 640;
@@ -38,7 +40,13 @@ const MAINLAND_MAX_LON = 146;
 const MAINLAND_MIN_LAT = 30.85;
 const OKINAWA_INSET = { x: 432, y: 590, width: 176, height: 116, padding: 14 };
 
-export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps) {
+export function JapanGeoMap({
+  views,
+  selectedCode,
+  onSelect,
+  interactive = true,
+  ariaLabel = '日本制覇マップ',
+}: JapanGeoMapProps) {
   const [geoJson, setGeoJson] = useState<GeoJson | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
@@ -170,6 +178,7 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
   }
 
   function handleShapeClick(code: string) {
+    if (!interactive || !onSelect) return;
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
@@ -179,23 +188,23 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
 
   return (
     <>
-      <div className="map-toolbar" aria-label="地図操作">
+      {interactive && <div className="map-toolbar" aria-label="地図操作">
         <button className="button" type="button" onClick={() => setViewport(DEFAULT_VIEWPORT)}>
           リセット
         </button>
         <span className="muted">ピンチで拡大縮小、ドラッグで移動できます</span>
-      </div>
-      <div className="map-shell">
+      </div>}
+      <div className={`map-shell ${interactive ? '' : 'map-shell--preview'}`}>
       <svg
-        className={`japan-map ${dragging ? 'dragging' : ''}`}
+        className={`japan-map ${dragging ? 'dragging' : ''} ${interactive ? '' : 'japan-map--preview'}`}
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
         role="img"
-        aria-label="日本制覇マップ"
-        onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        aria-label={ariaLabel}
+        onWheel={interactive ? handleWheel : undefined}
+        onPointerDown={interactive ? handlePointerDown : undefined}
+        onPointerMove={interactive ? handlePointerMove : undefined}
+        onPointerUp={interactive ? handlePointerUp : undefined}
+        onPointerCancel={interactive ? handlePointerUp : undefined}
       >
         <defs>
           <pattern id="map-pattern-passed" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
@@ -235,19 +244,19 @@ export function JapanGeoMap({ views, selectedCode, onSelect }: JapanGeoMapProps)
                 vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                tabIndex={0}
-                role="button"
-                aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
-                aria-pressed={selectedCode === code}
-                onClick={() => handleShapeClick(code)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') onSelect(code);
-                }}
+                tabIndex={interactive ? 0 : undefined}
+                role={interactive ? 'button' : undefined}
+                aria-label={interactive ? `${view.master.nameJa}: ${STATUS_LABELS[status]}` : undefined}
+                aria-pressed={interactive ? selectedCode === code : undefined}
+                onClick={interactive ? () => handleShapeClick(code) : undefined}
+                onKeyDown={interactive ? (event) => {
+                  if ((event.key === 'Enter' || event.key === ' ') && onSelect) onSelect(code);
+                } : undefined}
               />
             );
           })}
         </g>
-        {renderOkinawaInset(geoJson, projections.okinawa, viewByCode, selectedCode, handleShapeClick, onSelect)}
+        {renderOkinawaInset(geoJson, projections.okinawa, viewByCode, selectedCode, handleShapeClick, onSelect, interactive)}
       </svg>
       </div>
     </>
@@ -313,7 +322,8 @@ function renderOkinawaInset(
   viewByCode: Map<string, PrefectureView>,
   selectedCode: string | undefined,
   handleShapeClick: (code: string) => void,
-  onSelect: (code: string) => void,
+  onSelect: ((code: string) => void) | undefined,
+  interactive: boolean,
 ) {
   const feature = geoJson.features.find((item) => codeFromShapeIso(item.properties.shapeISO) === OKINAWA_CODE);
   const view = viewByCode.get(OKINAWA_CODE);
@@ -336,14 +346,14 @@ function renderOkinawaInset(
         width={OKINAWA_INSET.width}
         height={OKINAWA_INSET.height}
         rx="14"
-        tabIndex={0}
-        role="button"
-        aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
-        aria-pressed={selectedCode === OKINAWA_CODE}
-        onClick={() => handleShapeClick(OKINAWA_CODE)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);
-        }}
+        tabIndex={interactive ? 0 : undefined}
+        role={interactive ? 'button' : undefined}
+        aria-label={interactive ? `${view.master.nameJa}: ${STATUS_LABELS[status]}` : undefined}
+        aria-pressed={interactive ? selectedCode === OKINAWA_CODE : undefined}
+        onClick={interactive ? () => handleShapeClick(OKINAWA_CODE) : undefined}
+        onKeyDown={interactive ? (event) => {
+          if ((event.key === 'Enter' || event.key === ' ') && onSelect) onSelect(OKINAWA_CODE);
+        } : undefined}
       />
       <text className="okinawa-inset__label" x={OKINAWA_INSET.x + 14} y={OKINAWA_INSET.y + 22}>沖縄</text>
       <path
@@ -352,14 +362,14 @@ function renderOkinawaInset(
         vectorEffect="non-scaling-stroke"
         strokeLinejoin="round"
         strokeLinecap="round"
-        tabIndex={0}
-        role="button"
-        aria-label={`${view.master.nameJa}: ${STATUS_LABELS[status]}`}
-        aria-pressed={selectedCode === OKINAWA_CODE}
-        onClick={() => handleShapeClick(OKINAWA_CODE)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') onSelect(OKINAWA_CODE);
-        }}
+        tabIndex={interactive ? 0 : undefined}
+        role={interactive ? 'button' : undefined}
+        aria-label={interactive ? `${view.master.nameJa}: ${STATUS_LABELS[status]}` : undefined}
+        aria-pressed={interactive ? selectedCode === OKINAWA_CODE : undefined}
+        onClick={interactive ? () => handleShapeClick(OKINAWA_CODE) : undefined}
+        onKeyDown={interactive ? (event) => {
+          if ((event.key === 'Enter' || event.key === ' ') && onSelect) onSelect(OKINAWA_CODE);
+        } : undefined}
       />
     </g>
   );
