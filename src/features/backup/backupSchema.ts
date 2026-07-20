@@ -14,13 +14,14 @@ import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
+import { normalizeMediaAssetOwnership } from '../../domain/media/mediaAssetUsage.ts';
 import {
   migrateScrapbookBlockToV10,
   migrateScrapbookPageToV10,
   migrateScrapbookToV10,
 } from '../../domain/scrapbooks/scrapbookMigration.ts';
 
-export const BACKUP_SCHEMA_VERSION = 10;
+export const BACKUP_SCHEMA_VERSION = 11;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -55,7 +56,10 @@ export interface TravelLogBackup {
 
 export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
   if (isObject(payload) && payload.app === 'travel-log-pwa' && isObject(payload.data)) {
+    assertSupportedBackupVersion(payload.schemaVersion);
     const data = payload.data as Record<string, unknown>;
+    const scrapbooks = sanitizeScrapbooks(data.scrapbooks);
+    const scrapbookIds = new Set(scrapbooks.map((scrapbook) => scrapbook.id));
     return {
       app: 'travel-log-pwa',
       schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -72,10 +76,10 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
         tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
         castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
         castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
-        scrapbooks: sanitizeScrapbooks(data.scrapbooks),
+        scrapbooks,
         scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
         scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
-        mediaAssets: sanitizeMediaAssets(data.mediaAssets),
+        mediaAssets: sanitizeMediaAssets(data.mediaAssets, scrapbookIds),
         manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
         travelGachaDraws: sanitizeTravelGachaDraws(data.travelGachaDraws),
         rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
@@ -94,6 +98,8 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
 
   if (isObject(payload)) {
     const data = payload as Record<string, unknown>;
+    const scrapbooks = sanitizeScrapbooks(data.scrapbooks);
+    const scrapbookIds = new Set(scrapbooks.map((scrapbook) => scrapbook.id));
     return emptyBackup({
       trips: arrayOrEmpty<Trip>(data.trips),
       placeVisits: arrayOrEmpty<PlaceVisit>(data.placeVisits),
@@ -106,10 +112,10 @@ export function normalizeBackupPayload(payload: unknown): TravelLogBackup {
       tripPrefectureVisits: arrayOrEmpty<TripPrefectureVisit>(data.tripPrefectureVisits),
       castleVisitSummaries: sanitizeCastleVisitSummaries(data.castleVisitSummaries),
       castleVisitEvents: sanitizeCastleVisitEvents(data.castleVisitEvents),
-      scrapbooks: sanitizeScrapbooks(data.scrapbooks),
+      scrapbooks,
       scrapbookPages: sanitizeScrapbookPages(data.scrapbookPages),
       scrapbookBlocks: sanitizeScrapbookBlocks(data.scrapbookBlocks),
-      mediaAssets: sanitizeMediaAssets(data.mediaAssets),
+      mediaAssets: sanitizeMediaAssets(data.mediaAssets, scrapbookIds),
       manualTimelineEntries: sanitizeManualTimelineEntries(data.manualTimelineEntries),
       travelGachaDraws: sanitizeTravelGachaDraws(data.travelGachaDraws),
       rpgExperienceEntries: sanitizeExperienceEntries(data.rpgExperienceEntries),
@@ -163,6 +169,12 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function arrayOrEmpty<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function assertSupportedBackupVersion(value: unknown): void {
+  if (typeof value === 'number' && Number.isFinite(value) && value > BACKUP_SCHEMA_VERSION) {
+    throw new Error('このバックアップは新しいバージョンで作成されています。アプリを更新してから読み込んでください。');
+  }
 }
 
 function sanitizeExperienceEntries(value: unknown): RpgExperienceEntry[] {
@@ -250,14 +262,19 @@ function sanitizeScrapbookBlocks(value: unknown): ScrapbookBlock[] {
   );
 }
 
-function sanitizeMediaAssets(value: unknown): MediaAsset[] {
+function sanitizeMediaAssets(value: unknown, scrapbookIds: ReadonlySet<string>): MediaAsset[] {
   return uniqueBy(
-    arrayOrEmpty<MediaAsset>(value).filter((asset) =>
-      Boolean(asset.id)
-      && Boolean(asset.tripId)
-      && ['local', 'remote', 'external'].includes(asset.storageType)
-      && ['local_only', 'pending', 'synced', 'failed'].includes(asset.mediaSyncStatus),
-    ),
+    arrayOrEmpty<MediaAsset>(value)
+      .filter((asset) =>
+        Boolean(asset.id)
+        && Boolean(asset.tripId)
+        && ['local', 'remote', 'external'].includes(asset.storageType)
+        && ['local_only', 'pending', 'synced', 'failed'].includes(asset.mediaSyncStatus),
+      )
+      .map(normalizeMediaAssetOwnership)
+      .map((asset) => asset.usage === 'cover-only' && !scrapbookIds.has(asset.ownerScrapbookId ?? '')
+        ? normalizeMediaAssetOwnership({ ...asset, usage: 'trip' })
+        : asset),
     (asset) => asset.id,
   );
 }

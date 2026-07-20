@@ -8,6 +8,7 @@ export type ScrapbookPageLayoutType = 'cover' | 'day' | 'section' | 'summary';
 export type ScrapbookPageKind = 'cover' | 'story' | 'timeline' | 'photo' | 'place' | 'feature' | 'ending' | 'custom';
 export type MediaStorageType = 'local' | 'remote' | 'external';
 export type MediaSyncStatus = 'local_only' | 'pending' | 'synced' | 'failed';
+export type MediaAssetUsage = 'trip' | 'cover-only';
 export type ScrapbookContentOrigin = 'generated' | 'manual';
 
 export interface ScrapbookCoverSettings {
@@ -213,6 +214,8 @@ export type ScrapbookBlock =
 
 export interface MediaAsset extends BaseEntity {
   tripId: EntityId;
+  usage?: MediaAssetUsage;
+  ownerScrapbookId?: EntityId;
   storageType: MediaStorageType;
   localReference?: string;
   remoteKey?: string;

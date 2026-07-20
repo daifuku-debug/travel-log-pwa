@@ -70,7 +70,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
       readAll<RpgSettings>('rpgSettings'),
     ]);
 
-    return {
+    return normalizeBackupPayload({
       app: 'travel-log-pwa',
       schemaVersion: BACKUP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
@@ -99,7 +99,7 @@ export async function buildBackupPayload(): Promise<TravelLogBackup> {
         tripRpgResults,
         rpgSettings,
       },
-    };
+    });
   } catch (error) {
     throw toAppError(error, 'バックアップの作成に失敗しました');
   }

@@ -1,5 +1,6 @@
 import type { EntityId } from '../../domain/models/common';
 import type { MediaAsset, MediaAssetBlob, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
+import { normalizeMediaAssetOwnership } from '../../domain/media/mediaAssetUsage';
 import type {
   MediaAssetBlobRepository,
   MediaAssetRepository,
@@ -96,6 +97,19 @@ export class LocalScrapbookBlockRepository
 export class LocalMediaAssetRepository extends LocalBaseRepository<MediaAsset> implements MediaAssetRepository {
   constructor() {
     super('mediaAssets');
+  }
+
+  override async list(): Promise<MediaAsset[]> {
+    return (await super.list()).map(normalizeMediaAssetOwnership);
+  }
+
+  override async getById(id: EntityId): Promise<MediaAsset | undefined> {
+    const asset = await super.getById(id);
+    return asset ? normalizeMediaAssetOwnership(asset) : undefined;
+  }
+
+  override async save(asset: MediaAsset): Promise<MediaAsset> {
+    return super.save(normalizeMediaAssetOwnership(asset));
   }
 
   async listByTripId(tripId: EntityId): Promise<MediaAsset[]> {
