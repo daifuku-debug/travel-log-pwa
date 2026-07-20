@@ -47,7 +47,7 @@ export function BottomSheet({
         aria-describedby={description ? descriptionId : undefined}
       >
         <div className="bottom-sheet__handle" aria-hidden="true" />
-        <header className="bottom-sheet__header">
+        <header className={`bottom-sheet__header${description ? '' : ' bottom-sheet__header--compact'}`}>
           <div>
             <h2 id={titleId}>{title}</h2>
             {description && <p id={descriptionId}>{description}</p>}

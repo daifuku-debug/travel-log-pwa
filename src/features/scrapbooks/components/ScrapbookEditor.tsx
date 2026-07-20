@@ -399,7 +399,9 @@ export function ScrapbookEditor({
         open={editorOpen}
         onClose={requestCloseEditorPanel}
         title={selectedPage.pageKind === 'cover' ? '表紙を編集' : 'ページを編集'}
-        description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
+        description={selectedPage.pageKind === 'cover'
+          ? undefined
+          : '変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。'}
         size={selectedPage.pageKind === 'cover' ? 'lg' : 'md'}
         dismissible={!coverPhotoImport.pending || coverPhotoImport.pending.status !== 'saving'}
         actions={<Button variant="primary" disabled={!dirty || hasPendingPhoto} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}

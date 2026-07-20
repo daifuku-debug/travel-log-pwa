@@ -2694,6 +2694,11 @@ a {
   padding: var(--space-3) var(--space-4);
 }
 
+.bottom-sheet__header--compact {
+  align-items: center;
+  padding-block: var(--space-2);
+}
+
 .bottom-sheet__header h2,
 .confirm-dialog h2 {
   margin: 0;

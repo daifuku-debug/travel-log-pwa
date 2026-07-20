@@ -922,6 +922,12 @@ await test('表紙編集は専用Bottom Sheetと既存Rendererを使い保存ま
   assert.doesNotMatch(scrapbookEditorSource, /repositories\./);
 });
 
+await test('表紙編集室のヘッダーは説明文を省きコンパクトに表示する', () => {
+  assert.match(scrapbookEditorSource, /description=\{selectedPage\.pageKind === 'cover'[\s\S]*\? undefined/);
+  assert.match(bottomSheetSource, /bottom-sheet__header--compact/);
+  assert.match(stylesSource, /\.bottom-sheet__header--compact\s*\{[\s\S]*padding-block: var\(--space-2\)/);
+});
+
 await test('表紙編集室は完成プレビューと実際の旅行データを使う編集パネルを並べる', () => {
   assert.match(scrapbookEditorSource, /<CoverEditorStudio/);
   assert.match(coverEditorStudioSource, /<ScrapbookPagePreview/);
