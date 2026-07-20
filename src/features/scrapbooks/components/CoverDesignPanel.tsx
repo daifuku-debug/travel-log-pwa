@@ -1,12 +1,21 @@
 import type { CSSProperties } from 'react';
-import type { ScrapbookCoverLayout, ScrapbookThemeId } from '../../../domain/models/scrapbook';
+import type { EntityId } from '../../../domain/models/common';
+import type { MediaAsset, ScrapbookCoverLayout, ScrapbookThemeId } from '../../../domain/models/scrapbook';
+import { formatCompactDateRange } from '../../../shared/date/dateUtils';
 import { Button } from '../../../shared/ui';
 import { COVER_TEMPLATES, COVER_THEMES } from '../coverDesignRegistry';
+import { ScrapbookMediaImage } from './ScrapbookMediaImage';
 
 export function CoverDesignPanel({
   appliedTemplateId,
   previewTemplateId,
   themeId,
+  title,
+  subtitle,
+  startDate,
+  endDate,
+  selectedPhotoId,
+  mediaAssets,
   onPreviewTemplate,
   onApplyTemplate,
   onThemeChange,
@@ -14,12 +23,21 @@ export function CoverDesignPanel({
   appliedTemplateId: ScrapbookCoverLayout;
   previewTemplateId?: ScrapbookCoverLayout;
   themeId: ScrapbookThemeId;
+  title: string;
+  subtitle: string;
+  startDate: string;
+  endDate: string;
+  selectedPhotoId?: EntityId;
+  mediaAssets: MediaAsset[];
   onPreviewTemplate: (templateId: ScrapbookCoverLayout) => void;
   onApplyTemplate: () => void;
   onThemeChange: (themeId: ScrapbookThemeId) => void;
 }) {
   const candidateId = previewTemplateId ?? appliedTemplateId;
   const candidate = COVER_TEMPLATES.find((template) => template.id === candidateId) ?? COVER_TEMPLATES[0];
+  const selectedAsset = mediaAssets.find((asset) => asset.id === selectedPhotoId);
+  const selectedTheme = COVER_THEMES.find((theme) => theme.id === themeId) ?? COVER_THEMES[0];
+  const dateLabel = formatCompactDateRange(startDate, endDate);
 
   return (
     <div className="scrapbook-cover-design">
@@ -42,8 +60,14 @@ export function CoverDesignPanel({
                 aria-checked={previewing}
                 onClick={() => onPreviewTemplate(template.id)}
               >
-                <span className={`scrapbook-cover-template__preview scrapbook-cover-template__preview--${template.previewVariant}`} aria-hidden="true">
-                  <i>TRAVEL</i><b>旅の記憶</b><small>JOURNAL</small>
+                <span
+                  className={`scrapbook-cover-template__preview scrapbook-cover-template__preview--${template.previewVariant}`}
+                  style={{ '--cover-template-accent': selectedTheme.swatches[1] } as CSSProperties}
+                  aria-hidden="true"
+                >
+                  {selectedAsset && <ScrapbookMediaImage asset={selectedAsset} alt="" />}
+                  <span className="scrapbook-cover-template__preview-shade" />
+                  <i>{dateLabel}</i><b>{title || '旅の記録'}</b><small>{subtitle || 'TRAVEL JOURNAL'}</small>
                 </span>
                 <span className="scrapbook-cover-template__copy"><strong>{template.name}</strong><small>{template.description}</small></span>
                 <span className="scrapbook-cover-template__state">{applied ? '使用中' : previewing ? 'プレビュー中' : ''}</span>

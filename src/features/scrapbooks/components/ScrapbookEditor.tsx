@@ -17,6 +17,7 @@ import {
 } from '../scrapbookService';
 import { PageEditorPanel } from './PageEditorPanel';
 import { CoverEditorPanel } from './CoverEditorPanel';
+import { CoverEditorStudio } from './CoverEditorStudio';
 import { PAGE_KIND_LABELS, PageNavigatorSheet } from './PageNavigatorSheet';
 import { SaveBar } from './SaveBar';
 import { ScrapbookPagePreview } from './ScrapbookViewer';
@@ -356,19 +357,26 @@ export function ScrapbookEditor({
         onClose={closeEditorPanel}
         title={selectedPage.pageKind === 'cover' ? '表紙を編集' : 'ページを編集'}
         description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
-        size="md"
+        size={selectedPage.pageKind === 'cover' ? 'lg' : 'md'}
         actions={<Button variant="primary" disabled={!dirty} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}
       >
         {selectedPage.pageKind === 'cover' ? (
-          <CoverEditorPanel
-            draft={draft}
-            mediaAssets={detail.mediaAssets}
+          <CoverEditorStudio
+            previewDetail={previewDetail}
+            previewPage={previewPage}
             tripDetail={tripDetail}
-            previewTemplateId={coverPreviewTemplateId}
-            onPreviewTemplate={setCoverPreviewTemplateId}
-            onApplyTemplate={applyCoverTemplate}
-            onChange={setDraft}
-          />
+            previewKey={`${previewDetail.scrapbook.themeId}-${previewDetail.scrapbook.coverLayout}-${previewDetail.scrapbook.coverSettings?.photoId ?? 'fallback'}`}
+          >
+            <CoverEditorPanel
+              draft={draft}
+              mediaAssets={detail.mediaAssets}
+              tripDetail={tripDetail}
+              previewTemplateId={coverPreviewTemplateId}
+              onPreviewTemplate={setCoverPreviewTemplateId}
+              onApplyTemplate={applyCoverTemplate}
+              onChange={setDraft}
+            />
+          </CoverEditorStudio>
         ) : (
           <PageEditorPanel page={selectedPage} draft={draft} onChange={setDraft} />
         )}

@@ -87,6 +87,12 @@ export function CoverEditorPanel({
             appliedTemplateId={draft.coverLayout}
             previewTemplateId={previewTemplateId}
             themeId={draft.coverThemeId}
+            title={draft.coverTitle}
+            subtitle={draft.coverSubtitle}
+            startDate={tripDetail.trip.startDate}
+            endDate={tripDetail.trip.endDate}
+            selectedPhotoId={draft.coverPhotoId}
+            mediaAssets={mediaAssets}
             onPreviewTemplate={onPreviewTemplate}
             onApplyTemplate={onApplyTemplate}
             onThemeChange={(coverThemeId) => onChange({ ...draft, coverThemeId })}

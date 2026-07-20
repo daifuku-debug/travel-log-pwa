@@ -20,9 +20,9 @@ export function CoverPhotoPanel({
   return (
     <section className="scrapbook-cover-panel" aria-labelledby="cover-photo-heading">
       <header className="scrapbook-cover-panel__heading">
-        <span>Cover photo</span>
-        <h3 id="cover-photo-heading">旅を代表する一枚</h3>
-        <p>この旅行に保存されている写真から選べます。</p>
+        <span>Photo</span>
+        <h3 id="cover-photo-heading">この旅の一枚を選ぶ</h3>
+        <p>選んだ写真は、上の完成プレビューへすぐに反映されます。</p>
       </header>
 
       {selectedAsset && (
@@ -33,24 +33,27 @@ export function CoverPhotoPanel({
       )}
 
       {mediaAssets.length > 0 ? (
-        <div className="scrapbook-cover-editor__photos" role="radiogroup" aria-label="表紙写真">
-          {mediaAssets.map((asset) => {
-            const selected = selectedPhotoId === asset.id;
-            return (
-              <button
-                key={asset.id}
-                type="button"
-                className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
-                role="radio"
-                aria-checked={selected}
-                aria-label={`${asset.originalFileName || '旅行写真'}を表紙にする${selected ? '、現在選択中' : ''}`}
-                onClick={() => onSelect(asset.id)}
-              >
-                <ScrapbookMediaImage asset={asset} alt="" />
-                {selected && <span>選択中</span>}
-              </button>
-            );
-          })}
+        <div className="scrapbook-cover-editor__photo-library">
+          <h4>写真一覧</h4>
+          <div className="scrapbook-cover-editor__photos" role="radiogroup" aria-label="表紙写真">
+            {mediaAssets.map((asset) => {
+              const selected = selectedPhotoId === asset.id;
+              return (
+                <button
+                  key={asset.id}
+                  type="button"
+                  className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${asset.originalFileName || '旅行写真'}を表紙にする${selected ? '、現在選択中' : ''}`}
+                  onClick={() => onSelect(asset.id)}
+                >
+                  <ScrapbookMediaImage asset={asset} alt="" />
+                  {selected && <span>選択中</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="scrapbook-cover-editor__fallback">

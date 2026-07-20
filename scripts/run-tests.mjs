@@ -106,6 +106,7 @@ const scrapbookEditorSource = await readFile(new URL('../src/features/scrapbooks
 const scrapbookCoverLogicSource = await readFile(new URL('../src/features/scrapbooks/scrapbookCoverLogic.ts', import.meta.url), 'utf8');
 const coverDesignRegistrySource = await readFile(new URL('../src/features/scrapbooks/coverDesignRegistry.ts', import.meta.url), 'utf8');
 const coverEditorPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverEditorPanel.tsx', import.meta.url), 'utf8');
+const coverEditorStudioSource = await readFile(new URL('../src/features/scrapbooks/components/CoverEditorStudio.tsx', import.meta.url), 'utf8');
 const coverDesignPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverDesignPanel.tsx', import.meta.url), 'utf8');
 const scrapbookPageEditorSource = await readFile(new URL('../src/features/scrapbooks/components/PageEditorPanel.tsx', import.meta.url), 'utf8');
 const scrapbookPageNavigatorSource = await readFile(new URL('../src/features/scrapbooks/components/PageNavigatorSheet.tsx', import.meta.url), 'utf8');
@@ -908,6 +909,16 @@ await test('表紙編集は専用Bottom Sheetと既存Rendererを使い保存ま
   assert.match(scrapbookService, /\['coverSettings', current\.coverSettings, nextCoverSettings\]/);
   assert.match(scrapbookService, /\['coverLayout', current\.coverLayout, nextCoverLayout\]/);
   assert.doesNotMatch(scrapbookEditorSource, /repositories\./);
+});
+
+await test('表紙編集室は完成プレビューと実際の旅行データを使う編集パネルを並べる', () => {
+  assert.match(scrapbookEditorSource, /<CoverEditorStudio/);
+  assert.match(coverEditorStudioSource, /<ScrapbookPagePreview/);
+  assert.match(coverEditorStudioSource, /scrapbook-cover-studio__stage/);
+  assert.match(coverEditorStudioSource, /scrapbook-cover-studio__controls/);
+  assert.match(coverDesignPanelSource, /formatCompactDateRange/);
+  assert.match(coverDesignPanelSource, /selectedAsset/);
+  assert.match(coverEditorPanelSource, /startDate=\{tripDetail\.trip\.startDate\}/);
 });
 
 await test('スクラップブック編集はページ選択、保存、失敗時保持、破棄確認を備える', () => {
