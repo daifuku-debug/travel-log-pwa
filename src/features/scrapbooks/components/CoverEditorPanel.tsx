@@ -1,108 +1,101 @@
-import type { ReactNode } from 'react';
-import type { MediaAsset, ScrapbookCoverLayout, ScrapbookThemeId } from '../../../domain/models/scrapbook';
-import { CheckboxField, SegmentedControl, TextInput } from '../../../shared/ui';
+import { useState, type KeyboardEvent } from 'react';
+import type { MediaAsset, ScrapbookCoverLayout } from '../../../domain/models/scrapbook';
 import type { TripDetail } from '../../trips/tripService';
-import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
 import type { ScrapbookPageDraft } from '../scrapbookEditorDraft';
-import { ScrapbookMediaImage } from './ScrapbookMediaImage';
+import { CoverDesignPanel } from './CoverDesignPanel';
+import { CoverPhotoPanel } from './CoverPhotoPanel';
+import { CoverTextPanel } from './CoverTextPanel';
 
-const THEME_OPTIONS: Array<{ value: ScrapbookThemeId; label: string }> = [
-  { value: 'classic', label: 'Classic' },
-  { value: 'journal', label: 'Journal' },
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'adventure', label: 'Adventure' },
-];
+type CoverEditorTab = 'photo' | 'design' | 'text';
 
-const LAYOUT_OPTIONS: Array<{ value: ScrapbookCoverLayout; label: string }> = [
-  { value: 'magazine', label: 'Magazine' },
-  { value: 'photo', label: 'Photo Full' },
-  { value: 'journal', label: 'Journal' },
-];
-
-const POSITION_OPTIONS = [
-  { value: 'bottom-left', label: '左下' },
-  { value: 'center', label: '中央' },
-  { value: 'bottom-right', label: '右下' },
+const TABS: Array<{ id: CoverEditorTab; label: string }> = [
+  { id: 'photo', label: '写真' },
+  { id: 'design', label: 'デザイン' },
+  { id: 'text', label: '文字' },
 ];
 
 export function CoverEditorPanel({
   draft,
   mediaAssets,
   tripDetail,
+  previewTemplateId,
+  onPreviewTemplate,
+  onApplyTemplate,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
   mediaAssets: MediaAsset[];
   tripDetail: TripDetail;
+  previewTemplateId?: ScrapbookCoverLayout;
+  onPreviewTemplate: (templateId: ScrapbookCoverLayout) => void;
+  onApplyTemplate: () => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tabId: CoverEditorTab) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = TABS.findIndex((tab) => tab.id === tabId);
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? TABS.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length;
+    const nextTab = TABS[nextIndex];
+    if (!nextTab) return;
+    setActiveTab(nextTab.id);
+    requestAnimationFrame(() => document.getElementById(`cover-editor-tab-${nextTab.id}`)?.focus());
+  }
+
   return (
     <div className="scrapbook-cover-editor">
-      <EditorSection title="写真" description="この旅に保存されている写真から表紙を選びます。">
-        {mediaAssets.length > 0 ? (
-          <div className="scrapbook-cover-editor__photos" role="radiogroup" aria-label="表紙写真">
-            {mediaAssets.map((asset) => {
-              const selected = draft.coverPhotoId === asset.id;
-              return (
-                <button
-                  key={asset.id}
-                  type="button"
-                  className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${asset.originalFileName || '旅行写真'}を表紙にする${selected ? '、現在選択中' : ''}`}
-                  onClick={() => onChange({ ...draft, coverPhotoId: asset.id })}
-                >
-                  <ScrapbookMediaImage asset={asset} alt="" />
-                  {selected && <span>選択中</span>}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="scrapbook-cover-editor__fallback">
-            <TripJournalVisual
-              trip={tripDetail.trip}
-              placeNames={tripDetail.places.map((place) => place.name)}
-              alt=""
-            />
-            <p>写真が追加されるまでは、旅行の内容から作った表紙を使用します。</p>
-          </div>
+      <div className="scrapbook-cover-editor__tabs" role="tablist" aria-label="表紙編集項目">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            id={`cover-editor-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`cover-editor-panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        id={`cover-editor-panel-${activeTab}`}
+        className="scrapbook-cover-editor__tab-panel"
+        role="tabpanel"
+        aria-labelledby={`cover-editor-tab-${activeTab}`}
+      >
+        {activeTab === 'photo' && (
+          <CoverPhotoPanel
+            selectedPhotoId={draft.coverPhotoId}
+            mediaAssets={mediaAssets}
+            tripDetail={tripDetail}
+            onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
+          />
         )}
-      </EditorSection>
-
-      <EditorSection title="デザイン">
-        <ControlGroup label="作品テーマ">
-          <SegmentedControl label="作品テーマ" value={draft.coverThemeId} options={THEME_OPTIONS} onChange={(coverThemeId) => onChange({ ...draft, coverThemeId })} />
-        </ControlGroup>
-        <ControlGroup label="表紙レイアウト">
-          <SegmentedControl label="表紙レイアウト" value={draft.coverLayout} options={LAYOUT_OPTIONS} onChange={(coverLayout) => onChange({ ...draft, coverLayout })} />
-        </ControlGroup>
-        <ControlGroup label="文字位置">
-          <SegmentedControl label="表紙の文字位置" value={draft.coverTitlePosition} options={POSITION_OPTIONS} onChange={(coverTitlePosition) => onChange({ ...draft, coverTitlePosition })} />
-        </ControlGroup>
-      </EditorSection>
-
-      <EditorSection title="表示">
-        <div className="scrapbook-cover-editor__toggles">
-          <CheckboxField label="日付を表示" checked={draft.coverShowDate} onChange={(event) => onChange({ ...draft, coverShowDate: event.target.checked })} />
-          <CheckboxField label="場所を表示" checked={draft.coverShowLocation} onChange={(event) => onChange({ ...draft, coverShowLocation: event.target.checked })} />
-          <CheckboxField label="サブタイトルを表示" checked={draft.coverShowSubtitle} onChange={(event) => onChange({ ...draft, coverShowSubtitle: event.target.checked })} />
-        </div>
-      </EditorSection>
-
-      <EditorSection title="テキスト">
-        <TextInput label="表紙タイトル" value={draft.coverTitle} maxLength={120} required onChange={(event) => onChange({ ...draft, coverTitle: event.target.value })} />
-        <TextInput label="サブタイトル" value={draft.coverSubtitle} maxLength={160} helperText="空欄の場合は旅行の目的やメモを表示します。" onChange={(event) => onChange({ ...draft, coverSubtitle: event.target.value })} />
-      </EditorSection>
+        {activeTab === 'design' && (
+          <CoverDesignPanel
+            appliedTemplateId={draft.coverLayout}
+            previewTemplateId={previewTemplateId}
+            themeId={draft.coverThemeId}
+            onPreviewTemplate={onPreviewTemplate}
+            onApplyTemplate={onApplyTemplate}
+            onThemeChange={(coverThemeId) => onChange({ ...draft, coverThemeId })}
+          />
+        )}
+        {activeTab === 'text' && (
+          <CoverTextPanel draft={draft} onChange={onChange} />
+        )}
+      </div>
     </div>
   );
-}
-
-function EditorSection({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <section className="scrapbook-cover-editor__section"><header><h3>{title}</h3>{description && <p>{description}</p>}</header><div>{children}</div></section>;
-}
-
-function ControlGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="scrapbook-cover-editor__control"><span>{label}</span>{children}</div>;
 }

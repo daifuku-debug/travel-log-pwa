@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ScrapbookBlock } from '../../domain/models/scrapbook';
+import { resolveScrapbookCoverPhotoId } from '../scrapbooks/scrapbookCoverLogic';
 import { createMediaObjectUrl, getScrapbookByTripId } from '../scrapbooks/scrapbookService';
 
 export interface TripJournalMediaState {
@@ -32,9 +33,12 @@ export function useTripJournalMedia(tripId?: string): TripJournalMediaState {
     void getScrapbookByTripId(tripId)
       .then(async (detail) => {
         if (!detail) return EMPTY_STATE;
-        const preferred = detail.scrapbook.coverAssetId
-          ? detail.mediaAssets.find((asset) => asset.id === detail.scrapbook.coverAssetId)
-          : undefined;
+        const preferredId = resolveScrapbookCoverPhotoId(
+          detail.scrapbook,
+          detail.pages,
+          detail.mediaAssets.map((asset) => asset.id),
+        );
+        const preferred = detail.mediaAssets.find((asset) => asset.id === preferredId);
         const orderedAssets = [preferred, ...detail.mediaAssets]
           .filter((asset, index, items) => asset && items.findIndex((candidate) => candidate?.id === asset.id) === index)
           .slice(0, 4);

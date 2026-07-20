@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
-import type { ScrapbookPage } from '../../../domain/models/scrapbook';
+import type { ScrapbookCoverLayout, ScrapbookPage } from '../../../domain/models/scrapbook';
 import { BottomSheet, Button, ConfirmDialog, InlineError, useToast } from '../../../shared/ui';
 import type { TripDetail } from '../../trips/tripService';
 import {
@@ -53,6 +53,7 @@ export function ScrapbookEditor({
   const [baseline, setBaseline] = useState(draft);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [coverPreviewTemplateId, setCoverPreviewTemplateId] = useState<ScrapbookCoverLayout>();
   const [pendingAction, setPendingAction] = useState<PendingAction>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -77,10 +78,13 @@ export function ScrapbookEditor({
   if (!selectedPage) return null;
 
   const previewPage = applyScrapbookPageDraft(selectedPage, draft);
+  const previewDraft = selectedPage.pageKind === 'cover' && coverPreviewTemplateId
+    ? { ...draft, coverLayout: coverPreviewTemplateId }
+    : draft;
   const previewDetail: ScrapbookDetail = {
     ...detail,
     scrapbook: selectedPage.pageKind === 'cover'
-      ? applyScrapbookCoverDraft(detail.scrapbook, draft)
+      ? applyScrapbookCoverDraft(detail.scrapbook, previewDraft)
       : detail.scrapbook,
     pages: detail.pages.map((page) => page.id === selectedPage.id ? previewPage : page),
   };
@@ -98,6 +102,7 @@ export function ScrapbookEditor({
     onSelectedPageChange(page.id);
     setDraft(nextDraft);
     setBaseline(nextDraft);
+    setCoverPreviewTemplateId(undefined);
     setSaveError('');
     setNavigatorOpen(false);
   }
@@ -208,6 +213,7 @@ export function ScrapbookEditor({
       };
       setDraft(savedDraft);
       setBaseline(savedDraft);
+      setCoverPreviewTemplateId(undefined);
       showToast({ title: '旅行記を更新しました。', variant: 'success' });
       onSaved();
       return true;
@@ -223,6 +229,7 @@ export function ScrapbookEditor({
 
   function discardDraft(notify = true) {
     setDraft(baseline);
+    setCoverPreviewTemplateId(undefined);
     setSaveError('');
     if (notify) showToast({ title: '変更を破棄しました。', variant: 'info' });
   }
@@ -252,6 +259,17 @@ export function ScrapbookEditor({
   }
 
   const confirmOpen = Boolean(pendingAction) || blocker.state === 'blocked';
+
+  function closeEditorPanel() {
+    setCoverPreviewTemplateId(undefined);
+    setEditorOpen(false);
+  }
+
+  function applyCoverTemplate() {
+    if (!coverPreviewTemplateId) return;
+    setDraft((current) => ({ ...current, coverLayout: coverPreviewTemplateId }));
+    setCoverPreviewTemplateId(undefined);
+  }
 
   return (
     <div className="scrapbook-editor-mode">
@@ -335,7 +353,7 @@ export function ScrapbookEditor({
 
       <BottomSheet
         open={editorOpen}
-        onClose={() => setEditorOpen(false)}
+        onClose={closeEditorPanel}
         title={selectedPage.pageKind === 'cover' ? '表紙を編集' : 'ページを編集'}
         description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
         size="md"
@@ -346,6 +364,9 @@ export function ScrapbookEditor({
             draft={draft}
             mediaAssets={detail.mediaAssets}
             tripDetail={tripDetail}
+            previewTemplateId={coverPreviewTemplateId}
+            onPreviewTemplate={setCoverPreviewTemplateId}
+            onApplyTemplate={applyCoverTemplate}
             onChange={setDraft}
           />
         ) : (

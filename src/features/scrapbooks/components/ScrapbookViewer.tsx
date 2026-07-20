@@ -7,6 +7,8 @@ import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
 import type { TripDetail } from '../../trips/tripService';
 import type { ScrapbookDetail } from '../scrapbookService';
 import { sortVisibleScrapbookPages } from '../scrapbookPageLogic';
+import { resolveCoverTitlePosition, resolveScrapbookCoverTemplateId } from '../coverDesignRegistry';
+import { resolveScrapbookCoverPhotoId } from '../scrapbookCoverLogic';
 import { ScrapbookMediaImage } from './ScrapbookMediaImage';
 
 type ViewerPage = ScrapbookDetail['pages'][number];
@@ -113,7 +115,7 @@ function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit, showContro
   const { scrapbook } = detail;
   const coverAsset = resolveCoverAsset(detail, assetsById);
   const settings = scrapbook.coverSettings;
-  const titlePosition = toClassName(settings?.titlePosition || 'bottom-left');
+  const titlePosition = resolveCoverTitlePosition(resolveViewerLayout(scrapbook), settings?.titlePosition);
   return (
     <header className={`scrapbook-viewer__cover scrapbook-viewer__cover--${titlePosition}`} data-page-kind="cover">
       {coverAsset ? (
@@ -299,18 +301,8 @@ function Achievement({ value, label }: { value: string; label: string }) {
 }
 
 function resolveCoverAsset(detail: ScrapbookDetail, assetsById: Map<string, MediaAsset>): MediaAsset | undefined {
-  const preferredIds = [detail.scrapbook.coverSettings?.photoId, detail.scrapbook.coverAssetId, ...(detail.scrapbook.highlightPhotoIds ?? [])];
-  for (const id of preferredIds) if (id && assetsById.has(id)) return assetsById.get(id);
-  for (const page of [...detail.pages].sort((left, right) => left.sortOrder - right.sortOrder)) {
-    for (const block of visibleBlocks(page)) {
-      if (block.type === 'photo') return assetsById.get(block.assetId);
-      if (block.type === 'photo_grid') {
-        const asset = block.assetIds.map((id) => assetsById.get(id)).find(Boolean);
-        if (asset) return asset;
-      }
-    }
-  }
-  return undefined;
+  const photoId = resolveScrapbookCoverPhotoId(detail.scrapbook, detail.pages, assetsById.keys());
+  return photoId ? assetsById.get(photoId) : undefined;
 }
 
 function visibleBlocks(page: ViewerPage): ScrapbookBlock[] {
@@ -367,6 +359,5 @@ function toClassName(value: string): string {
 }
 
 function resolveViewerLayout(scrapbook: ScrapbookDetail['scrapbook']): string {
-  if (scrapbook.userEditedFields?.includes('coverLayout')) return scrapbook.coverLayout;
-  return scrapbook.layoutVariant || scrapbook.coverSettings?.layout || scrapbook.coverLayout;
+  return resolveScrapbookCoverTemplateId(scrapbook);
 }

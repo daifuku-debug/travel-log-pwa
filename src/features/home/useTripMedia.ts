@@ -3,6 +3,7 @@ import {
   createMediaObjectUrl,
   getScrapbookByTripId,
 } from '../scrapbooks/scrapbookService';
+import { resolveScrapbookCoverPhotoId } from '../scrapbooks/scrapbookCoverLogic';
 
 export type TripMediaLoadState =
   | { status: 'loading' }
@@ -24,10 +25,10 @@ export function useTripMedia(tripIds: string[]): Record<string, TripMediaLoadSta
     void Promise.all(ids.map(async (tripId) => {
       try {
         const detail = await getScrapbookByTripId(tripId);
-        const preferredAsset = detail?.scrapbook.coverAssetId
-          ? detail.mediaAssets.find((asset) => asset.id === detail.scrapbook.coverAssetId)
+        const preferredId = detail
+          ? resolveScrapbookCoverPhotoId(detail.scrapbook, detail.pages, detail.mediaAssets.map((asset) => asset.id))
           : undefined;
-        const asset = preferredAsset ?? detail?.mediaAssets[0];
+        const asset = detail?.mediaAssets.find((candidate) => candidate.id === preferredId);
         if (!asset) return [tripId, { status: 'empty' } satisfies TripMediaLoadState] as const;
 
         const src = await createMediaObjectUrl(asset, 'thumbnail');

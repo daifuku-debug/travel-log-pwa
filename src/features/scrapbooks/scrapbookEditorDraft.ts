@@ -5,6 +5,7 @@ import type {
   ScrapbookPage,
   ScrapbookThemeId,
 } from '../../domain/models/scrapbook';
+import { resolveCoverTitlePosition, resolveScrapbookCoverTemplateId } from './coverDesignRegistry.ts';
 
 export interface ScrapbookPageDraft {
   pageId: string;
@@ -25,6 +26,7 @@ export function createScrapbookPageDraft(
   page: ScrapbookPage,
   scrapbook: Scrapbook,
 ): ScrapbookPageDraft {
+  const coverLayout = resolveScrapbookCoverTemplateId(scrapbook);
   return {
     pageId: page.id,
     pageTitle: page.title,
@@ -35,8 +37,8 @@ export function createScrapbookPageDraft(
     coverShowDate: scrapbook.coverSettings?.showDate !== false,
     coverShowLocation: scrapbook.coverSettings?.showLocation !== false,
     coverShowSubtitle: scrapbook.coverSettings?.showSubtitle !== false,
-    coverTitlePosition: scrapbook.coverSettings?.titlePosition ?? 'bottom-left',
-    coverLayout: scrapbook.coverLayout,
+    coverTitlePosition: resolveCoverTitlePosition(coverLayout, scrapbook.coverSettings?.titlePosition),
+    coverLayout,
     coverThemeId: scrapbook.themeId,
   };
 }
@@ -46,6 +48,7 @@ export function isScrapbookPageDraftDirty(
   page: ScrapbookPage,
   scrapbook: Scrapbook,
 ): boolean {
+  const coverLayout = resolveScrapbookCoverTemplateId(scrapbook);
   return draft.pageTitle !== page.title
     || draft.isHidden !== (page.isHidden ?? false)
     || (page.pageKind === 'cover' && (
@@ -55,8 +58,8 @@ export function isScrapbookPageDraftDirty(
       || draft.coverShowDate !== (scrapbook.coverSettings?.showDate !== false)
       || draft.coverShowLocation !== (scrapbook.coverSettings?.showLocation !== false)
       || draft.coverShowSubtitle !== (scrapbook.coverSettings?.showSubtitle !== false)
-      || draft.coverTitlePosition !== (scrapbook.coverSettings?.titlePosition ?? 'bottom-left')
-      || draft.coverLayout !== scrapbook.coverLayout
+      || draft.coverTitlePosition !== resolveCoverTitlePosition(coverLayout, scrapbook.coverSettings?.titlePosition)
+      || draft.coverLayout !== coverLayout
       || draft.coverThemeId !== scrapbook.themeId
     ));
 }
