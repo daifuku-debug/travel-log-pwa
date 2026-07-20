@@ -1,5 +1,9 @@
 import { useEffect, useId, useRef, type RefObject } from 'react';
 
+const overlayStack: symbol[] = [];
+let bodyScrollLockCount = 0;
+let bodyOverflowBeforeLock = '';
+
 export function useOverlay({
   open,
   onClose,
@@ -17,14 +21,18 @@ export function useOverlay({
   const onCloseRef = useRef(onClose);
   const dismissibleRef = useRef(dismissible);
   const initialFocusRefRef = useRef(initialFocusRef);
+  const overlayTokenRef = useRef(Symbol('overlay'));
   onCloseRef.current = onClose;
   dismissibleRef.current = dismissible;
   initialFocusRefRef.current = initialFocusRef;
 
   useEffect(() => {
     if (!open) return;
+    const overlayToken = overlayTokenRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
-    const previousOverflow = document.body.style.overflow;
+    overlayStack.push(overlayToken);
+    if (bodyScrollLockCount === 0) bodyOverflowBeforeLock = document.body.style.overflow;
+    bodyScrollLockCount += 1;
     document.body.style.overflow = 'hidden';
 
     const frame = window.requestAnimationFrame(() => {
@@ -34,6 +42,7 @@ export function useOverlay({
     });
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (overlayStack.at(-1) !== overlayToken) return;
       if (event.key === 'Escape' && dismissibleRef.current) {
         event.preventDefault();
         onCloseRef.current();
@@ -57,10 +66,14 @@ export function useOverlay({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      const wasTopOverlay = overlayStack.at(-1) === overlayToken;
       window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      const stackIndex = overlayStack.lastIndexOf(overlayToken);
+      if (stackIndex >= 0) overlayStack.splice(stackIndex, 1);
+      bodyScrollLockCount = Math.max(0, bodyScrollLockCount - 1);
+      if (bodyScrollLockCount === 0) document.body.style.overflow = bodyOverflowBeforeLock;
+      if (wasTopOverlay && previousFocus?.isConnected) previousFocus.focus();
     };
   }, [open]);
 

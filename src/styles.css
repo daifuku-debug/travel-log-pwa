@@ -4254,6 +4254,28 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   background: #172322;
 }
 
+.scrapbook-cover-photo-input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  margin: -1px;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.scrapbook-cover-photo-library {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.scrapbook-cover-photo-library > .button {
+  width: 100%;
+}
+
 .scrapbook-cover-editor__current-photo > img,
 .scrapbook-cover-editor__current-photo > .scrapbook-media-placeholder {
   width: 100%;
@@ -4282,6 +4304,23 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   padding: var(--space-3);
 }
 
+.scrapbook-cover-import__heading {
+  display: grid;
+  gap: 4px;
+}
+
+.scrapbook-cover-import__heading span {
+  color: #f1c77c;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-import__heading p {
+  margin: 0;
+  color: rgba(237, 242, 240, .58);
+  font-size: var(--font-size-xs);
+}
+
 .scrapbook-cover-import.has-error {
   border-color: rgba(239, 130, 130, .2);
 }
@@ -4298,19 +4337,7 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   display: block;
   width: 100%;
   height: 220px;
-  object-fit: cover;
-}
-
-.scrapbook-cover-import__preview > span {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  border-radius: var(--radius-pill);
-  background: rgba(10, 18, 18, .84);
-  padding: 5px 9px;
-  color: #f1c77c;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  object-fit: contain;
 }
 
 .scrapbook-cover-import__details {
@@ -4333,10 +4360,12 @@ body.scrapbook-editor-active .bottom-sheet .field select {
 }
 
 .scrapbook-cover-import__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
   gap: var(--space-2);
+}
+
+.scrapbook-cover-import__actions .button {
+  width: 100%;
 }
 
 .scrapbook-photo-source-actions {
