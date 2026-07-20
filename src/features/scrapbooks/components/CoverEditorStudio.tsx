@@ -8,12 +8,14 @@ export function CoverEditorStudio({
   previewPage,
   tripDetail,
   previewKey,
+  pendingPhotoUrl,
   children,
 }: {
   previewDetail: ScrapbookDetail;
   previewPage: ScrapbookDetail['pages'][number];
   tripDetail: TripDetail;
   previewKey: string;
+  pendingPhotoUrl?: string;
   children: ReactNode;
 }) {
   return (
@@ -25,9 +27,15 @@ export function CoverEditorStudio({
         </header>
         <div className="scrapbook-cover-studio__canvas" aria-live="polite">
           <div key={previewKey} className="scrapbook-cover-studio__canvas-inner">
-            <ScrapbookPagePreview detail={previewDetail} page={previewPage} tripDetail={tripDetail} />
+            <ScrapbookPagePreview
+              detail={previewDetail}
+              page={previewPage}
+              tripDetail={tripDetail}
+              coverPhotoPreviewUrl={pendingPhotoUrl}
+            />
           </div>
         </div>
+        {pendingPhotoUrl && <span className="scrapbook-cover-studio__pending-label">追加前の写真</span>}
         <p>編集内容は保存前でも、この表紙に反映されます。</p>
       </section>
       <section className="scrapbook-cover-studio__controls" aria-label="表紙の編集項目">

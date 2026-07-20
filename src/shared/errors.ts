@@ -1,10 +1,13 @@
 export class AppError extends Error {
+  readonly cause?: unknown;
+
   constructor(
     message: string,
-    public readonly cause?: unknown,
+    cause?: unknown,
   ) {
     super(message);
     this.name = 'AppError';
+    this.cause = cause;
   }
 }
 

@@ -1,0 +1,92 @@
+import type { EntityId } from '../../domain/models/common.ts';
+import type { MediaAsset } from '../../domain/models/scrapbook.ts';
+import type { MediaAssetBlobRepository, MediaAssetRepository } from '../../domain/repositories/ScrapbookRepository.ts';
+import { AppError } from '../../shared/errors.ts';
+import { createId } from '../../shared/id.ts';
+import type { PreparedMediaImage } from './mediaAssetValidation.ts';
+
+const LOCAL_USER_ID = 'local-user';
+
+export interface MediaAssetPersistence {
+  mediaAssets: MediaAssetRepository;
+  mediaAssetBlobs: MediaAssetBlobRepository;
+}
+
+export class MediaAssetSaveError extends AppError {
+  readonly cleanupErrors: unknown[];
+
+  constructor(message: string, cause?: unknown, cleanupErrors: unknown[] = []) {
+    super(message, cause);
+    this.name = 'MediaAssetSaveError';
+    this.cleanupErrors = cleanupErrors;
+  }
+}
+
+export async function persistPreparedTripMediaAsset(
+  tripId: EntityId,
+  prepared: PreparedMediaImage,
+  persistence: MediaAssetPersistence,
+): Promise<MediaAsset> {
+  const now = new Date().toISOString();
+  const assetId = createId('media-asset');
+  const originalBlobId = `${assetId}:original`;
+  const thumbnailBlobId = `${assetId}:thumbnail`;
+  let originalBlobSaved = false;
+  let metadataSaveStarted = false;
+
+  try {
+    await persistence.mediaAssetBlobs.save({
+      id: originalBlobId,
+      assetId,
+      kind: 'original',
+      blob: prepared.file,
+      mimeType: prepared.mimeType,
+      createdAt: now,
+    });
+    originalBlobSaved = true;
+    await persistence.mediaAssetBlobs.save({
+      id: thumbnailBlobId,
+      assetId,
+      kind: 'thumbnail',
+      blob: prepared.thumbnailBlob,
+      mimeType: prepared.thumbnailBlob.type || prepared.mimeType,
+      createdAt: now,
+    });
+
+    metadataSaveStarted = true;
+    return await persistence.mediaAssets.save({
+      id: assetId,
+      userId: LOCAL_USER_ID,
+      tripId,
+      storageType: 'local',
+      localReference: originalBlobId,
+      thumbnailReference: thumbnailBlobId,
+      mimeType: prepared.mimeType,
+      width: prepared.width,
+      height: prepared.height,
+      fileSize: prepared.file.size,
+      originalFileName: prepared.file.name,
+      mediaSyncStatus: 'local_only',
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 'pending',
+    });
+  } catch (error) {
+    const cleanupErrors: unknown[] = [];
+    if (originalBlobSaved) {
+      try {
+        await persistence.mediaAssetBlobs.deleteByAssetId(assetId);
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+    }
+    if (metadataSaveStarted) {
+      try {
+        await persistence.mediaAssets.softDelete(assetId);
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+    }
+    throw new MediaAssetSaveError('写真を端末に保存できませんでした。空き容量を確認して、もう一度お試しください。', error, cleanupErrors);
+  }
+}

@@ -5,6 +5,7 @@ import type { ScrapbookPageDraft } from '../scrapbookEditorDraft';
 import { CoverDesignPanel } from './CoverDesignPanel';
 import { CoverPhotoPanel } from './CoverPhotoPanel';
 import { CoverTextPanel } from './CoverTextPanel';
+import type { PendingCoverPhoto } from '../useCoverPhotoImport';
 
 type CoverEditorTab = 'photo' | 'design' | 'text';
 
@@ -21,6 +22,10 @@ export function CoverEditorPanel({
   previewTemplateId,
   onPreviewTemplate,
   onApplyTemplate,
+  pendingPhoto,
+  onChoosePhotoFile,
+  onApplyPendingPhoto,
+  onCancelPendingPhoto,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
@@ -29,6 +34,10 @@ export function CoverEditorPanel({
   previewTemplateId?: ScrapbookCoverLayout;
   onPreviewTemplate: (templateId: ScrapbookCoverLayout) => void;
   onApplyTemplate: () => void;
+  pendingPhoto?: PendingCoverPhoto;
+  onChoosePhotoFile: (file: File) => void;
+  onApplyPendingPhoto: () => void;
+  onCancelPendingPhoto: () => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
   const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
@@ -79,6 +88,10 @@ export function CoverEditorPanel({
             selectedPhotoId={draft.coverPhotoId}
             mediaAssets={mediaAssets}
             tripDetail={tripDetail}
+            pendingPhoto={pendingPhoto}
+            onChooseFile={onChoosePhotoFile}
+            onApplyPending={onApplyPendingPhoto}
+            onCancelPending={onCancelPendingPhoto}
             onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
           />
         )}

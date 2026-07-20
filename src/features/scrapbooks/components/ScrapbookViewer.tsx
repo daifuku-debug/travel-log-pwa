@@ -22,6 +22,7 @@ interface PageRendererProps {
   showControls?: boolean;
   showLegacyStory?: boolean;
   showLegacyPhotoFallback?: boolean;
+  coverPhotoPreviewUrl?: string;
 }
 
 export function ScrapbookViewer({
@@ -65,10 +66,12 @@ export function ScrapbookPagePreview({
   detail,
   page,
   tripDetail,
+  coverPhotoPreviewUrl,
 }: {
   detail: ScrapbookDetail;
   page: ViewerPage;
   tripDetail: TripDetail;
+  coverPhotoPreviewUrl?: string;
 }) {
   const assetsById = new Map(detail.mediaAssets.map((asset) => [asset.id, asset]));
   const layout = resolveViewerLayout(detail.scrapbook);
@@ -90,6 +93,7 @@ export function ScrapbookPagePreview({
         page={page}
         tripDetail={tripDetail}
         assetsById={assetsById}
+        coverPhotoPreviewUrl={coverPhotoPreviewUrl}
         showLegacyStory={!hasStoryPage && page.id === firstContentPageId}
         showLegacyPhotoFallback={!hasPhotoPage && page.id === endingPageId}
       />
@@ -111,14 +115,16 @@ export function ScrapbookPageRenderer(props: PageRendererProps) {
   );
 }
 
-function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit, showControls }: PageRendererProps) {
+function ScrapbookCoverPage({ detail, tripDetail, assetsById, onEdit, showControls, coverPhotoPreviewUrl }: PageRendererProps) {
   const { scrapbook } = detail;
   const coverAsset = resolveCoverAsset(detail, assetsById);
   const settings = scrapbook.coverSettings;
   const titlePosition = resolveCoverTitlePosition(resolveViewerLayout(scrapbook), settings?.titlePosition);
   return (
     <header className={`scrapbook-viewer__cover scrapbook-viewer__cover--${titlePosition}`} data-page-kind="cover">
-      {coverAsset ? (
+      {coverPhotoPreviewUrl ? (
+        <img src={coverPhotoPreviewUrl} alt={`${scrapbook.title}へ追加前の表紙写真`} className="scrapbook-viewer__cover-image" />
+      ) : coverAsset ? (
         <ScrapbookMediaImage asset={coverAsset} alt={`${scrapbook.title}の表紙写真`} className="scrapbook-viewer__cover-image" loading="eager" />
       ) : (
         <TripJournalVisual trip={tripDetail.trip} placeNames={tripDetail.places.map((place) => place.name)} alt="" className="scrapbook-viewer__cover-fallback" />

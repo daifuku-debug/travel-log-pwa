@@ -18,6 +18,7 @@ import { SCRAPBOOK_SCHEMA_SOURCE_REVISION } from '../../domain/scrapbooks/scrapb
 import { grantExperienceOnce } from '../rpg/experienceService';
 import { refreshRpgProgress } from '../rpg/rpgProgressService';
 import { appendEditedFields } from './scrapbookRevision';
+import { saveTripMediaAsset } from '../media/mediaAssetService';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -295,7 +296,7 @@ export async function addPhotoBlockFromFile(
   title = '',
 ): Promise<ScrapbookBlock> {
   try {
-    const asset = await saveLocalMediaAsset(tripId, file);
+    const asset = await saveTripMediaAsset(tripId, file);
     return addScrapbookBlock(pageId, {
       type: 'photo',
       text: body,
@@ -318,7 +319,7 @@ export async function addPhotoGridBlockFromFiles(
   title = '',
 ): Promise<ScrapbookBlock> {
   try {
-    const assets = await Promise.all(files.map((file) => saveLocalMediaAsset(tripId, file)));
+    const assets = await Promise.all(files.map((file) => saveTripMediaAsset(tripId, file)));
     return addScrapbookBlock(pageId, {
       type: 'photo_grid',
       text: body,
@@ -668,103 +669,6 @@ function buildBlock({
     note: optionalText(input.note),
     textStyle: 'body',
   };
-}
-
-async function saveLocalMediaAsset(tripId: EntityId, file: File): Promise<MediaAsset> {
-  validateImageFile(file);
-  const now = new Date().toISOString();
-  const assetId = createId('media-asset');
-  const originalBlobId = `${assetId}:original`;
-  const thumbnailBlobId = `${assetId}:thumbnail`;
-  const image = await createImagePreview(file);
-  const thumbnail = image ? await createThumbnailBlob(image, file.type) : undefined;
-
-  await repositories.mediaAssetBlobs.save({
-    id: originalBlobId,
-    assetId,
-    kind: 'original',
-    blob: file,
-    mimeType: file.type,
-    createdAt: now,
-  });
-  if (thumbnail) {
-    await repositories.mediaAssetBlobs.save({
-      id: thumbnailBlobId,
-      assetId,
-      kind: 'thumbnail',
-      blob: thumbnail.blob,
-      mimeType: thumbnail.blob.type || file.type,
-      createdAt: now,
-    });
-  }
-
-  return repositories.mediaAssets.save({
-    id: assetId,
-    userId: LOCAL_USER_ID,
-    tripId,
-    storageType: 'local',
-    localReference: originalBlobId,
-    thumbnailReference: thumbnail ? thumbnailBlobId : originalBlobId,
-    mimeType: file.type,
-    width: thumbnail?.sourceWidth,
-    height: thumbnail?.sourceHeight,
-    fileSize: file.size,
-    originalFileName: file.name,
-    mediaSyncStatus: 'local_only',
-    createdAt: now,
-    updatedAt: now,
-    syncStatus: 'pending',
-  });
-}
-
-function validateImageFile(file: File): void {
-  if (!file.type.startsWith('image/')) throw new Error('画像ファイルを選択してください。');
-  const maxBytes = 12 * 1024 * 1024;
-  if (file.size > maxBytes) throw new Error('写真は12MB以下にしてください。');
-}
-
-async function createImagePreview(file: File): Promise<HTMLImageElement | undefined> {
-  if (typeof Image === 'undefined' || typeof URL === 'undefined') return undefined;
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.decoding = 'async';
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error('画像を読み込めませんでした。'));
-      image.src = objectUrl;
-    });
-    return image;
-  } catch {
-    return undefined;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-async function createThumbnailBlob(
-  image: HTMLImageElement,
-  mimeType: string,
-): Promise<{ blob: Blob; sourceWidth: number; sourceHeight: number } | undefined> {
-  if (typeof document === 'undefined') return undefined;
-  const sourceWidth = image.naturalWidth || image.width;
-  const sourceHeight = image.naturalHeight || image.height;
-  if (!sourceWidth || !sourceHeight) return undefined;
-  const maxEdge = 960;
-  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
-  const width = Math.max(1, Math.round(sourceWidth * scale));
-  const height = Math.max(1, Math.round(sourceHeight * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) return undefined;
-  context.drawImage(image, 0, 0, width, height);
-  const outputType = mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-  const blob = await new Promise<Blob | undefined>((resolve) => {
-    canvas.toBlob((value) => resolve(value ?? undefined), outputType, 0.82);
-  });
-  return blob ? { blob, sourceWidth, sourceHeight } : undefined;
 }
 
 export function validateScrapbookInput(input: ScrapbookInput): string[] {

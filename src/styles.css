@@ -4070,6 +4070,16 @@ body.scrapbook-editor-active .bottom-nav {
   text-align: center;
 }
 
+.scrapbook-cover-studio__pending-label {
+  margin-top: -2px;
+  border-radius: var(--radius-pill);
+  background: rgba(241, 199, 124, .1);
+  padding: 5px 9px;
+  color: #f1c77c;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
 .scrapbook-cover-studio__canvas {
   width: min(100%, 310px);
   aspect-ratio: 3 / 4;
@@ -4261,6 +4271,81 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   color: #fff;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-import {
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid rgba(241, 199, 124, .18);
+  border-radius: var(--radius-lg);
+  background: rgba(241, 199, 124, .035);
+  padding: var(--space-3);
+}
+
+.scrapbook-cover-import.has-error {
+  border-color: rgba(239, 130, 130, .2);
+}
+
+.scrapbook-cover-import__preview {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #0b1212;
+}
+
+.scrapbook-cover-import__preview img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.scrapbook-cover-import__preview > span {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 18, 18, .84);
+  padding: 5px 9px;
+  color: #f1c77c;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-import__details {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.scrapbook-cover-import__details strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrapbook-cover-import__details span,
+.scrapbook-cover-import__status {
+  margin: 0;
+  color: rgba(237, 242, 240, .58);
+  font-size: var(--font-size-xs);
+}
+
+.scrapbook-cover-import__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.scrapbook-photo-source-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scrapbook-photo-source-actions .button {
+  width: 100%;
 }
 
 .scrapbook-cover-editor__photo-library {
@@ -4586,6 +4671,12 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   transform: translateY(-1px);
 }
 
+.scrapbook-cover-editor__photo:disabled {
+  cursor: default;
+  opacity: .48;
+  transform: none;
+}
+
 .scrapbook-cover-editor__photo.is-selected {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 22%, transparent), 0 12px 30px rgba(7, 18, 18, .16);
@@ -4802,6 +4893,15 @@ body.scrapbook-editor-active .bottom-sheet .checkbox-field {
 
   .scrapbook-cover-editor__photos {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scrapbook-cover-import__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .scrapbook-cover-import__actions .button {
+    width: 100%;
   }
 
   .scrapbook-cover-studio__canvas {

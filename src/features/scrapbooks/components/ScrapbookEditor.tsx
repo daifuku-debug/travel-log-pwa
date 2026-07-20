@@ -21,8 +21,9 @@ import { CoverEditorStudio } from './CoverEditorStudio';
 import { PAGE_KIND_LABELS, PageNavigatorSheet } from './PageNavigatorSheet';
 import { SaveBar } from './SaveBar';
 import { ScrapbookPagePreview } from './ScrapbookViewer';
+import { useCoverPhotoImport } from '../useCoverPhotoImport';
 
-type PendingAction = { type: 'exit' } | { type: 'select'; pageId: string };
+type PendingAction = { type: 'exit' } | { type: 'select'; pageId: string } | { type: 'close-editor' };
 
 export function ScrapbookEditor({
   detail,
@@ -57,19 +58,22 @@ export function ScrapbookEditor({
   const [coverPreviewTemplateId, setCoverPreviewTemplateId] = useState<ScrapbookCoverLayout>();
   const [pendingAction, setPendingAction] = useState<PendingAction>();
   const [saving, setSaving] = useState(false);
+  const [addedMediaAssets, setAddedMediaAssets] = useState(detail.mediaAssets);
   const [saveError, setSaveError] = useState('');
   const [pageTurnDirection, setPageTurnDirection] = useState<'next' | 'previous'>('next');
   const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined);
   const { showToast } = useToast();
+  const coverPhotoImport = useCoverPhotoImport(detail.scrapbook.tripId);
   const dirty = !areScrapbookPageDraftsEqual(draft, baseline);
-  const blocker = useBlocker(dirty);
+  const hasPendingPhoto = coverPhotoImport.hasPending;
+  const blocker = useBlocker(dirty || hasPendingPhoto);
 
   useEffect(() => {
-    if (!dirty) return undefined;
+    if (!dirty && !hasPendingPhoto) return undefined;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dirty]);
+  }, [dirty, hasPendingPhoto]);
 
   useEffect(() => {
     document.body.classList.add('scrapbook-editor-active');
@@ -88,6 +92,7 @@ export function ScrapbookEditor({
       ? applyScrapbookCoverDraft(detail.scrapbook, previewDraft)
       : detail.scrapbook,
     pages: detail.pages.map((page) => page.id === selectedPage.id ? previewPage : page),
+    mediaAssets: addedMediaAssets,
   };
   const selectedPageIndex = pages.findIndex((page) => page.id === selectedPage.id);
   const canGoPrevious = selectedPageIndex > 0;
@@ -113,7 +118,7 @@ export function ScrapbookEditor({
       setNavigatorOpen(false);
       return;
     }
-    if (dirty) {
+    if (hasPendingPhoto || dirty) {
       setPendingAction({ type: 'select', pageId });
       return;
     }
@@ -141,7 +146,7 @@ export function ScrapbookEditor({
   }
 
   function requestExit() {
-    if (dirty) {
+    if (hasPendingPhoto || dirty) {
       setPendingAction({ type: 'exit' });
       return;
     }
@@ -149,6 +154,11 @@ export function ScrapbookEditor({
   }
 
   async function saveDraft(): Promise<boolean> {
+    if (hasPendingPhoto) {
+      setEditorOpen(true);
+      showToast({ title: '追加中の写真を使うか、キャンセルしてから記録を更新してください。', variant: 'info' });
+      return false;
+    }
     const pageTitle = draft.pageTitle.trim();
     const coverTitle = draft.coverTitle.trim();
     if (!pageTitle || (selectedPage.pageKind === 'cover' && !coverTitle)) {
@@ -242,6 +252,7 @@ export function ScrapbookEditor({
     }
     if (pendingAction?.type === 'exit') onExit();
     if (pendingAction?.type === 'select') selectPage(pendingAction.pageId);
+    if (pendingAction?.type === 'close-editor') closeEditorPanelNow();
     setPendingAction(undefined);
   }
 
@@ -254,22 +265,53 @@ export function ScrapbookEditor({
     completePendingAction();
   }
 
+  function discardPendingPhotoAndContinue() {
+    coverPhotoImport.cancel();
+    if (pendingAction?.type === 'close-editor') {
+      closeEditorPanelNow();
+      setPendingAction(undefined);
+      return;
+    }
+    if (!dirty) completePendingAction();
+  }
+
   function cancelPendingAction() {
     if (blocker.state === 'blocked') blocker.reset();
     setPendingAction(undefined);
   }
 
-  const confirmOpen = Boolean(pendingAction) || blocker.state === 'blocked';
+  const guardOpen = Boolean(pendingAction) || blocker.state === 'blocked';
+  const pendingPhotoConfirmOpen = guardOpen && hasPendingPhoto;
+  const draftConfirmOpen = guardOpen && !hasPendingPhoto;
 
-  function closeEditorPanel() {
+  function closeEditorPanelNow() {
     setCoverPreviewTemplateId(undefined);
     setEditorOpen(false);
+  }
+
+  function requestCloseEditorPanel() {
+    if (hasPendingPhoto) {
+      setPendingAction({ type: 'close-editor' });
+      return;
+    }
+    closeEditorPanelNow();
   }
 
   function applyCoverTemplate() {
     if (!coverPreviewTemplateId) return;
     setDraft((current) => ({ ...current, coverLayout: coverPreviewTemplateId }));
     setCoverPreviewTemplateId(undefined);
+  }
+
+  async function applyPendingCoverPhoto() {
+    const asset = await coverPhotoImport.save();
+    if (!asset) {
+      showToast({ title: '写真を保存できませんでした。選択内容は残っています。', variant: 'error' });
+      return;
+    }
+    setAddedMediaAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
+    setDraft((current) => ({ ...current, coverPhotoId: asset.id }));
+    showToast({ title: '旅行写真へ追加しました。表紙へ反映するには記録を更新してください。', variant: 'success' });
   }
 
   return (
@@ -338,6 +380,7 @@ export function ScrapbookEditor({
       <SaveBar
         dirty={dirty}
         saving={saving}
+        disabled={hasPendingPhoto}
         onDiscard={() => discardDraft()}
         onSave={() => void saveDraft()}
       />
@@ -354,11 +397,12 @@ export function ScrapbookEditor({
 
       <BottomSheet
         open={editorOpen}
-        onClose={closeEditorPanel}
+        onClose={requestCloseEditorPanel}
         title={selectedPage.pageKind === 'cover' ? '表紙を編集' : 'ページを編集'}
         description="変更はプレビューへすぐ反映され、「記録を更新」を選ぶまで完成版には反映されません。"
         size={selectedPage.pageKind === 'cover' ? 'lg' : 'md'}
-        actions={<Button variant="primary" disabled={!dirty} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}
+        dismissible={!coverPhotoImport.pending || coverPhotoImport.pending.status !== 'saving'}
+        actions={<Button variant="primary" disabled={!dirty || hasPendingPhoto} loading={saving} onClick={() => void saveDraft()}>記録を更新</Button>}
       >
         {selectedPage.pageKind === 'cover' ? (
           <CoverEditorStudio
@@ -366,11 +410,16 @@ export function ScrapbookEditor({
             previewPage={previewPage}
             tripDetail={tripDetail}
             previewKey={`${previewDetail.scrapbook.themeId}-${previewDetail.scrapbook.coverLayout}-${previewDetail.scrapbook.coverSettings?.photoId ?? 'fallback'}`}
+            pendingPhotoUrl={coverPhotoImport.pending?.previewUrl}
           >
             <CoverEditorPanel
               draft={draft}
-              mediaAssets={detail.mediaAssets}
+              mediaAssets={addedMediaAssets}
               tripDetail={tripDetail}
+              pendingPhoto={coverPhotoImport.pending}
+              onChoosePhotoFile={(file) => void coverPhotoImport.selectFile(file)}
+              onApplyPendingPhoto={() => void applyPendingCoverPhoto()}
+              onCancelPendingPhoto={coverPhotoImport.cancel}
               previewTemplateId={coverPreviewTemplateId}
               onPreviewTemplate={setCoverPreviewTemplateId}
               onApplyTemplate={applyCoverTemplate}
@@ -383,7 +432,7 @@ export function ScrapbookEditor({
       </BottomSheet>
 
       <ConfirmDialog
-        open={confirmOpen}
+        open={draftConfirmOpen}
         title="編集内容を記録しますか？"
         description="このページには未記録の編集内容があります。記録を更新して続けるか、変更を破棄してください。"
         confirmLabel="記録を更新"
@@ -393,6 +442,17 @@ export function ScrapbookEditor({
         processing={saving}
         onConfirm={saveAndContinue}
         onSecondary={discardAndContinue}
+        onCancel={cancelPendingAction}
+      />
+      <ConfirmDialog
+        open={pendingPhotoConfirmOpen}
+        title="追加中の写真があります"
+        description="この写真はまだ旅行写真へ保存されていません。追加を破棄して続けますか？"
+        confirmLabel="写真の追加を破棄"
+        cancelLabel="編集を続ける"
+        variant="danger"
+        processing={coverPhotoImport.pending?.status === 'saving'}
+        onConfirm={discardPendingPhotoAndContinue}
         onCancel={cancelPendingAction}
       />
     </div>
