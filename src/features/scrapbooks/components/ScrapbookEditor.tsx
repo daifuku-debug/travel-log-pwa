@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import type { ScrapbookCoverLayout, ScrapbookPage } from '../../../domain/models/scrapbook';
+import { filterCoverAssetsForScrapbook, isCoverOnlyMediaAsset } from '../../../domain/media/mediaAssetUsage';
 import { BottomSheet, Button, ConfirmDialog, InlineError, useToast } from '../../../shared/ui';
 import type { TripDetail } from '../../trips/tripService';
 import {
@@ -63,7 +64,11 @@ export function ScrapbookEditor({
   const [pageTurnDirection, setPageTurnDirection] = useState<'next' | 'previous'>('next');
   const pointerStart = useRef<{ x: number; y: number } | undefined>(undefined);
   const { showToast } = useToast();
-  const coverPhotoImport = useCoverPhotoImport(detail.scrapbook.tripId);
+  const coverPhotoImport = useCoverPhotoImport(detail.scrapbook.tripId, detail.scrapbook.id);
+  const coverMediaAssets = useMemo(
+    () => filterCoverAssetsForScrapbook(addedMediaAssets, detail.scrapbook.id),
+    [addedMediaAssets, detail.scrapbook.id],
+  );
   const dirty = !areScrapbookPageDraftsEqual(draft, baseline);
   const hasPendingPhoto = coverPhotoImport.hasPending;
   const blocker = useBlocker(dirty || hasPendingPhoto);
@@ -311,7 +316,12 @@ export function ScrapbookEditor({
     }
     setAddedMediaAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
     setDraft((current) => ({ ...current, coverPhotoId: asset.id }));
-    showToast({ title: '旅行写真へ追加しました。表紙へ反映するには記録を更新してください。', variant: 'success' });
+    showToast({
+      title: isCoverOnlyMediaAsset(asset)
+        ? '表紙専用写真へ追加しました。表紙へ反映するには記録を更新してください。'
+        : '旅行写真へ追加しました。表紙へ反映するには記録を更新してください。',
+      variant: 'success',
+    });
   }
 
   return (
@@ -416,12 +426,13 @@ export function ScrapbookEditor({
           >
             <CoverEditorPanel
               draft={draft}
-              mediaAssets={addedMediaAssets}
+              mediaAssets={coverMediaAssets}
               tripDetail={tripDetail}
               pendingPhoto={coverPhotoImport.pending}
               onChoosePhotoFile={(file) => void coverPhotoImport.selectFile(file)}
               onApplyPendingPhoto={() => void applyPendingCoverPhoto()}
               onCancelPendingPhoto={coverPhotoImport.cancel}
+              onPendingPhotoDestinationChange={coverPhotoImport.setDestination}
               previewTemplateId={coverPreviewTemplateId}
               onPreviewTemplate={setCoverPreviewTemplateId}
               onApplyTemplate={applyCoverTemplate}

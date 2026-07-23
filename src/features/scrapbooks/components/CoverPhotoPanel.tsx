@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { EntityId } from '../../../domain/models/common';
 import type { MediaAsset } from '../../../domain/models/scrapbook';
+import { isCoverOnlyMediaAsset } from '../../../domain/media/mediaAssetUsage';
 import { BottomSheet, Button, InlineError } from '../../../shared/ui';
 import type { PendingCoverPhoto } from '../useCoverPhotoImport';
 import type { TripDetail } from '../../trips/tripService';
@@ -16,6 +17,7 @@ export function CoverPhotoPanel({
   onChooseFile,
   onApplyPending,
   onCancelPending,
+  onDestinationChange,
 }: {
   selectedPhotoId?: EntityId;
   mediaAssets: MediaAsset[];
@@ -25,6 +27,7 @@ export function CoverPhotoPanel({
   onChooseFile: (file: File) => void;
   onApplyPending: () => void;
   onCancelPending: () => void;
+  onDestinationChange: (destination: PendingCoverPhoto['destination']) => void;
 }) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const libraryInputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +88,7 @@ export function CoverPhotoPanel({
         >
           <div className="scrapbook-cover-import__heading">
             <span>追加前の写真</span>
-            <p>この写真を旅行へ保存し、表紙の候補として使います。</p>
+            <p>保存先を選んで、表紙の候補として追加します。</p>
           </div>
           {pendingPhoto.previewUrl && (
             <div className="scrapbook-cover-import__preview">
@@ -99,6 +102,29 @@ export function CoverPhotoPanel({
               {pendingPhoto.width && pendingPhoto.height ? ` · ${pendingPhoto.width} × ${pendingPhoto.height}px` : ''}
             </span>
           </div>
+          <fieldset className="scrapbook-cover-destination" disabled={isBusy}>
+            <legend>保存先</legend>
+            <label className={pendingPhoto.destination === 'trip' ? 'is-selected' : ''}>
+              <input
+                type="radio"
+                name="cover-photo-destination"
+                value="trip"
+                checked={pendingPhoto.destination === 'trip'}
+                onChange={() => onDestinationChange('trip')}
+              />
+              <span><strong>旅行写真として追加</strong><small>旅行の写真一覧や本文でも使用できます</small></span>
+            </label>
+            <label className={pendingPhoto.destination === 'cover-only' ? 'is-selected' : ''}>
+              <input
+                type="radio"
+                name="cover-photo-destination"
+                value="cover-only"
+                checked={pendingPhoto.destination === 'cover-only'}
+                onChange={() => onDestinationChange('cover-only')}
+              />
+              <span><strong>表紙専用として追加</strong><small>この旅行雑誌の表紙素材として保存します</small></span>
+            </label>
+          </fieldset>
           {pendingPhoto.status === 'validating' && <p className="scrapbook-cover-import__status" role="status">写真を確認しています…</p>}
           {pendingPhoto.status === 'saving' && <p className="scrapbook-cover-import__status" role="status">写真を保存しています…</p>}
           {pendingPhoto.error && <InlineError message={pendingPhoto.error} />}
@@ -128,7 +154,7 @@ export function CoverPhotoPanel({
 
           {mediaAssets.length > 0 ? (
             <div className="scrapbook-cover-editor__photo-library">
-              <h4>旅行の写真</h4>
+              <h4>表紙の候補</h4>
               <div className="scrapbook-cover-editor__photos" role="radiogroup" aria-label="表紙写真">
                 {mediaAssets.map((asset) => {
                   const selected = selectedPhotoId === asset.id;
@@ -139,10 +165,11 @@ export function CoverPhotoPanel({
                       className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
                       role="radio"
                       aria-checked={selected}
-                      aria-label={`${asset.originalFileName || '旅行写真'}を表紙にする${selected ? '、現在選択中' : ''}`}
+                      aria-label={`${asset.originalFileName || '旅行写真'}${isCoverOnlyMediaAsset(asset) ? '、表紙専用' : ''}を表紙にする${selected ? '、現在選択中' : ''}`}
                       onClick={() => onSelect(asset.id)}
                     >
                       <ScrapbookMediaImage asset={asset} alt="" />
+                      {isCoverOnlyMediaAsset(asset) && <span className="scrapbook-cover-editor__usage-badge">表紙専用</span>}
                       {selected && <span>選択中</span>}
                     </button>
                   );
@@ -162,7 +189,7 @@ export function CoverPhotoPanel({
         open={sourceOpen}
         onClose={() => setSourceOpen(false)}
         title="写真を追加"
-        description="追加した写真は、この旅行の写真として端末内に保存されます。"
+        description="端末から写真を選んだあと、旅行写真または表紙専用として保存できます。"
         size="sm"
         initialFocusRef={sourcePrimaryActionRef}
       >

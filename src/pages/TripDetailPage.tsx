@@ -91,7 +91,7 @@ export function TripDetailPage() {
 
   const { trip, places, transportLegs } = data;
   const placeNames = places.map((place) => place.name);
-  const coverSource = media.sources[0];
+  const coverSource = media.coverSource;
 
   return (
     <article className="trip-journal">

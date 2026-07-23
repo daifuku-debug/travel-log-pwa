@@ -30,6 +30,17 @@ export function isCoverAssetAvailableToScrapbook(asset: MediaAsset, scrapbookId:
   return normalized.usage === 'trip' || normalized.ownerScrapbookId === scrapbookId;
 }
 
+export function filterTripMediaAssets(assets: readonly MediaAsset[]): MediaAsset[] {
+  return assets.filter(isTripMediaAsset);
+}
+
+export function filterCoverAssetsForScrapbook(
+  assets: readonly MediaAsset[],
+  scrapbookId: EntityId,
+): MediaAsset[] {
+  return assets.filter((asset) => isCoverAssetAvailableToScrapbook(asset, scrapbookId));
+}
+
 function normalizeEntityId(value: unknown): EntityId | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }

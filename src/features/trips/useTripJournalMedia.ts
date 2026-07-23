@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { ScrapbookBlock } from '../../domain/models/scrapbook';
+import { filterTripMediaAssets } from '../../domain/media/mediaAssetUsage';
 import { resolveScrapbookCoverPhotoId } from '../scrapbooks/scrapbookCoverLogic';
 import { createMediaObjectUrl, getScrapbookByTripId } from '../scrapbooks/scrapbookService';
 
 export interface TripJournalMediaState {
   status: 'loading' | 'ready' | 'empty' | 'error';
+  coverSource?: string;
   sources: string[];
   highlights: string[];
   photoCount: number;
@@ -33,26 +35,32 @@ export function useTripJournalMedia(tripId?: string): TripJournalMediaState {
     void getScrapbookByTripId(tripId)
       .then(async (detail) => {
         if (!detail) return EMPTY_STATE;
+        const tripMediaAssets = filterTripMediaAssets(detail.mediaAssets);
         const preferredId = resolveScrapbookCoverPhotoId(
           detail.scrapbook,
           detail.pages,
           detail.mediaAssets.map((asset) => asset.id),
         );
         const preferred = detail.mediaAssets.find((asset) => asset.id === preferredId);
-        const orderedAssets = [preferred, ...detail.mediaAssets]
-          .filter((asset, index, items) => asset && items.findIndex((candidate) => candidate?.id === asset.id) === index)
-          .slice(0, 4);
-        const sources = (await Promise.all(orderedAssets.map(async (asset) => {
+        const galleryAssets = tripMediaAssets.slice(0, 4);
+        const imageAssets = [preferred, ...galleryAssets]
+          .filter((asset, index, items) => asset && items.findIndex((candidate) => candidate?.id === asset.id) === index);
+        const sourceByAssetId = new Map((await Promise.all(imageAssets.map(async (asset) => {
           if (!asset) return undefined;
           const source = await createMediaObjectUrl(asset, 'thumbnail');
           if (source) objectUrls.add(source);
-          return source;
-        }))).filter((source): source is string => Boolean(source));
+          return source ? [asset.id, source] as const : undefined;
+        }))).filter((entry): entry is readonly [string, string] => Boolean(entry)));
+        const coverSource = preferred ? sourceByAssetId.get(preferred.id) : undefined;
+        const sources = galleryAssets
+          .map((asset) => sourceByAssetId.get(asset.id))
+          .filter((source): source is string => Boolean(source));
         return {
-          status: sources.length > 0 ? 'ready' : 'empty',
+          status: coverSource || sources.length > 0 ? 'ready' : 'empty',
+          coverSource,
           sources,
           highlights: detail.pages.flatMap((page) => page.blocks).map(blockText).filter(Boolean).slice(0, 3),
-          photoCount: detail.mediaAssets.length,
+          photoCount: tripMediaAssets.length,
         } satisfies TripJournalMediaState;
       })
       .then((nextState) => {

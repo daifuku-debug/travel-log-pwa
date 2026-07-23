@@ -26,6 +26,7 @@ export function CoverEditorPanel({
   onChoosePhotoFile,
   onApplyPendingPhoto,
   onCancelPendingPhoto,
+  onPendingPhotoDestinationChange,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
@@ -38,6 +39,7 @@ export function CoverEditorPanel({
   onChoosePhotoFile: (file: File) => void;
   onApplyPendingPhoto: () => void;
   onCancelPendingPhoto: () => void;
+  onPendingPhotoDestinationChange: (destination: PendingCoverPhoto['destination']) => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
   const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
@@ -92,6 +94,7 @@ export function CoverEditorPanel({
             onChooseFile={onChoosePhotoFile}
             onApplyPending={onApplyPendingPhoto}
             onCancelPending={onCancelPendingPhoto}
+            onDestinationChange={onPendingPhotoDestinationChange}
             onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
           />
         )}

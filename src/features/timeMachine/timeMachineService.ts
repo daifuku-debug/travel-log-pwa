@@ -16,6 +16,7 @@ import { isValidDateInputValue, todayDateInputValue } from '../../shared/date/da
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
 import { inferLocationFromTimeline } from './locationInferenceService';
+import { filterTripMediaAssets } from '../../domain/media/mediaAssetUsage';
 
 const LOCAL_USER_ID = 'local-user';
 const DEFAULT_TIMEZONE = 'Asia/Tokyo';
@@ -116,6 +117,7 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
     const tripsById = new Map(trips.map((trip) => [trip.id, trip]));
     const castleById = new Map(castleMaster.map((castle) => [castle.id, castle]));
     const collectionItemById = new Map(collectionItems.map((item) => [item.id, item]));
+    const tripMediaAssets = filterTripMediaAssets(mediaAssets);
 
     const relatedTrips = trips
       .filter((trip) => dateInRange(normalizedQuery.date, trip.startDate, trip.endDate))
@@ -135,7 +137,7 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
     const events = filterEstimatedEvents(dedupeTimelineEvents([
       ...buildTripEvents(relatedTrips),
       ...buildPlaceVisitEvents(placeVisits, tripsById, normalizedQuery.date, queryAt),
-      ...buildPhotoEvents(mediaAssets, tripsById, normalizedQuery.date, queryAt),
+      ...buildPhotoEvents(tripMediaAssets, tripsById, normalizedQuery.date, queryAt),
       ...buildScrapbookEvents(relatedScrapbooks, normalizedQuery.date),
       ...buildManualEvents(manualEntries),
       ...buildCastleEvents(castleEvents, castleById, tripsById, normalizedQuery.date),
@@ -143,7 +145,7 @@ export async function getTimeMachineResult(query: TimeMachineQuery): Promise<Tim
       ...(normalizedQuery.includeRpg ? buildRpgEvents(rpgEntries, userAchievements, userTitles, normalizedQuery.date) : []),
     ]), normalizedQuery.includeEstimated).sort(compareTimelineEvents);
 
-    const photos = mediaAssets.filter((asset) => isMediaOnDate(asset, normalizedQuery.date, queryAt));
+    const photos = tripMediaAssets.filter((asset) => isMediaOnDate(asset, normalizedQuery.date, queryAt));
     const locationInference = inferLocationFromTimeline(events, queryAt);
     const mapPoints = events.filter((event) => isValidCoordinate(event.latitude, event.longitude));
 

@@ -4364,6 +4364,75 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   font-size: var(--font-size-xs);
 }
 
+.scrapbook-cover-destination {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: var(--space-2) 0 0;
+}
+
+.scrapbook-cover-destination legend {
+  margin-bottom: var(--space-2);
+  color: rgba(247, 250, 248, .82);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-destination label {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target-min);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .025);
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+
+.scrapbook-cover-destination label.is-selected {
+  border-color: rgba(112, 189, 177, .52);
+  background: rgba(112, 189, 177, .09);
+}
+
+.scrapbook-cover-destination label:has(input:focus-visible) {
+  outline: 2px solid #8ac9bf;
+  outline-offset: 2px;
+}
+
+.scrapbook-cover-destination:disabled label {
+  cursor: default;
+  opacity: .55;
+}
+
+.scrapbook-cover-destination input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #70bdb1;
+}
+
+.scrapbook-cover-destination label > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.scrapbook-cover-destination strong {
+  color: #f4f7f6;
+  font-size: var(--font-size-sm);
+}
+
+.scrapbook-cover-destination small {
+  color: rgba(237, 242, 240, .58);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
 .scrapbook-cover-import__actions {
   display: grid;
   gap: var(--space-2);
@@ -4846,6 +4915,15 @@ body.scrapbook-editor-active .bottom-sheet .checkbox-field {
   left: 9px;
   font-size: .68rem;
   font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-cover-editor__photo > .scrapbook-cover-editor__usage-badge {
+  top: 7px;
+  right: auto;
+  bottom: auto;
+  left: 7px;
+  background: rgba(241, 199, 124, .9);
+  color: #172126;
 }
 
 .scrapbook-page-navigator__thumbnail i {

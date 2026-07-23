@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntityId } from '../../domain/models/common';
-import type { MediaAsset } from '../../domain/models/scrapbook';
+import type { MediaAsset, MediaAssetUsage } from '../../domain/models/scrapbook';
 import {
   prepareMediaImage,
   savePreparedTripMediaAsset,
@@ -11,6 +11,7 @@ export type CoverPhotoImportStatus = 'validating' | 'previewing' | 'saving' | 'e
 
 export interface PendingCoverPhoto {
   file: File;
+  destination: MediaAssetUsage;
   previewUrl?: string;
   status: CoverPhotoImportStatus;
   width?: number;
@@ -18,7 +19,7 @@ export interface PendingCoverPhoto {
   error?: string;
 }
 
-export function useCoverPhotoImport(tripId: EntityId) {
+export function useCoverPhotoImport(tripId: EntityId, scrapbookId?: EntityId) {
   const [pending, setPending] = useState<PendingCoverPhoto>();
   const preparedRef = useRef<PreparedMediaImage | undefined>(undefined);
   const previewUrlRef = useRef<string | undefined>(undefined);
@@ -44,7 +45,7 @@ export function useCoverPhotoImport(tripId: EntityId) {
     preparedRef.current = undefined;
     const previewUrl = URL.createObjectURL(file);
     previewUrlRef.current = previewUrl;
-    setPending({ file, previewUrl, status: 'validating' });
+    setPending({ file, previewUrl, status: 'validating', destination: 'trip' });
     try {
       const prepared = await prepareMediaImage(file);
       if (requestIdRef.current !== requestId) return;
@@ -53,6 +54,7 @@ export function useCoverPhotoImport(tripId: EntityId) {
         file,
         previewUrl,
         status: 'previewing',
+        destination: 'trip',
         width: prepared.width,
         height: prepared.height,
       });
@@ -62,10 +64,15 @@ export function useCoverPhotoImport(tripId: EntityId) {
       setPending({
         file,
         status: 'error',
+        destination: 'trip',
         error: error instanceof Error ? error.message : '写真を読み込めませんでした。',
       });
     }
   }, [releasePreview]);
+
+  const setDestination = useCallback((destination: MediaAssetUsage) => {
+    setPending((current) => current ? { ...current, destination } : current);
+  }, []);
 
   const save = useCallback(async (): Promise<MediaAsset | undefined> => {
     const prepared = preparedRef.current;
@@ -74,7 +81,12 @@ export function useCoverPhotoImport(tripId: EntityId) {
     const requestId = requestIdRef.current;
     setPending((current) => current ? { ...current, status: 'saving', error: undefined } : current);
     try {
-      const asset = await savePreparedTripMediaAsset(tripId, prepared);
+      if (pending.destination === 'cover-only' && !scrapbookId) {
+        throw new Error('表紙専用写真の保存先を確認できませんでした。');
+      }
+      const asset = await savePreparedTripMediaAsset(tripId, prepared, pending.destination === 'cover-only'
+        ? { usage: 'cover-only', ownerScrapbookId: scrapbookId }
+        : { usage: 'trip' });
       if (requestIdRef.current !== requestId) {
         savingRef.current = false;
         return asset;
@@ -95,7 +107,7 @@ export function useCoverPhotoImport(tripId: EntityId) {
       savingRef.current = false;
       return undefined;
     }
-  }, [pending, releasePreview, tripId]);
+  }, [pending, releasePreview, scrapbookId, tripId]);
 
   useEffect(() => () => {
     requestIdRef.current += 1;
@@ -106,6 +118,7 @@ export function useCoverPhotoImport(tripId: EntityId) {
     pending,
     hasPending: Boolean(pending),
     selectFile,
+    setDestination,
     save,
     cancel,
   };

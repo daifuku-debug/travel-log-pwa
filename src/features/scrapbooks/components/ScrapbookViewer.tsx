@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { MediaAsset, ScrapbookBlock, ScrapbookPage as ScrapbookPageModel } from '../../../domain/models/scrapbook';
+import { isTripMediaAsset } from '../../../domain/media/mediaAssetUsage';
 import { formatCompactDateRange, isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
 import { TripJournalTimeline } from '../../trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
@@ -204,7 +205,7 @@ function PlacePage({ page, tripDetail, assetsById }: PageRendererProps) {
 }
 
 function EndingPage({ detail, page, tripDetail, assetsById, onEdit, showControls, showLegacyPhotoFallback }: PageRendererProps) {
-  const photoCount = countPhotos(detail.pages);
+  const photoCount = countPhotos(detail.pages, assetsById);
   const castleCount = tripDetail.places.filter((place) => place.castleId).length;
   return (
     <>
@@ -275,7 +276,10 @@ function StoryNote({ title, body }: { title?: string; body?: string }) {
 
 function PhotoStory({ block, index, assetsById }: { block: Extract<ScrapbookBlock, { type: 'photo' | 'photo_grid' }>; index: number; assetsById: Map<string, MediaAsset> }) {
   const assetIds = block.type === 'photo' ? [block.assetId] : block.assetIds;
-  const assets = assetIds.map((id) => assetsById.get(id)).filter((asset): asset is MediaAsset => Boolean(asset));
+  const assets = assetIds
+    .map((id) => assetsById.get(id))
+    .filter((asset): asset is MediaAsset => asset !== undefined)
+    .filter(isTripMediaAsset);
   const variant = block.layoutVariant || (block.type === 'photo' ? block.displaySize : `grid-${Math.min(block.columns, 3)}`);
   if (assets.length === 0) return null;
   return (
@@ -352,8 +356,14 @@ function buildPlaceEntries(placeBlocks: Array<Extract<ScrapbookBlock, { type: 'p
   return entries.length > 0 ? entries : [{ id: `empty-${page?.id || 'page'}`, name: '旅の目的地', date: page?.date || tripDetail.trip.startDate, note: '訪問場所を追加すると、この旅の舞台が並びます。' }];
 }
 
-function countPhotos(pages: ViewerPage[]): number {
-  return new Set(pages.flatMap((page) => visibleBlocks(page).flatMap((block) => block.type === 'photo' ? [block.assetId] : block.type === 'photo_grid' ? block.assetIds : []))).size;
+function countPhotos(pages: ViewerPage[], assetsById: Map<string, MediaAsset>): number {
+  return new Set(pages.flatMap((page) => visibleBlocks(page).flatMap((block) => {
+    const assetIds = block.type === 'photo' ? [block.assetId] : block.type === 'photo_grid' ? block.assetIds : [];
+    return assetIds.filter((assetId) => {
+      const asset = assetsById.get(assetId);
+      return asset ? isTripMediaAsset(asset) : false;
+    });
+  }))).size;
 }
 
 function formatDisplayDate(value: string): string {

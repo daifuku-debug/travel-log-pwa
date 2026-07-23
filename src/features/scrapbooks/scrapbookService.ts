@@ -19,6 +19,7 @@ import { grantExperienceOnce } from '../rpg/experienceService';
 import { refreshRpgProgress } from '../rpg/rpgProgressService';
 import { appendEditedFields } from './scrapbookRevision';
 import { saveTripMediaAsset } from '../media/mediaAssetService';
+import { filterCoverAssetsForScrapbook } from '../../domain/media/mediaAssetUsage';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -92,7 +93,7 @@ export async function getScrapbookDetail(scrapbookId: EntityId): Promise<Scrapbo
     return {
       scrapbook,
       pages: pagesWithBlocks,
-      mediaAssets,
+      mediaAssets: filterCoverAssetsForScrapbook(mediaAssets, scrapbook.id),
     };
   } catch (error) {
     throw toAppError(error, 'スクラップブック詳細の読み込みに失敗しました');
