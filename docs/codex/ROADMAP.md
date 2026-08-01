@@ -11,9 +11,9 @@
 | Phase 5-A.2.3-D-B2 | 完了 | 完全一致重複確認、既存写真再利用、明示的新規追加 |
 | Phase 5-A.2.3-D-C1 | 完了 | MediaAssetの永続参照検索と参照サマリー |
 | Phase 5-A.2.3-D-C2 | 完了 | 参照ゼロ写真だけを対象にした安全なmetadata＋Blob削除 |
-| Phase 5-A.2.3-D-C3 | 次 | 参照一覧UI、明示的な参照解除、使用中写真の削除方針 |
-| Phase 5-A.2.3-D-D | 未着手 | Integrity Scan、Orphan Blob検出、Missing thumbnail修復 |
+| Phase 5-A.2.3-D-C3 | 完了 | 参照一覧UI、安全な参照の明示解除、解除後再検索と段階的削除 |
+| Phase 5-A.2.3-D-D | 次 | Integrity Scan、Orphan Blob検出、Missing thumbnail修復 |
 | Trip削除カスケード | 別系統 | Trip、Scrapbook、Page、Block、MediaAsset、Blobの整合した削除 |
 | 写真込みBackup／R2同期 | 別系統 | Blobを含む復元可能なBackupとCloudflare同期 |
 
-次Phaseでは、使用中写真の参照先をユーザーへ示し、明示的な参照解除を安全に行う設計へ進みます。Integrity ScanとTrip削除カスケードは混ぜません。
+次Phaseでは、MediaAssetとBlobの整合性を診断するIntegrity Scanへ進みます。Trip削除カスケードは混ぜません。

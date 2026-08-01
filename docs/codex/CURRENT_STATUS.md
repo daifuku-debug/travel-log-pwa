@@ -2,31 +2,31 @@
 
 ## Last completed
 
-- Phase 5-A.2.3-D-C2: 参照ゼロ写真の安全な削除
-- 削除直前の永続参照再確認と、参照ゼロ時だけのMetadata論理削除・Blob直接削除を実装
-- 参照あり、検索失敗、Metadata失敗、Blob失敗を区別する再試行可能なError設計を追加
-- CoverPhotoPanelへ使用状況確認付きの削除導線を追加し、成功時だけ候補一覧を即時更新
-- Latest Phase Commit: `cb31364`
+- Phase 5-A.2.3-D-C3: 参照一覧と明示的な参照解除
+- 表紙、ハイライト、写真Block参照を構造化して一覧化し、同一Block内の重複は件数表示へ集約
+- 安全な任意写真参照だけを明示選択で解除し、PhotoBlockなど必須参照は編集を案内
+- 実行直前と解除後に参照を再検索し、参照ゼロになった後だけ既存の安全な削除へ進めるUIを実装
+- Latest Phase Commit: `59d3c39`
 
 ## Current state
 
 - Backup Schema Version: 12
 - IndexedDB Version: 10
-- Test count: 213
+- Test count: 220
 - Working tree: clean after this status update
-- Origin difference: `main` is 3 commits ahead of `origin/main`
+- Origin difference: `main` is 5 commits ahead of `origin/main`
 
 ## Next
 
-- Phase 5-A.2.3-D-C3: 参照一覧と明示的な参照解除
-- 使用中写真の参照先をユーザーへ示し、確認を伴う明示的な参照解除へ進める。
-- 今回触らない: 使用中写真の強制削除
-- 今回触らない: Integrity Scan
+- Phase 5-A.2.3-D-D: MediaAsset Integrity Scan
+- Orphan Blob、Missing Blob、不正所有関係を検出し、安全な修復方針へ進める。
 - 今回触らない: Trip削除カスケード
+- 今回触らない: 写真Blobを含むBackup
+- 今回触らない: Cloudflare R2同期
 
 ## Known risks
 
-- 参照付き写真を安全に解除・削除するフローは未実装
+- 複数Repository更新は完全な一括Transactionではないため、部分失敗時は再検索して再試行が必要
 - Blob削除失敗後はMetadata論理削除済みとなり、同じAsset IDでの再試行が必要
 - JSON Backupは写真Blob本体を含まない
 - Orphan Blob／Missing BlobのIntegrity Scanは未実装

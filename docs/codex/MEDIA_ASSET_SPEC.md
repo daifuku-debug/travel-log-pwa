@@ -77,7 +77,9 @@ ${assetId}:thumbnail
 - Photo／Ticket Blockの`assetId`
 - PhotoGrid／Meal／Purchase Blockの`assetIds[]`
 
-論理削除済みScrapbook／Page／Blockと、Home、TimeMachine、Draft、Pending Fileなどの派生・一時参照は含みません。取得失敗はErrorとし、参照ゼロと区別します。現在は検索のみで、参照解除や写真削除へは未接続です。
+論理削除済みScrapbook／Page／Blockと、Home、TimeMachine、Draft、Pending Fileなどの派生・一時参照は含みません。取得失敗はErrorとし、参照ゼロと区別します。
+
+参照一覧では表紙、旧表紙、ハイライト、Page／Blockを区別し、同一Block配列内の重複は件数付きでまとめます。表紙の新旧参照、ハイライト、PhotoGrid／Meal／Purchase配列、任意のTicket写真だけをユーザーの明示選択後に解除できます。写真必須のPhotoBlockは自動解除しません。更新前後に参照を再検索し、参照ゼロになった後だけmetadata論理削除とBlob直接削除を別操作で実行します。
 
 ## Backup
 
@@ -88,8 +90,8 @@ ${assetId}:thumbnail
 
 ## 未対応
 
-- 写真削除UI、参照解除、参照付き写真の削除
 - Integrity Scan、Orphan Blob／Missing Blobの修復
+- 複数Repositoryをまたぐ参照解除の一括Transaction
 - Trip／Scrapbook削除時のMediaAssetカスケード
 - 写真Blobを含むBackup
 - Cloudflare R2同期
