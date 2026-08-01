@@ -71,6 +71,11 @@ import {
   scanMediaAssetIntegrityWithDependencies,
 } from '../src/features/media/mediaIntegrityLogic.ts';
 import {
+  getMediaIntegrityRepairAction,
+  repairMediaIntegrityIssueWithDependencies,
+  repairMediaIntegrityIssuesWithDependencies,
+} from '../src/features/media/mediaIntegrityRepairLogic.ts';
+import {
   deleteUnreferencedMediaAssetWithDependencies,
   MediaAssetDeletionError,
 } from '../src/features/media/mediaAssetDeletionLogic.ts';
@@ -125,6 +130,9 @@ const mediaAssetDeletionServiceSource = await readFile(new URL('../src/features/
 const mediaAssetReferenceDetachmentServiceSource = await readFile(new URL('../src/features/media/mediaAssetReferenceDetachmentService.ts', import.meta.url), 'utf8');
 const mediaIntegrityDataSourceSource = await readFile(new URL('../src/infrastructure/localDb/mediaIntegrityDataSource.ts', import.meta.url), 'utf8');
 const mediaIntegrityServiceSource = await readFile(new URL('../src/features/media/mediaIntegrityService.ts', import.meta.url), 'utf8');
+const mediaIntegrityRepairDataSourceSource = await readFile(new URL('../src/infrastructure/localDb/mediaIntegrityRepairDataSource.ts', import.meta.url), 'utf8');
+const mediaIntegrityPanelSource = await readFile(new URL('../src/features/media/components/MediaIntegrityPanel.tsx', import.meta.url), 'utf8');
+const settingsPageSource = await readFile(new URL('../src/pages/SettingsPage.tsx', import.meta.url), 'utf8');
 const duplicatePhotoReviewSource = await readFile(new URL('../src/features/scrapbooks/components/DuplicatePhotoReview.tsx', import.meta.url), 'utf8');
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
@@ -2190,6 +2198,215 @@ await test('Integrity Scanは部分取得失敗と完全取得失敗を空の正
       && error.failedStages.length === 5
       && error.completedStages.length === 0,
   );
+});
+
+function createIntegrityRepairState({ assets = [], blobs = [], scanReport } = {}) {
+  const assetMap = new Map(assets.map((asset) => [asset.id, structuredClone(asset)]));
+  const blobMap = new Map(blobs.map((blob) => [blob.id, blob]));
+  const calls = [];
+  const state = {
+    assetMap,
+    blobMap,
+    calls,
+    failMetadataSave: false,
+    failThumbnail: false,
+    dependencies: {
+      getMediaAssetRaw: async (id) => { calls.push(`asset:get:${id}`); return assetMap.get(id); },
+      listMediaAssetsRaw: async () => { calls.push('asset:list'); return [...assetMap.values()]; },
+      saveMediaAssetRaw: async (asset) => {
+        calls.push(`asset:save:${asset.id}`);
+        if (state.failMetadataSave) throw new Error('metadata save failed');
+        assetMap.set(asset.id, asset);
+        return asset;
+      },
+      getMediaAssetBlobRaw: async (id) => { calls.push(`blob:get:${id}`); return blobMap.get(id); },
+      saveMediaAssetBlobRaw: async (blob) => { calls.push(`blob:save:${blob.id}`); blobMap.set(blob.id, blob); return blob; },
+      deleteMediaAssetBlobById: async (id) => { calls.push(`blob:delete:${id}`); blobMap.delete(id); },
+      deleteMediaAssetBlobsByAssetId: async (assetId) => {
+        calls.push(`blobs:delete:${assetId}`);
+        blobMap.delete(`${assetId}:original`);
+        blobMap.delete(`${assetId}:thumbnail`);
+      },
+      createThumbnail: async () => {
+        calls.push('thumbnail:create');
+        if (state.failThumbnail) throw new Error('thumbnail failed');
+        return new Blob(['new-thumbnail'], { type: 'image/jpeg' });
+      },
+      scan: async () => scanReport ?? buildMediaIntegrityReport(createIntegritySnapshot(), referenceTestNow),
+      now: () => referenceTestNow,
+    },
+  };
+  return state;
+}
+
+function createRepairIssue(type, overrides = {}) {
+  return {
+    type,
+    severity: type === 'missing-thumbnail' ? 'warning' : 'error',
+    repairability: 'repair-candidate',
+    reason: 'metadata-missing',
+    ...overrides,
+  };
+}
+
+await test('Integrity修復はMissing Thumbnailを既存originalから再生成して参照を揃える', async () => {
+  const asset = createIntegrityAsset('repair-thumbnail', { thumbnailReference: 'legacy-thumbnail' });
+  const issue = createRepairIssue('missing-thumbnail', { assetId: asset.id, blobId: `${asset.id}:thumbnail`, tripId: asset.tripId });
+  const state = createIntegrityRepairState({ assets: [asset], blobs: [createIntegrityBlob(asset.id, 'original')] });
+  const repair = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repair.status, 'success');
+  assert.equal(state.blobMap.get(`${asset.id}:thumbnail`).kind, 'thumbnail');
+  assert.equal(state.assetMap.get(asset.id).thumbnailReference, `${asset.id}:thumbnail`);
+  assert.equal(state.assetMap.get(asset.id).contentHash, asset.contentHash);
+  assert.equal(state.assetMap.get(asset.id).usage, asset.usage);
+});
+
+await test('Integrity修復はoriginal欠損またはThumbnail生成失敗でMetadataを変更しない', async () => {
+  const asset = createIntegrityAsset('repair-thumbnail-fail', { thumbnailReference: 'legacy-thumbnail' });
+  const issue = createRepairIssue('missing-thumbnail', { assetId: asset.id, blobId: `${asset.id}:thumbnail` });
+  const missingState = createIntegrityRepairState({ assets: [asset] });
+  const missing = await repairMediaIntegrityIssueWithDependencies(issue, missingState.dependencies);
+  assert.equal(missing.status, 'skipped');
+  assert.equal(missing.code, 'precondition-failed');
+  assert.equal(missingState.calls.some((call) => call.startsWith('asset:save')), false);
+
+  const failedState = createIntegrityRepairState({ assets: [asset], blobs: [createIntegrityBlob(asset.id, 'original')] });
+  failedState.failThumbnail = true;
+  const failed = await repairMediaIntegrityIssueWithDependencies(issue, failedState.dependencies);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.code, 'thumbnail-generation-failed');
+  assert.equal(failedState.calls.some((call) => call.startsWith('asset:save')), false);
+});
+
+await test('Integrity修復はThumbnail Metadata更新失敗時に新Blobを補償削除する', async () => {
+  const asset = createIntegrityAsset('repair-thumbnail-compensation', { thumbnailReference: 'legacy-thumbnail' });
+  const issue = createRepairIssue('missing-thumbnail', { assetId: asset.id, blobId: `${asset.id}:thumbnail` });
+  const state = createIntegrityRepairState({ assets: [asset], blobs: [createIntegrityBlob(asset.id, 'original')] });
+  state.failMetadataSave = true;
+  const repair = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repair.status, 'failed');
+  assert.equal(repair.code, 'metadata-save-failed');
+  assert.equal(state.blobMap.has(`${asset.id}:thumbnail`), false);
+  assert.equal(state.assetMap.get(asset.id).thumbnailReference, 'legacy-thumbnail');
+});
+
+await test('Integrity修復はCleanup Pendingを論理削除済み再確認後に対象2 Blobだけ清掃する', async () => {
+  const deleted = createIntegrityAsset('repair-cleanup', { deletedAt: referenceTestNow });
+  const other = createIntegrityAsset('repair-cleanup-other');
+  const issue = createRepairIssue('cleanup-pending', { assetId: deleted.id, blobId: `${deleted.id}:original` });
+  const state = createIntegrityRepairState({
+    assets: [deleted, other],
+    blobs: [
+      createIntegrityBlob(deleted.id, 'original'), createIntegrityBlob(deleted.id, 'thumbnail'),
+      createIntegrityBlob(other.id, 'original'), createIntegrityBlob(other.id, 'thumbnail'),
+    ],
+  });
+  const repair = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repair.status, 'success');
+  assert.equal(state.blobMap.has(`${deleted.id}:original`), false);
+  assert.equal(state.blobMap.has(`${deleted.id}:thumbnail`), false);
+  assert.equal(state.blobMap.has(`${other.id}:original`), true);
+
+  state.assetMap.set(deleted.id, { ...deleted, deletedAt: undefined });
+  const stale = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(stale.status, 'skipped');
+  assert.equal(stale.code, 'stale-issue');
+});
+
+await test('Integrity修復はOrphanと不正形式Blobを再検証し対象キーだけ削除する', async () => {
+  const orphan = createIntegrityBlob('repair-orphan', 'original');
+  const malformed = createIntegrityBlob('repair-malformed', 'thumbnail', { id: 'malformed-blob-key' });
+  const state = createIntegrityRepairState({ blobs: [orphan, malformed] });
+  const orphanIssue = createRepairIssue('orphan-blob', { assetId: orphan.assetId, blobId: orphan.id });
+  const malformedIssue = createRepairIssue('invalid-blob-id', { assetId: malformed.assetId, blobId: malformed.id, reason: 'invalid-format' });
+  assert.equal((await repairMediaIntegrityIssueWithDependencies(orphanIssue, state.dependencies)).status, 'success');
+  assert.equal((await repairMediaIntegrityIssueWithDependencies(malformedIssue, state.dependencies)).status, 'success');
+  assert.equal(state.blobMap.size, 0);
+
+  const recreatedState = createIntegrityRepairState({ assets: [createIntegrityAsset(orphan.assetId)], blobs: [orphan] });
+  const recreated = await repairMediaIntegrityIssueWithDependencies(orphanIssue, recreatedState.dependencies);
+  assert.equal(recreated.status, 'skipped');
+  assert.equal(recreatedState.blobMap.has(orphan.id), true);
+});
+
+await test('Integrity修復は有効Metadataが参照する不正形式Blobを削除しない', async () => {
+  const malformed = createIntegrityBlob('repair-referenced-malformed', 'original', { id: 'legacy-blob-key' });
+  const asset = createIntegrityAsset(malformed.assetId, { localReference: malformed.id });
+  const state = createIntegrityRepairState({ assets: [asset], blobs: [malformed] });
+  const issue = createRepairIssue('invalid-blob-id', { assetId: asset.id, blobId: malformed.id, reason: 'invalid-format' });
+  const repair = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repair.status, 'skipped');
+  assert.equal(repair.code, 'precondition-failed');
+  assert.equal(state.blobMap.has(malformed.id), true);
+});
+
+await test('Integrity修復は既定Blobが存在する現在値だけを正規参照へ更新する', async () => {
+  const asset = createIntegrityAsset('repair-reference', { localReference: 'legacy-original' });
+  const issue = createRepairIssue('invalid-blob-reference', {
+    assetId: asset.id,
+    field: 'localReference',
+    expectedValue: `${asset.id}:original`,
+    actualValue: 'legacy-original',
+    reason: 'reference-mismatch',
+  });
+  const state = createIntegrityRepairState({ assets: [asset], blobs: [createIntegrityBlob(asset.id, 'original')] });
+  const repair = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repair.status, 'success');
+  assert.equal(state.assetMap.get(asset.id).localReference, `${asset.id}:original`);
+
+  const repeated = await repairMediaIntegrityIssueWithDependencies(issue, state.dependencies);
+  assert.equal(repeated.status, 'skipped');
+  const missingState = createIntegrityRepairState({ assets: [asset] });
+  const missing = await repairMediaIntegrityIssueWithDependencies(issue, missingState.dependencies);
+  assert.equal(missing.status, 'skipped');
+  assert.equal(missing.code, 'precondition-failed');
+});
+
+await test('Integrity修復は対象外Issueを変更せず、各結果と修復後再Scanを返す', async () => {
+  const unsupported = [
+    createRepairIssue('missing-original', { assetId: 'missing-original' }),
+    createRepairIssue('dangling-reference', { assetId: 'dangling' }),
+    createRepairIssue('invalid-cover-owner', { assetId: 'owner' }),
+  ];
+  assert.ok(unsupported.every((issue) => getMediaIntegrityRepairAction(issue) === undefined));
+  const report = buildMediaIntegrityReport(createIntegritySnapshot(), referenceTestNow);
+  const state = createIntegrityRepairState({ scanReport: report });
+  const batch = await repairMediaIntegrityIssuesWithDependencies(unsupported, state.dependencies);
+  assert.equal(batch.rescanStatus, 'success');
+  assert.equal(batch.report, report);
+  assert.ok(batch.results.every((item) => item.status === 'skipped' && item.code === 'unsupported-issue'));
+  assert.equal(state.calls.length, 0);
+});
+
+await test('Integrity修復は一部失敗を個別結果へ残し再Scan失敗も区別する', async () => {
+  const asset = createIntegrityAsset('repair-partial', { thumbnailReference: 'legacy' });
+  const issue = createRepairIssue('missing-thumbnail', { assetId: asset.id, blobId: `${asset.id}:thumbnail` });
+  const unsupported = createRepairIssue('missing-original', { assetId: 'unsupported' });
+  const state = createIntegrityRepairState({ assets: [asset], blobs: [createIntegrityBlob(asset.id, 'original')] });
+  state.failThumbnail = true;
+  state.dependencies.scan = async () => { throw new Error('rescan failed'); };
+  const batch = await repairMediaIntegrityIssuesWithDependencies([issue, unsupported], state.dependencies);
+  assert.equal(batch.results[0].status, 'failed');
+  assert.equal(batch.results[1].status, 'skipped');
+  assert.equal(batch.rescanStatus, 'failed');
+  assert.equal(batch.report, undefined);
+});
+
+await test('写真データ診断UIは明示実行・Summary・分類・確認・Loading・再診断を備える', () => {
+  assert.match(mediaIntegrityPanelSource, /写真データ診断/);
+  assert.match(mediaIntegrityPanelSource, /診断を実行/);
+  assert.match(mediaIntegrityPanelSource, /正常/);
+  assert.match(mediaIntegrityPanelSource, /注意/);
+  assert.match(mediaIntegrityPanelSource, /要確認/);
+  assert.match(mediaIntegrityPanelSource, /ConfirmDialog/);
+  assert.match(mediaIntegrityPanelSource, /aria-busy/);
+  assert.match(mediaIntegrityPanelSource, /aria-live/);
+  assert.match(mediaIntegrityPanelSource, /repair\.report/);
+  assert.match(settingsPageSource, /MediaIntegrityPanel/);
+  assert.match(stylesSource, /\.media-integrity__issues li[\s\S]*minmax\(0, 1fr\)/);
+  assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.media-integrity__issues li \.button[\s\S]*min-height: var\(--tap-target-min\)/);
+  assert.match(mediaIntegrityRepairDataSourceSource, /deleteManyById\('mediaAssetBlobs', \[id\]\)/);
+  assert.doesNotMatch(mediaIntegrityRepairDataSourceSource, /clearStore/);
 });
 
 function createDeletionDependencies(overrides = {}) {

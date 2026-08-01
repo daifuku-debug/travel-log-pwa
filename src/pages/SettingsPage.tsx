@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { buildBackupPayload, restoreBackupPayload } from '../features/backup/backupService';
 import { rerunInitialRpgAggregation, resetRpgDataOnly } from '../features/rpg/rpgMaintenanceService';
 import { getRpgSettings, updateRpgSettings } from '../features/rpg/rpgSettingsService';
+import { MediaIntegrityPanel } from '../features/media/components/MediaIntegrityPanel';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
 
 export function SettingsPage() {
@@ -80,6 +81,8 @@ export function SettingsPage() {
             onChange={(event) => void handleImport(event.target.files?.[0])}
           />
         </section>
+
+        <MediaIntegrityPanel />
 
         <section className="card">
           <h2>Cloudflare同期</h2>

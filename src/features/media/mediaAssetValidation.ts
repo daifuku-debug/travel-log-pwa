@@ -91,6 +91,19 @@ export async function prepareMediaImage(
   }
 }
 
+export async function createMediaThumbnailFromBlob(
+  blob: Blob,
+  mimeType: string,
+  processor: MediaImageProcessor = browserMediaImageProcessor,
+): Promise<Blob> {
+  const source = new File([blob], 'media-integrity-original', { type: mimeType || blob.type });
+  const decoded = await processor.decode(source);
+  if (!decoded.width || !decoded.height) throw new Error('Image dimensions are unavailable');
+  const thumbnail = await processor.createThumbnail(decoded, mimeType || blob.type);
+  if (!thumbnail.size) throw new Error('Empty thumbnail');
+  return thumbnail;
+}
+
 const browserMediaImageProcessor: MediaImageProcessor = {
   async decode(file) {
     if (typeof Image === 'undefined' || typeof URL === 'undefined') throw new Error('Image decoding is unavailable');
