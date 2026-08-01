@@ -1,6 +1,6 @@
 # MediaAsset Spec
 
-現在の写真保存・分類・重複検出・参照検索の仕様です。層の責務は[Architecture](ARCHITECTURE.md)、今後の作業順は[Roadmap](ROADMAP.md)を参照してください。
+現在の写真保存・分類・重複検出・参照検索・整合性診断の仕様です。層の責務は[Architecture](ARCHITECTURE.md)、今後の作業順は[Roadmap](ROADMAP.md)を参照してください。
 
 ## モデル
 
@@ -81,6 +81,19 @@ ${assetId}:thumbnail
 
 参照一覧では表紙、旧表紙、ハイライト、Page／Blockを区別し、同一Block配列内の重複は件数付きでまとめます。表紙の新旧参照、ハイライト、PhotoGrid／Meal／Purchase配列、任意のTicket写真だけをユーザーの明示選択後に解除できます。写真必須のPhotoBlockは自動解除しません。更新前後に参照を再検索し、参照ゼロになった後だけmetadata論理削除とBlob直接削除を別操作で実行します。
 
+## Integrity Scan
+
+`scanMediaAssetIntegrity`はMediaAsset、Blob、Scrapbook、Page、Blockの生レコードを各Storeから1回ずつ読み、データを書き換えずに次を診断します。
+
+- Orphan Blob、不正形式Blob ID、Missing original／thumbnail、Cleanup Pending
+- `localReference`／`thumbnailReference`と決定的Blob IDの不一致
+- 不正な`contentHash`形式
+- `cover-only`のowner欠損、不存在、論理削除、Trip不一致
+- 存在しない、または論理削除済みAssetへの永続参照
+- 論理削除済み、または所有元が欠損したPage／Block／Scrapbook内の写真参照
+
+未参照の`trip`写真と未使用の`cover-only`素材は正常です。JSON Backup復元後のMissing Blobも報告しますが、削除可能とは判定しません。一部Storeでも取得に失敗した場合はReportを返さず、部分失敗と完全失敗を区別したErrorにします。現在はServiceからの明示実行のみで、起動時Scan、UI接続、修復はありません。
+
 ## Backup
 
 - 現在のJSON Backup Schemaは**v12**、IndexedDB Versionは**10**です。
@@ -90,7 +103,7 @@ ${assetId}:thumbnail
 
 ## 未対応
 
-- Integrity Scan、Orphan Blob／Missing Blobの修復
+- Integrity Scan結果のUI表示とOrphan Blob／Missing Blobの修復
 - 複数Repositoryをまたぐ参照解除の一括Transaction
 - Trip／Scrapbook削除時のMediaAssetカスケード
 - 写真Blobを含むBackup

@@ -33,12 +33,11 @@
 
 ## 現在のPhase
 
-スクラップブックPhase 5-AのMediaAssetライフサイクル整備中です。現在までに端末写真追加、`trip`／`cover-only`分類、安全なBlobキー削除、SHA-256完全一致検出、重複確認UI、永続参照検索基盤が完成しています。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
+スクラップブックPhase 5-AのMediaAssetライフサイクル整備中です。現在までに端末写真追加、`trip`／`cover-only`分類、安全なBlobキー削除、SHA-256完全一致検出、重複確認UI、永続参照の検索・解除・参照ゼロ削除、読み取り専用Integrity Scanが完成しています。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
 
 ## 大きな残課題
 
-- 参照ゼロ写真の安全な削除と、その後の参照解除付き削除
-- MediaAsset整合性スキャンと修復
+- Integrity診断結果のUI表示と安全な修復
 - Trip削除時の関連データ削除
 - 写真本体を含むバックアップ、Cloudflare D1／R2同期
 - 写真クロップ、焦点位置、より高度なスクラップブック編集
