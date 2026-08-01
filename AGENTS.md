@@ -2,6 +2,7 @@
 
 Before making changes, read:
 
+- [docs/codex/CURRENT_STATUS.md](docs/codex/CURRENT_STATUS.md)
 - [docs/codex/PROJECT_CONTEXT.md](docs/codex/PROJECT_CONTEXT.md)
 - [docs/codex/ARCHITECTURE.md](docs/codex/ARCHITECTURE.md)
 - [docs/codex/PRODUCT_RULES.md](docs/codex/PRODUCT_RULES.md)
