@@ -23,6 +23,7 @@ import { PAGE_KIND_LABELS, PageNavigatorSheet } from './PageNavigatorSheet';
 import { SaveBar } from './SaveBar';
 import { ScrapbookPagePreview } from './ScrapbookViewer';
 import { useCoverPhotoImport } from '../useCoverPhotoImport';
+import type { DetachMediaAssetReferencesResult } from '../../media/mediaAssetReferenceDetachmentService';
 
 type PendingAction = { type: 'exit' } | { type: 'select'; pageId: string } | { type: 'close-editor' };
 
@@ -347,6 +348,20 @@ export function ScrapbookEditor({
     showToast({ title: '写真を端末から削除しました。', variant: 'success' });
   }
 
+  function handleDetachedPhotoReferences(result: DetachMediaAssetReferencesResult) {
+    if (result.detachedCover && draft.coverPhotoId === result.assetId) {
+      setDraft((current) => ({ ...current, coverPhotoId: undefined }));
+      setBaseline((current) => ({ ...current, coverPhotoId: undefined }));
+    }
+    showToast({
+      title: result.canDelete
+        ? '選択した参照を解除しました。写真を削除できます。'
+        : '選択した参照を解除しました。残りの使用箇所を確認してください。',
+      variant: 'success',
+    });
+    onSaved();
+  }
+
   return (
     <div className="scrapbook-editor-mode">
       <header className="scrapbook-editor-toolbar">
@@ -462,6 +477,7 @@ export function ScrapbookEditor({
               onRetryDuplicateReview={() => void coverPhotoImport.retryDuplicateCheck()}
               protectedPhotoId={draft.coverPhotoId !== baseline.coverPhotoId ? draft.coverPhotoId : undefined}
               onDeletedPhoto={handleDeletedPhoto}
+              onPhotoReferencesDetached={handleDetachedPhotoReferences}
               previewTemplateId={coverPreviewTemplateId}
               onPreviewTemplate={setCoverPreviewTemplateId}
               onApplyTemplate={applyCoverTemplate}

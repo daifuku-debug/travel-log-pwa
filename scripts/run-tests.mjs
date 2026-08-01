@@ -26,6 +26,11 @@ import {
   summarizeMediaAssetReferences,
 } from '../src/domain/media/mediaAssetReferences.ts';
 import {
+  detachMediaAssetFromBlock,
+  detachMediaAssetFromScrapbook,
+  groupMediaAssetReferences,
+} from '../src/domain/media/mediaAssetReferenceDetachment.ts';
+import {
   collectScrapbookMediaAssetIds,
   mergeGeneratedScrapbookFields,
 } from '../src/features/scrapbooks/scrapbookRevision.ts';
@@ -53,6 +58,10 @@ import { persistPreparedTripMediaAsset } from '../src/features/media/mediaAssetP
 import { webCryptoContentHasher } from '../src/features/media/contentHasher.ts';
 import { findExactDuplicateMediaAssetsWithDependencies } from '../src/features/media/mediaAssetDuplicateLogic.ts';
 import { findMediaAssetReferencesWithDependencies } from '../src/features/media/mediaAssetReferenceLogic.ts';
+import {
+  detachMediaAssetReferencesWithDependencies,
+  MediaAssetReferenceDetachmentError,
+} from '../src/features/media/mediaAssetReferenceDetachmentLogic.ts';
 import {
   deleteUnreferencedMediaAssetWithDependencies,
   MediaAssetDeletionError,
@@ -105,6 +114,7 @@ const coverPhotoImportSource = await readFile(new URL('../src/features/scrapbook
 const coverPhotoPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverPhotoPanel.tsx', import.meta.url), 'utf8');
 const mediaDeleteDialogSource = await readFile(new URL('../src/features/scrapbooks/components/MediaDeleteDialog.tsx', import.meta.url), 'utf8');
 const mediaAssetDeletionServiceSource = await readFile(new URL('../src/features/media/mediaAssetDeletionService.ts', import.meta.url), 'utf8');
+const mediaAssetReferenceDetachmentServiceSource = await readFile(new URL('../src/features/media/mediaAssetReferenceDetachmentService.ts', import.meta.url), 'utf8');
 const duplicatePhotoReviewSource = await readFile(new URL('../src/features/scrapbooks/components/DuplicatePhotoReview.tsx', import.meta.url), 'utf8');
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
@@ -1709,6 +1719,207 @@ await test('MediaAsset参照検索は派生表示・Draft・Pending・Blob参照
   assert.deepEqual(references, []);
 });
 
+function createDetachmentBlocks() {
+  return [
+    { ...referenceTestBase, id: 'photo', pageId: 'page-1', type: 'photo', assetId: 'asset-target', title: '一枚', body: '本文', displaySize: 'large', sortOrder: 10 },
+    { ...referenceTestBase, id: 'grid', pageId: 'page-1', type: 'photo_grid', assetIds: ['asset-target', 'asset-other', 'asset-target'], title: '景色', body: '本文', columns: 3, sortOrder: 20 },
+    { ...referenceTestBase, id: 'meal', pageId: 'page-1', type: 'meal', name: '昼食', body: '本文', assetIds: ['asset-other', 'asset-target', 'asset-target'], isBestMeal: false, sortOrder: 30 },
+    { ...referenceTestBase, id: 'ticket', pageId: 'page-1', type: 'ticket', assetId: 'asset-target', itemType: 'ticket', title: '乗車券', body: '本文', sortOrder: 40 },
+    { ...referenceTestBase, id: 'purchase', pageId: 'page-1', type: 'purchase', name: 'お土産', body: '本文', assetIds: ['asset-target', 'asset-other'], sortOrder: 50 },
+  ];
+}
+
+function createDetachmentReferences() {
+  const context = { tripId: 'trip-1', scrapbookId: 'scrapbook-1', page: referenceTestPage };
+  return [
+    ...findScrapbookMediaAssetReferences(referenceTestScrapbook, 'asset-target'),
+    ...createDetachmentBlocks().flatMap((block) => findBlockMediaAssetReferences(block, context, 'asset-target')),
+  ];
+}
+
+await test('写真参照一覧は表紙の新旧参照と同一Block内の複数出現をまとめて件数表示できる', () => {
+  const groups = groupMediaAssetReferences(createDetachmentReferences());
+  assert.deepEqual(groups.map((group) => [group.kind, group.occurrenceCount, group.detachable]), [
+    ['cover', 2, true],
+    ['highlight', 2, true],
+    ['photo', 1, false],
+    ['photo-grid', 2, true],
+    ['meal', 2, true],
+    ['ticket', 1, true],
+    ['purchase', 1, true],
+  ]);
+  assert.deepEqual(groups[0].fields, ['coverSettings.photoId', 'coverAssetId']);
+  assert.equal(groups[0].ownerLabel, '京都の旅');
+  assert.equal(groups.find((group) => group.kind === 'photo-grid').pageLabel, '旅の景色');
+});
+
+await test('解除用純粋関数は対象写真だけを外し本文・順序・Block設定を維持する', () => {
+  const now = '2026-08-01T00:00:00.000Z';
+  const scrapbook = detachMediaAssetFromScrapbook(
+    referenceTestScrapbook,
+    'asset-target',
+    new Set(['cover', 'highlight']),
+    now,
+  );
+  assert.equal(scrapbook.coverSettings.photoId, undefined);
+  assert.equal(scrapbook.coverAssetId, undefined);
+  assert.deepEqual(scrapbook.highlightPhotoIds, ['asset-other']);
+  assert.equal(scrapbook.title, referenceTestScrapbook.title);
+  assert.equal(scrapbook.version, referenceTestScrapbook.version + 1);
+
+  const [photo, grid, meal, ticket, purchase] = createDetachmentBlocks();
+  assert.equal(detachMediaAssetFromBlock(photo, 'asset-target', now), undefined);
+  const detachedGrid = detachMediaAssetFromBlock(grid, 'asset-target', now);
+  const detachedMeal = detachMediaAssetFromBlock(meal, 'asset-target', now);
+  const detachedTicket = detachMediaAssetFromBlock(ticket, 'asset-target', now);
+  const detachedPurchase = detachMediaAssetFromBlock(purchase, 'asset-target', now);
+  assert.deepEqual(detachedGrid.assetIds, ['asset-other']);
+  assert.deepEqual(detachedMeal.assetIds, ['asset-other']);
+  assert.equal(detachedTicket.assetId, undefined);
+  assert.deepEqual(detachedPurchase.assetIds, ['asset-other']);
+  for (const [before, after] of [[grid, detachedGrid], [meal, detachedMeal], [ticket, detachedTicket], [purchase, detachedPurchase]]) {
+    assert.equal(after.body, before.body);
+    assert.equal(after.sortOrder, before.sortOrder);
+    assert.equal(after.type, before.type);
+  }
+});
+
+function createDetachmentDependencies({ references, failBlockSave = false } = {}) {
+  const calls = [];
+  const blocks = new Map(createDetachmentBlocks().map((block) => [block.id, block]));
+  let scrapbook = referenceTestScrapbook;
+  let findCount = 0;
+  const scriptedReferences = references ?? createDetachmentReferences();
+  return {
+    calls,
+    get scrapbook() { return scrapbook; },
+    get blocks() { return blocks; },
+    dependencies: {
+      scrapbooks: {
+        getById: async () => { calls.push('scrapbook:get'); return scrapbook; },
+        save: async (next) => { calls.push('scrapbook:save'); scrapbook = next; return next; },
+      },
+      scrapbookBlocks: {
+        getById: async (id) => { calls.push(`block:get:${id}`); return blocks.get(id); },
+        save: async (next) => {
+          calls.push(`block:save:${next.id}`);
+          if (failBlockSave) throw new Error('block save failed');
+          blocks.set(next.id, next);
+          return next;
+        },
+      },
+      findReferences: async () => {
+        calls.push('references:find');
+        findCount += 1;
+        return findCount <= 2 ? scriptedReferences : [];
+      },
+      now: () => '2026-08-01T00:00:00.000Z',
+    },
+  };
+}
+
+await test('参照解除Serviceは実行直前と更新後に再検索し参照0件だけ削除可能と返す', async () => {
+  const references = createDetachmentReferences().filter((reference) => (
+    reference.type !== 'scrapbook-block' || reference.blockType === 'photo_grid'
+  ));
+  const keys = groupMediaAssetReferences(references).map((group) => group.key);
+  const state = createDetachmentDependencies({ references });
+  const result = await detachMediaAssetReferencesWithDependencies({
+    assetId: 'asset-target', tripId: 'trip-1', selectedGroupKeys: keys,
+  }, state.dependencies);
+  assert.equal(result.canDelete, true);
+  assert.equal(result.detachedCover, true);
+  assert.deepEqual(result.remainingReferences, []);
+  assert.deepEqual(state.calls, [
+    'references:find', 'references:find', 'scrapbook:get', 'block:get:grid',
+    'scrapbook:save', 'block:save:grid', 'references:find',
+  ]);
+  assert.equal(state.scrapbook.coverSettings.photoId, undefined);
+  assert.equal(state.scrapbook.coverAssetId, undefined);
+  assert.deepEqual(state.blocks.get('grid').assetIds, ['asset-other']);
+  assert.match(mediaAssetReferenceDetachmentServiceSource, /findReferences: findMediaAssetReferences/);
+});
+
+await test('解除不可のPhotoBlock、未保存Draft、参照再検索失敗では永続データを変更しない', async () => {
+  const photoReference = createDetachmentReferences().filter((reference) => reference.blockType === 'photo');
+  const photoKey = groupMediaAssetReferences(photoReference)[0].key;
+  for (const input of [
+    { assetId: 'asset-target', tripId: 'trip-1', selectedGroupKeys: [photoKey] },
+    { assetId: 'asset-target', tripId: 'trip-1', selectedGroupKeys: ['scrapbook:scrapbook-1:cover'], protectedAssetIds: ['asset-target'] },
+  ]) {
+    const state = createDetachmentDependencies({ references: photoReference });
+    await assert.rejects(
+      detachMediaAssetReferencesWithDependencies(input, state.dependencies),
+      (error) => error instanceof MediaAssetReferenceDetachmentError
+        && ['unsupported-reference', 'transient-reference'].includes(error.code),
+    );
+    assert.equal(state.calls.some((call) => call.includes(':save')), false);
+  }
+
+  const state = createDetachmentDependencies({ references: createDetachmentReferences() });
+  let checks = 0;
+  state.dependencies.findReferences = async () => {
+    checks += 1;
+    if (checks === 2) throw new Error('latest reference failed');
+    return createDetachmentReferences();
+  };
+  await assert.rejects(
+    detachMediaAssetReferencesWithDependencies({
+      assetId: 'asset-target', tripId: 'trip-1', selectedGroupKeys: ['scrapbook:scrapbook-1:cover'],
+    }, state.dependencies),
+    (error) => error instanceof MediaAssetReferenceDetachmentError && error.code === 'reference-search-failed',
+  );
+  assert.equal(state.calls.some((call) => call.includes(':save')), false);
+});
+
+await test('一部参照の更新失敗時は削除可能とせず再試行情報を返す', async () => {
+  const references = createDetachmentReferences().filter((reference) => (
+    reference.type === 'scrapbook-cover'
+    || reference.type === 'scrapbook-legacy-cover'
+    || reference.blockType === 'photo_grid'
+  ));
+  const state = createDetachmentDependencies({ references, failBlockSave: true });
+  await assert.rejects(
+    detachMediaAssetReferencesWithDependencies({
+      assetId: 'asset-target',
+      tripId: 'trip-1',
+      selectedGroupKeys: groupMediaAssetReferences(references).map((group) => group.key),
+    }, state.dependencies),
+    (error) => error instanceof MediaAssetReferenceDetachmentError
+      && error.code === 'update-failed'
+      && error.retryable
+      && error.updatedGroupKeys.includes('scrapbook:scrapbook-1:cover'),
+  );
+  assert.equal(state.calls.includes('scrapbook:save'), true);
+  assert.equal(state.calls.includes('block:save:grid'), true);
+  assert.equal(state.calls.filter((call) => call === 'references:find').length, 2);
+});
+
+await test('同じ参照解除を再実行しても追加更新せず安全に完了する', async () => {
+  const state = createDetachmentDependencies({ references: [] });
+  const result = await detachMediaAssetReferencesWithDependencies({
+    assetId: 'asset-target',
+    tripId: 'trip-1',
+    selectedGroupKeys: ['scrapbook:scrapbook-1:cover'],
+  }, state.dependencies);
+  assert.equal(result.canDelete, true);
+  assert.deepEqual(result.updatedGroupKeys, []);
+  assert.equal(state.calls.some((call) => call.includes(':get') || call.includes(':save')), false);
+  assert.equal(state.calls.filter((call) => call === 'references:find').length, 3);
+});
+
+await test('参照解除UIは明示選択・解除可否・解除後の別段階削除をアクセシブルに表示する', () => {
+  assert.match(mediaDeleteDialogSource, /使用中の参照/);
+  assert.match(mediaDeleteDialogSource, /type="checkbox"/);
+  assert.match(mediaDeleteDialogSource, /解除可能/);
+  assert.match(mediaDeleteDialogSource, /先に編集が必要/);
+  assert.match(mediaDeleteDialogSource, /選択した参照を解除/);
+  assert.match(mediaDeleteDialogSource, /写真を削除/);
+  assert.match(mediaDeleteDialogSource, /new Set\(\)/);
+  assert.match(mediaDeleteDialogSource, /protectedByDraft/);
+  assert.match(stylesSource, /\.scrapbook-media-references__list > label[\s\S]*min-height: var\(--tap-target-min\)/);
+});
+
 function createDeletionDependencies(overrides = {}) {
   const calls = [];
   const asset = {
@@ -1873,7 +2084,8 @@ await test('削除処理はtripとcover-onlyを扱い、未保存Draft選択中�
 await test('削除確認UIは写真・用途・使用中状態を示し成功時だけ候補一覧を更新する', () => {
   assert.match(mediaDeleteDialogSource, /写真を削除/);
   assert.match(mediaDeleteDialogSource, /isCoverOnlyMediaAsset\(asset\) \? '表紙専用' : '旅行写真'/);
-  assert.match(mediaDeleteDialogSource, /表紙や本文で使用中のため削除できません/);
+  assert.match(mediaDeleteDialogSource, /使用中の参照/);
+  assert.match(mediaDeleteDialogSource, /先に編集が必要/);
   assert.match(mediaDeleteDialogSource, /protectedByDraft/);
   assert.match(mediaDeleteDialogSource, /deleteUnreferencedMediaAsset/);
   assert.match(coverPhotoPanelSource, /scrapbook-cover-editor__photo-delete/);

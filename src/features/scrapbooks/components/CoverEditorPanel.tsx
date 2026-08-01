@@ -7,6 +7,7 @@ import { CoverDesignPanel } from './CoverDesignPanel';
 import { CoverPhotoPanel } from './CoverPhotoPanel';
 import { CoverTextPanel } from './CoverTextPanel';
 import type { PendingCoverPhoto } from '../useCoverPhotoImport';
+import type { DetachMediaAssetReferencesResult } from '../../media/mediaAssetReferenceDetachmentService';
 
 type CoverEditorTab = 'photo' | 'design' | 'text';
 
@@ -34,6 +35,7 @@ export function CoverEditorPanel({
   onRetryDuplicateReview,
   protectedPhotoId,
   onDeletedPhoto,
+  onPhotoReferencesDetached,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
@@ -53,6 +55,7 @@ export function CoverEditorPanel({
   onRetryDuplicateReview: () => void;
   protectedPhotoId?: EntityId;
   onDeletedPhoto: (assetId: EntityId) => void;
+  onPhotoReferencesDetached: (result: DetachMediaAssetReferencesResult) => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
   const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
@@ -114,6 +117,7 @@ export function CoverEditorPanel({
             onRetryDuplicateReview={onRetryDuplicateReview}
             protectedPhotoId={protectedPhotoId}
             onDeleted={onDeletedPhoto}
+            onReferencesDetached={onPhotoReferencesDetached}
             onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
           />
         )}

@@ -4,6 +4,7 @@ import type { MediaAsset } from '../../../domain/models/scrapbook';
 import { isCoverOnlyMediaAsset } from '../../../domain/media/mediaAssetUsage';
 import { BottomSheet, Button, InlineError } from '../../../shared/ui';
 import type { PendingCoverPhoto } from '../useCoverPhotoImport';
+import type { DetachMediaAssetReferencesResult } from '../../media/mediaAssetReferenceDetachmentService';
 import type { TripDetail } from '../../trips/tripService';
 import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
 import { DuplicatePhotoReview } from './DuplicatePhotoReview';
@@ -26,6 +27,7 @@ export function CoverPhotoPanel({
   onRetryDuplicateReview,
   protectedPhotoId,
   onDeleted,
+  onReferencesDetached,
 }: {
   selectedPhotoId?: EntityId;
   mediaAssets: MediaAsset[];
@@ -42,6 +44,7 @@ export function CoverPhotoPanel({
   onRetryDuplicateReview: () => void;
   protectedPhotoId?: EntityId;
   onDeleted: (assetId: EntityId) => void;
+  onReferencesDetached: (result: DetachMediaAssetReferencesResult) => void;
 }) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<MediaAsset>();
@@ -277,6 +280,7 @@ export function CoverPhotoPanel({
           onDeleted(result.assetId);
           setDeleteTarget(undefined);
         }}
+        onReferencesDetached={onReferencesDetached}
       />
     </section>
   );
