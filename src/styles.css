@@ -290,6 +290,75 @@ a {
   padding: var(--space-3) 14px;
 }
 
+.full-backup {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.full-backup__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.full-backup__heading h2,
+.full-backup__heading p,
+.full-backup > p {
+  margin: 0;
+}
+
+.full-backup__estimate {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  padding: 6px 10px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.full-backup__privacy,
+.full-backup__warning {
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  padding: var(--space-3);
+}
+
+.full-backup__progress {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.full-backup__progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.full-backup__progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--color-primary);
+}
+
+@media (max-width: 560px) {
+  .full-backup__heading {
+    flex-direction: column;
+  }
+
+  .full-backup__estimate {
+    white-space: normal;
+  }
+
+  .full-backup .form-actions,
+  .full-backup .button {
+    width: 100%;
+  }
+}
+
 .media-integrity {
   display: grid;
   gap: var(--space-4);

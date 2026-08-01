@@ -109,12 +109,14 @@ ${assetId}:thumbnail
 - BackupはMediaAsset metadata、`usage`、所有先、正常な`contentHash`を含みます。
 - 写真Blob本体は含みません。復元後にBlobがない場合は既存Fallbackを使用します。
 - v11以前のBackupはHashなしで読み込め、用途のない旧MediaAssetは`trip`として扱います。未知の将来Versionは拒否します。
+- 完全Backup Package v1は、同じv12 Metadataとoriginal／thumbnail BlobをZIPへ格納し、Blob単位のSHA-256で自己検証します。欠損Blobは削除せずmanifestの警告へ残します。
+- 完全Backup ZIPのRestoreは未実装です。詳細は[Backup Spec](BACKUP_SPEC.md)を参照してください。
 
 ## 未対応
 
 - Missing Original、Dangling Reference、Invalid Cover Ownerの安全な手動復旧
 - 複数Repositoryをまたぐ参照解除の一括Transaction
 - Trip／Scrapbook削除時のMediaAssetカスケード
-- 写真Blobを含むBackup
+- 写真Blobを含むBackupのRestore
 - Cloudflare R2同期
 - Perceptual Hash、類似画像検出

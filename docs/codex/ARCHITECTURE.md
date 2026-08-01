@@ -52,6 +52,8 @@ Repository interfaceはDomain、Local実装はInfrastructure、複数Repository�
 - 現在のIndexedDB Versionは**10**です。
 - Backup Versionは書き出し形式とImport互換性、DB VersionはStore／Index構造を管理する別の番号です。同時に上げる前提ではありません。
 - JSONバックアップはMediaAsset metadataを含みますが、写真Blob本体を含みません。
+- 完全BackupはPackage Version 1のZIPへv12 Metadataとoriginal／thumbnail Blobを格納します。Package Version、Backup Schema、DB Versionは独立して管理します。
+- 完全Backup Exportは必要Storeを同一read-only TransactionでSnapshot化し、UI非依存Validatorの自己検証後だけダウンロード可能にします。詳細は[Backup Spec](BACKUP_SPEC.md)を参照してください。
 
 ## Scrapbook構造
 

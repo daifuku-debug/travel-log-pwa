@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { BlobReader, BlobWriter, TextReader, TextWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 
 import {
   calculateJapanConquestSummary,
@@ -8,6 +9,15 @@ import {
   resolveStatus,
 } from '../src/features/japanConquest/japanConquestLogic.ts';
 import { BACKUP_SCHEMA_VERSION, normalizeBackupPayload } from '../src/features/backup/backupSchema.ts';
+import {
+  FULL_BACKUP_PACKAGE_VERSION,
+  findDuplicateBackupPaths,
+  validateFullBackupPackage,
+} from '../src/features/backup/fullBackupPackage.ts';
+import {
+  buildFullBackupPackageFromSnapshot,
+  estimateFullBackupFromSnapshot,
+} from '../src/features/backup/fullBackupService.ts';
 import {
   filterCoverAssetsForScrapbook,
   filterTripMediaAssets,
@@ -123,6 +133,8 @@ const mediaAssetServiceSource = await readFile(new URL('../src/features/media/me
 const mediaAssetValidationSource = await readFile(new URL('../src/features/media/mediaAssetValidation.ts', import.meta.url), 'utf8');
 const mediaAssetPersistenceSource = await readFile(new URL('../src/features/media/mediaAssetPersistence.ts', import.meta.url), 'utf8');
 const backupServiceSource = await readFile(new URL('../src/features/backup/backupService.ts', import.meta.url), 'utf8');
+const fullBackupServiceSource = await readFile(new URL('../src/features/backup/fullBackupService.ts', import.meta.url), 'utf8');
+const fullBackupPanelSource = await readFile(new URL('../src/features/backup/FullBackupPanel.tsx', import.meta.url), 'utf8');
 const coverPhotoImportSource = await readFile(new URL('../src/features/scrapbooks/useCoverPhotoImport.ts', import.meta.url), 'utf8');
 const coverPhotoPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverPhotoPanel.tsx', import.meta.url), 'utf8');
 const mediaDeleteDialogSource = await readFile(new URL('../src/features/scrapbooks/components/MediaDeleteDialog.tsx', import.meta.url), 'utf8');
@@ -529,6 +541,220 @@ await test('将来VersionのBackupは読み込まない', () => {
     () => normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 13, data: {} }),
     /新しいバージョン/,
   );
+});
+
+function createBackupTestAsset(id, usage = 'trip') {
+  return {
+    id,
+    userId: 'local-user',
+    tripId: 'trip-1',
+    usage,
+    ownerScrapbookId: usage === 'cover-only' ? 'scrapbook-1' : undefined,
+    contentHash: `sha256:${'a'.repeat(64)}`,
+    storageType: 'local',
+    localReference: `${id}:original`,
+    thumbnailReference: `${id}:thumbnail`,
+    mimeType: 'image/jpeg',
+    mediaSyncStatus: 'local_only',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    syncStatus: 'pending',
+  };
+}
+
+function createBackupTestBlob(assetId, kind, suffix = 0) {
+  const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, suffix, 0x01, 0x02, 0x03]);
+  return {
+    id: `${assetId}:${kind}`,
+    assetId,
+    kind,
+    blob: new Blob([bytes], { type: 'image/jpeg' }),
+    mimeType: 'image/jpeg',
+    createdAt: '2026-08-01T00:00:00.000Z',
+  };
+}
+
+function createBackupTestSnapshot(assets = [], blobs = []) {
+  return {
+    trips: [],
+    scrapbooks: [{ id: 'scrapbook-1', tripId: 'trip-1', title: '旅', status: 'draft', layoutMode: 'pages', themeId: 'journal' }],
+    mediaAssets: assets,
+    mediaAssetBlobs: blobs,
+  };
+}
+
+async function rewriteBackupZip(source, options = {}) {
+  const reader = new ZipReader(new BlobReader(source));
+  const entries = await reader.getEntries();
+  const files = [];
+  for (const entry of entries) {
+    if (entry.directory || options.omitPaths?.includes(entry.filename)) continue;
+    let filename = options.renamePaths?.[entry.filename] ?? entry.filename;
+    let data;
+    if (entry.filename === 'manifest.json') {
+      const manifest = JSON.parse(await entry.getData(new TextWriter()));
+      options.mutateManifest?.(manifest);
+      data = new TextReader(JSON.stringify(manifest));
+    } else {
+      data = new BlobReader(await entry.getData(new BlobWriter()));
+    }
+    files.push({ filename, data });
+  }
+  await reader.close();
+  const writer = new ZipWriter(new BlobWriter('application/zip'));
+  for (const file of files) await writer.add(file.filename, file.data, { level: file.filename.startsWith('media/') ? 0 : 6 });
+  for (const extra of options.extraEntries ?? []) await writer.add(extra.path, new TextReader(extra.text), { level: 0 });
+  return writer.close();
+}
+
+await test('完全Backup Package v1は写真なしMetadataを自己検証できる', async () => {
+  const result = await buildFullBackupPackageFromSnapshot(createBackupTestSnapshot());
+  assert.equal(FULL_BACKUP_PACKAGE_VERSION, 1);
+  assert.equal(result.validation.success, true);
+  assert.equal(result.manifest.metadataSchemaVersion, 12);
+  assert.deepEqual(result.manifest.summary, {
+    mediaAssetCount: 0,
+    mediaEntryCount: 0,
+    includedCount: 0,
+    missingCount: 0,
+    includedByteSize: 0,
+    originalIncludedCount: 0,
+    thumbnailIncludedCount: 0,
+  });
+});
+
+await test('完全Backupはoriginalとthumbnailを無圧縮格納してchecksumを検証する', async () => {
+  const asset = createBackupTestAsset('asset-both');
+  const snapshot = createBackupTestSnapshot([asset], [
+    createBackupTestBlob(asset.id, 'original', 1),
+    createBackupTestBlob(asset.id, 'thumbnail', 2),
+  ]);
+  const result = await buildFullBackupPackageFromSnapshot(snapshot);
+  assert.equal(result.validation.success, true);
+  assert.equal(result.manifest.summary.includedCount, 2);
+  assert.equal(result.manifest.summary.missingCount, 0);
+  assert.ok(result.manifest.mediaEntries.every((entry) => entry.checksum?.startsWith('sha256:')));
+  assert.equal(result.manifest.mediaEntries.find((entry) => entry.kind === 'original').contentHash, asset.contentHash);
+  assert.equal(result.manifest.mediaEntries.find((entry) => entry.kind === 'thumbnail').contentHash, undefined);
+});
+
+await test('完全Backupはtripとcover-onlyを含み、Blob欠損をmanifestへ残す', async () => {
+  const trip = createBackupTestAsset('asset-trip');
+  const cover = createBackupTestAsset('asset-cover', 'cover-only');
+  const snapshot = createBackupTestSnapshot([trip, cover], [
+    createBackupTestBlob(trip.id, 'original', 1),
+    createBackupTestBlob(cover.id, 'thumbnail', 2),
+  ]);
+  const result = await buildFullBackupPackageFromSnapshot(snapshot);
+  assert.equal(result.validation.success, true);
+  assert.equal(result.manifest.summary.includedCount, 2);
+  assert.equal(result.manifest.summary.missingCount, 2);
+  assert.equal(result.manifest.warnings.length, 2);
+  assert.ok(result.manifest.mediaEntries.filter((entry) => entry.status === 'missing').every((entry) => entry.missingReason === 'blob-not-found'));
+  assert.equal(result.validation.warnings.length, 2);
+  assert.deepEqual(estimateFullBackupFromSnapshot(snapshot), {
+    mediaAssetCount: 2,
+    availableBlobCount: 2,
+    missingBlobCount: 2,
+    availableByteSize: 16,
+  });
+});
+
+await test('完全Backup validatorはchecksum・容量・Summary改ざんを拒否する', async () => {
+  const asset = createBackupTestAsset('asset-tamper');
+  const source = (await buildFullBackupPackageFromSnapshot(createBackupTestSnapshot(
+    [asset],
+    [createBackupTestBlob(asset.id, 'original'), createBackupTestBlob(asset.id, 'thumbnail')],
+  ))).blob;
+  const checksum = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.mediaEntries[0].checksum = `sha256:${'b'.repeat(64)}`; } });
+  const byteSize = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.mediaEntries[0].byteSize += 1; } });
+  const summary = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.summary.includedCount = 0; } });
+  assert.ok((await validateFullBackupPackage(checksum)).errors.some((issue) => issue.code === 'checksum-mismatch'));
+  assert.ok((await validateFullBackupPackage(byteSize)).errors.some((issue) => issue.code === 'byte-size-mismatch'));
+  assert.ok((await validateFullBackupPackage(summary)).errors.some((issue) => issue.code === 'summary-mismatch'));
+});
+
+await test('完全Backup validatorはMIME不一致と危険なpathを拒否する', async () => {
+  const asset = createBackupTestAsset('asset-path');
+  const source = (await buildFullBackupPackageFromSnapshot(createBackupTestSnapshot(
+    [asset],
+    [createBackupTestBlob(asset.id, 'original'), createBackupTestBlob(asset.id, 'thumbnail')],
+  ))).blob;
+  const oldPath = 'media/asset-path/original.jpg';
+  const mimeMismatch = await rewriteBackupZip(source, {
+    renamePaths: { [oldPath]: 'media/asset-path/original.png' },
+    mutateManifest: (manifest) => {
+      const entry = manifest.mediaEntries.find((item) => item.kind === 'original');
+      entry.path = 'media/asset-path/original.png';
+      entry.mimeType = 'image/png';
+    },
+  });
+  const traversal = await rewriteBackupZip(source, {
+    mutateManifest: (manifest) => { manifest.mediaEntries[0].path = '../original.jpg'; },
+  });
+  assert.ok((await validateFullBackupPackage(mimeMismatch)).errors.some((issue) => issue.code === 'mime-type-mismatch'));
+  assert.ok((await validateFullBackupPackage(traversal)).errors.some((issue) => issue.code === 'unsafe-path'));
+});
+
+await test('完全Backup validatorは重複宣言・欠損・missing混入を拒否する', async () => {
+  const asset = createBackupTestAsset('asset-shape');
+  const source = (await buildFullBackupPackageFromSnapshot(createBackupTestSnapshot(
+    [asset],
+    [createBackupTestBlob(asset.id, 'original'), createBackupTestBlob(asset.id, 'thumbnail')],
+  ))).blob;
+  const duplicate = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.mediaEntries.push({ ...manifest.mediaEntries[0] }); manifest.summary.mediaEntryCount += 1; manifest.summary.includedCount += 1; manifest.summary.includedByteSize += manifest.mediaEntries[0].byteSize; manifest.summary.originalIncludedCount += 1; } });
+  const missingFile = await rewriteBackupZip(source, { omitPaths: ['media/asset-shape/original.jpg'] });
+  const missingMixed = await rewriteBackupZip(source, { mutateManifest: (manifest) => { const entry = manifest.mediaEntries[0]; entry.status = 'missing'; entry.missingReason = 'blob-not-found'; delete entry.checksum; manifest.summary.includedCount -= 1; manifest.summary.missingCount += 1; manifest.summary.includedByteSize -= entry.byteSize; manifest.summary.originalIncludedCount -= 1; entry.byteSize = 0; } });
+  assert.ok((await validateFullBackupPackage(duplicate)).errors.some((issue) => issue.code === 'duplicate-media-entry'));
+  assert.ok((await validateFullBackupPackage(missingFile)).errors.some((issue) => issue.code === 'included-file-missing'));
+  assert.ok((await validateFullBackupPackage(missingMixed)).errors.some((issue) => issue.code === 'missing-file-present'));
+  assert.deepEqual(findDuplicateBackupPaths(['manifest.json', 'media/a/original.jpg', 'manifest.json']), ['manifest.json']);
+});
+
+await test('完全Backup validatorは未知Package／Metadata Versionを拒否する', async () => {
+  const source = (await buildFullBackupPackageFromSnapshot(createBackupTestSnapshot())).blob;
+  const packageVersion = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.packageVersion = 2; } });
+  const metadataVersion = await rewriteBackupZip(source, { mutateManifest: (manifest) => { manifest.metadataSchemaVersion = 13; } });
+  assert.ok((await validateFullBackupPackage(packageVersion)).errors.some((issue) => issue.code === 'package-version-unsupported'));
+  assert.ok((await validateFullBackupPackage(metadataVersion)).errors.some((issue) => issue.code === 'metadata-schema-unsupported'));
+});
+
+await test('完全BackupはCancel・Hash失敗・自己検証失敗でPackageを返さない', async () => {
+  const asset = createBackupTestAsset('asset-errors');
+  const snapshot = createBackupTestSnapshot([asset], [createBackupTestBlob(asset.id, 'original')]);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(() => buildFullBackupPackageFromSnapshot(snapshot, { signal: controller.signal }), /cancel|abort/i);
+  await assert.rejects(() => buildFullBackupPackageFromSnapshot(snapshot, { hasher: { sha256: async () => { throw new Error('hash failed'); } } }), /作成できません/);
+  await assert.rejects(() => buildFullBackupPackageFromSnapshot(snapshot, {
+    validatePackage: async () => ({ success: false, warnings: [], errors: [{ code: 'checksum-mismatch' }] }),
+  }), /自己検証/);
+});
+
+await test('完全Backup Exportは入力Snapshotを変更せず、軽量JSON Backup経路を維持する', async () => {
+  const asset = createBackupTestAsset('asset-immutable');
+  const snapshot = createBackupTestSnapshot([asset], [createBackupTestBlob(asset.id, 'original')]);
+  const beforeAsset = { ...asset };
+  await buildFullBackupPackageFromSnapshot(snapshot);
+  assert.deepEqual(asset, beforeAsset);
+  assert.match(backupServiceSource, /buildBackupPayloadFromSnapshot/);
+  assert.match(settingsPageSource, /JSON\.stringify\(payload, null, 2\)/);
+  assert.match(settingsPageSource, /restoreBackupPayload/);
+});
+
+await test('完全Backup UIは二重実行、Cancel、自己検証前Download、Object URLを安全に扱う', () => {
+  assert.match(fullBackupPanelSource, /if \(controllerRef\.current\) return/);
+  assert.match(fullBackupPanelSource, /controllerRef\.current\?\.abort/);
+  assert.match(fullBackupPanelSource, /result\?\.validation\.success/);
+  assert.match(fullBackupPanelSource, /URL\.createObjectURL/);
+  assert.match(fullBackupPanelSource, /URL\.revokeObjectURL/);
+  assert.match(fullBackupPanelSource, /aria-busy/);
+  assert.match(fullBackupPanelSource, /aria-live/);
+  assert.match(fullBackupPanelSource, /完全Backupを作成/);
+  assert.match(settingsPageSource, /軽量Backup/);
+  assert.match(settingsPageSource, /FullBackupPanel/);
+  assert.match(fullBackupServiceSource, /level: 0/);
+  assert.match(localDbSource, /readStoresSnapshot/);
 });
 
 await test('v8スクラップブックを既存情報を保ったままv10へ移行する', () => {

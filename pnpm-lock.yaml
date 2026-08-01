@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@zip.js/zip.js':
+        specifier: ^2.8.34
+        version: 2.8.34
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -460,6 +463,10 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
+
+  '@zip.js/zip.js@2.8.34':
+    resolution: {integrity: sha512-+6a3lyqq69rpseLbvDPiVIWsZ/HdTGAAD6afFtug6ECPDGttb2dHnPC6cJgdPofYkzL9OvXizegq+DQVfL2rnA==}
+    engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
 
   baseline-browser-mapping@2.10.42:
     resolution: {integrity: sha512-c/jurFrDLyui7o1J86yLkRu4LMsTYcBohveus7/I2Hzdn9KIP2bdJPTue/lR1KH46enoPbD77GKeSYNdyPoD3Q==}
@@ -999,6 +1006,8 @@ snapshots:
       vite: 7.3.6
     transitivePeerDependencies:
       - supports-color
+
+  '@zip.js/zip.js@2.8.34': {}
 
   baseline-browser-mapping@2.10.42: {}
 

@@ -12,7 +12,7 @@
 - ページ駆動型スクラップブックViewerと編集室、表紙編集、端末写真追加
 - 日本制覇マップ、コレクション、日本100名城・続日本100名城、欲しいもの
 - タイムマシン、旅ガチャ、旅行RPG
-- IndexedDBへの端末内保存とJSONバックアップ／復元
+- IndexedDBへの端末内保存、軽量JSONバックアップ／復元、写真込み完全Backup ZIPの書き出し
 
 ## 技術と対応環境
 
@@ -39,5 +39,5 @@
 
 - Missing Original、Dangling Reference、Invalid Cover Ownerの手動復旧
 - Trip削除時の関連データ削除
-- 写真本体を含むバックアップ、Cloudflare D1／R2同期
+- 写真込み完全Backup ZIPの復元、Cloudflare D1／R2同期
 - 写真クロップ、焦点位置、より高度なスクラップブック編集

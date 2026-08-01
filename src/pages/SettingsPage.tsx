@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { buildBackupPayload, restoreBackupPayload } from '../features/backup/backupService';
+import { FullBackupPanel } from '../features/backup/FullBackupPanel';
 import { rerunInitialRpgAggregation, resetRpgDataOnly } from '../features/rpg/rpgMaintenanceService';
 import { getRpgSettings, updateRpgSettings } from '../features/rpg/rpgSettingsService';
 import { MediaIntegrityPanel } from '../features/media/components/MediaIntegrityPanel';
@@ -63,8 +64,9 @@ export function SettingsPage() {
         </section>
 
         <section className="card">
-          <h2>JSONバックアップ</h2>
-          <p className="muted">旅行記録、訪問場所、コレクション、日本制覇マップの訪問情報を書き出し・復元します。</p>
+          <p className="eyebrow">軽量Backup</p>
+          <h2>記録のみ</h2>
+          <p className="muted">旅行記録、訪問場所、コレクション、日本制覇マップの訪問情報をJSONで書き出し・復元します。写真本体は含みません。</p>
           <div className="form-actions">
             <button className="button button--primary" type="button" onClick={() => void handleExport()}>
               書き出し
@@ -81,6 +83,8 @@ export function SettingsPage() {
             onChange={(event) => void handleImport(event.target.files?.[0])}
           />
         </section>
+
+        <FullBackupPanel />
 
         <MediaIntegrityPanel />
 

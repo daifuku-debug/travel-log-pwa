@@ -1,4 +1,4 @@
-import { AppError } from '../../shared/errors';
+import { AppError } from '../../shared/errors.ts';
 
 const DB_NAME = 'travel-log-local-db';
 const DB_VERSION = 10;
@@ -90,6 +90,27 @@ export async function readAll<T>(storeName: StoreName): Promise<T[]> {
     const request = db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
     request.onsuccess = () => resolve(request.result as T[]);
     request.onerror = () => reject(new AppError('端末内データの読み込みに失敗しました', request.error));
+  });
+}
+
+export async function readStoresSnapshot(
+  storeNames: readonly StoreName[],
+): Promise<Partial<Record<StoreName, unknown[]>>> {
+  const db = await getLocalDb();
+  const uniqueStoreNames = [...new Set(storeNames)];
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(uniqueStoreNames, 'readonly');
+    const snapshot: Partial<Record<StoreName, unknown[]>> = {};
+
+    uniqueStoreNames.forEach((storeName) => {
+      const request = transaction.objectStore(storeName).getAll();
+      request.onsuccess = () => {
+        snapshot[storeName] = request.result as unknown[];
+      };
+    });
+    transaction.oncomplete = () => resolve(snapshot);
+    transaction.onerror = () => reject(new AppError('端末内データの読み込みに失敗しました', transaction.error));
+    transaction.onabort = () => reject(new AppError('端末内データの読み込みに失敗しました', transaction.error));
   });
 }
 

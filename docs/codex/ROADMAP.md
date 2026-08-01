@@ -14,8 +14,10 @@
 | Phase 5-A.2.3-D-C3 | 完了 | 参照一覧UI、安全な参照の明示解除、解除後再検索と段階的削除 |
 | Phase 5-A.2.3-D-D1 | 完了 | Metadata、Blob、永続参照、cover-only所有関係の読み取り専用Integrity Scan |
 | Phase 5-A.2.3-D-D2 | 完了 | 診断Summary、種類別Issue表示、再検証付きの安全な修復と再Scan |
-| Phase 5-A.2.3-D-D3 | 次 | Missing Original、Dangling Reference、Invalid Cover Ownerの手動復旧設計 |
+| Phase 5-A.2.3-D-D3 | 完了 | Missing Original、Dangling Reference、Invalid Cover Ownerの手動復旧設計 |
+| 写真込みBackup Phase 1 | 完了 | Package v1、v12 Metadata＋写真BlobのZIP Export、自己検証、軽量Backupとの分離 |
+| 写真込みBackup Phase 2 | 次 | 復元前Preview、一時領域、原子的な全置換Restore、復元後Integrity Scan |
 | Trip削除カスケード | 別系統 | Trip、Scrapbook、Page、Block、MediaAsset、Blobの整合した削除 |
-| 写真込みBackup／R2同期 | 別系統 | Blobを含む復元可能なBackupとCloudflare同期 |
+| R2同期 | 別系統 | Cloudflare認証、写真Blob同期、競合解決 |
 
-次Phaseでは、自動修復できない要確認Issueの安全な手動復旧方針を設計します。Trip削除カスケードは混ぜません。
+写真込みBackupの次Phaseでは、検証済みPackageを既存データへ安全に全置換するRestoreを設計・実装します。Metadata統合、R2同期、Trip削除カスケードは混ぜません。

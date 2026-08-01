@@ -14,95 +14,86 @@ import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
-import { clearStore, putMany, readAll } from '../../infrastructure/localDb/db';
-import { toAppError } from '../../shared/errors';
-import { BACKUP_SCHEMA_VERSION, normalizeBackupPayload, type TravelLogBackup } from './backupSchema';
+import { clearStore, putMany, readStoresSnapshot, type StoreName } from '../../infrastructure/localDb/db.ts';
+import { toAppError } from '../../shared/errors.ts';
+import { BACKUP_SCHEMA_VERSION, normalizeBackupPayload, type TravelLogBackup } from './backupSchema.ts';
 
 export async function buildBackupPayload(): Promise<TravelLogBackup> {
   try {
-    const [
-      trips,
-      placeVisits,
-      tripTransportLegs,
-      wishlistItems,
-      collections,
-      collectionItems,
-      collectionVisits,
-      prefectureVisits,
-      tripPrefectureVisits,
-      castleVisitSummaries,
-      castleVisitEvents,
-      scrapbooks,
-      scrapbookPages,
-      scrapbookBlocks,
-      mediaAssets,
-      manualTimelineEntries,
-      travelGachaDraws,
-      rpgExperienceEntries,
-      userRpgTitles,
-      userRpgAchievements,
-      rpgQuests,
-      tripRpgResults,
-      rpgSettings,
-    ] = await Promise.all([
-      readAll<Trip>('trips'),
-      readAll<PlaceVisit>('placeVisits'),
-      readAll<TripTransportLeg>('tripTransportLegs'),
-      readAll<WishlistItem>('wishlistItems'),
-      readAll<Collection>('collections'),
-      readAll<CollectionItem>('collectionItems'),
-      readAll<CollectionVisit>('collectionVisits'),
-      readAll<PrefectureVisit>('prefectureVisits'),
-      readAll<TripPrefectureVisit>('tripPrefectureVisits'),
-      readAll<CastleVisitSummary>('castleVisitSummaries'),
-      readAll<CastleVisitEvent>('castleVisitEvents'),
-      readAll<Scrapbook>('scrapbooks'),
-      readAll<ScrapbookPage>('scrapbookPages'),
-      readAll<ScrapbookBlock>('scrapbookBlocks'),
-      readAll<MediaAsset>('mediaAssets'),
-      readAll<ManualTimelineEntry>('manualTimelineEntries'),
-      readAll<TravelGachaDraw>('travelGachaDraws'),
-      readAll<RpgExperienceEntry>('rpgExperienceEntries'),
-      readAll<UserRpgTitle>('userRpgTitles'),
-      readAll<UserRpgAchievement>('userRpgAchievements'),
-      readAll<RpgQuest>('rpgQuests'),
-      readAll<TripRpgResult>('tripRpgResults'),
-      readAll<RpgSettings>('rpgSettings'),
-    ]);
-
-    return normalizeBackupPayload({
-      app: 'travel-log-pwa',
-      schemaVersion: BACKUP_SCHEMA_VERSION,
-      exportedAt: new Date().toISOString(),
-      data: {
-        trips,
-        placeVisits,
-        tripTransportLegs,
-        wishlistItems,
-        collections,
-        collectionItems,
-        collectionVisits,
-        prefectureVisits,
-        tripPrefectureVisits,
-        castleVisitSummaries,
-        castleVisitEvents,
-        scrapbooks,
-        scrapbookPages,
-        scrapbookBlocks,
-        mediaAssets,
-        manualTimelineEntries,
-        travelGachaDraws,
-        rpgExperienceEntries,
-        userRpgTitles,
-        userRpgAchievements,
-        rpgQuests,
-        tripRpgResults,
-        rpgSettings,
-      },
-    });
+    return buildBackupPayloadFromSnapshot(await readBackupSnapshot());
   } catch (error) {
     throw toAppError(error, 'バックアップの作成に失敗しました');
   }
+}
+
+export const BACKUP_METADATA_STORE_NAMES = [
+  'trips',
+  'placeVisits',
+  'tripTransportLegs',
+  'wishlistItems',
+  'collections',
+  'collectionItems',
+  'collectionVisits',
+  'prefectureVisits',
+  'tripPrefectureVisits',
+  'castleVisitSummaries',
+  'castleVisitEvents',
+  'scrapbooks',
+  'scrapbookPages',
+  'scrapbookBlocks',
+  'mediaAssets',
+  'manualTimelineEntries',
+  'travelGachaDraws',
+  'rpgExperienceEntries',
+  'userRpgTitles',
+  'userRpgAchievements',
+  'rpgQuests',
+  'tripRpgResults',
+  'rpgSettings',
+] as const satisfies readonly StoreName[];
+
+export type BackupSnapshot = Partial<Record<StoreName, unknown[]>>;
+
+export async function readBackupSnapshot(includeMediaBlobs = false): Promise<BackupSnapshot> {
+  return readStoresSnapshot(includeMediaBlobs
+    ? [...BACKUP_METADATA_STORE_NAMES, 'mediaAssetBlobs']
+    : BACKUP_METADATA_STORE_NAMES);
+}
+
+export function buildBackupPayloadFromSnapshot(
+  snapshot: BackupSnapshot,
+  exportedAt = new Date().toISOString(),
+): TravelLogBackup {
+  return normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    exportedAt,
+    data: {
+      trips: snapshot.trips as Trip[] | undefined,
+      placeVisits: snapshot.placeVisits as PlaceVisit[] | undefined,
+      tripTransportLegs: snapshot.tripTransportLegs as TripTransportLeg[] | undefined,
+      wishlistItems: snapshot.wishlistItems as WishlistItem[] | undefined,
+      collections: snapshot.collections as Collection[] | undefined,
+      collectionItems: snapshot.collectionItems as CollectionItem[] | undefined,
+      collectionVisits: snapshot.collectionVisits as CollectionVisit[] | undefined,
+      prefectureVisits: snapshot.prefectureVisits as PrefectureVisit[] | undefined,
+      tripPrefectureVisits: snapshot.tripPrefectureVisits as TripPrefectureVisit[] | undefined,
+      castleVisitSummaries: snapshot.castleVisitSummaries as CastleVisitSummary[] | undefined,
+      castleVisitEvents: snapshot.castleVisitEvents as CastleVisitEvent[] | undefined,
+      scrapbooks: snapshot.scrapbooks as Scrapbook[] | undefined,
+      scrapbookPages: snapshot.scrapbookPages as ScrapbookPage[] | undefined,
+      scrapbookBlocks: snapshot.scrapbookBlocks as ScrapbookBlock[] | undefined,
+      mediaAssets: snapshot.mediaAssets as MediaAsset[] | undefined,
+      manualTimelineEntries: snapshot.manualTimelineEntries as ManualTimelineEntry[] | undefined,
+      travelGachaDraws: snapshot.travelGachaDraws as TravelGachaDraw[] | undefined,
+      rpgExperienceEntries: snapshot.rpgExperienceEntries as RpgExperienceEntry[] | undefined,
+      userRpgTitles: snapshot.userRpgTitles as UserRpgTitle[] | undefined,
+      userRpgAchievements: snapshot.userRpgAchievements as UserRpgAchievement[] | undefined,
+      rpgQuests: snapshot.rpgQuests as RpgQuest[] | undefined,
+      tripRpgResults: snapshot.tripRpgResults as TripRpgResult[] | undefined,
+      rpgSettings: snapshot.rpgSettings as RpgSettings[] | undefined,
+    },
+  });
 }
 
 export async function restoreBackupPayload(payload: unknown): Promise<void> {
