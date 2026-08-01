@@ -32,6 +32,8 @@ export function CoverEditorPanel({
   onReuseDuplicatePhoto,
   onBypassDuplicateReview,
   onRetryDuplicateReview,
+  protectedPhotoId,
+  onDeletedPhoto,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
@@ -49,6 +51,8 @@ export function CoverEditorPanel({
   onReuseDuplicatePhoto: () => void;
   onBypassDuplicateReview: () => void;
   onRetryDuplicateReview: () => void;
+  protectedPhotoId?: EntityId;
+  onDeletedPhoto: (assetId: EntityId) => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
   const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
@@ -108,6 +112,8 @@ export function CoverEditorPanel({
             onReuseDuplicate={onReuseDuplicatePhoto}
             onBypassDuplicateReview={onBypassDuplicateReview}
             onRetryDuplicateReview={onRetryDuplicateReview}
+            protectedPhotoId={protectedPhotoId}
+            onDeleted={onDeletedPhoto}
             onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
           />
         )}

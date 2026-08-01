@@ -53,6 +53,10 @@ import { persistPreparedTripMediaAsset } from '../src/features/media/mediaAssetP
 import { webCryptoContentHasher } from '../src/features/media/contentHasher.ts';
 import { findExactDuplicateMediaAssetsWithDependencies } from '../src/features/media/mediaAssetDuplicateLogic.ts';
 import { findMediaAssetReferencesWithDependencies } from '../src/features/media/mediaAssetReferenceLogic.ts';
+import {
+  deleteUnreferencedMediaAssetWithDependencies,
+  MediaAssetDeletionError,
+} from '../src/features/media/mediaAssetDeletionLogic.ts';
 import { calculateLevelProgress, expRequiredForNextLevel } from '../src/features/rpg/rpgLevel.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
@@ -99,6 +103,8 @@ const mediaAssetPersistenceSource = await readFile(new URL('../src/features/medi
 const backupServiceSource = await readFile(new URL('../src/features/backup/backupService.ts', import.meta.url), 'utf8');
 const coverPhotoImportSource = await readFile(new URL('../src/features/scrapbooks/useCoverPhotoImport.ts', import.meta.url), 'utf8');
 const coverPhotoPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverPhotoPanel.tsx', import.meta.url), 'utf8');
+const mediaDeleteDialogSource = await readFile(new URL('../src/features/scrapbooks/components/MediaDeleteDialog.tsx', import.meta.url), 'utf8');
+const mediaAssetDeletionServiceSource = await readFile(new URL('../src/features/media/mediaAssetDeletionService.ts', import.meta.url), 'utf8');
 const duplicatePhotoReviewSource = await readFile(new URL('../src/features/scrapbooks/components/DuplicatePhotoReview.tsx', import.meta.url), 'utf8');
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
@@ -1701,6 +1707,179 @@ await test('MediaAsset参照検索は派生表示・Draft・Pending・Blob参照
     sortOrder: 10,
   }, { tripId: 'trip-1', scrapbookId: 'scrapbook-1', page: referenceTestPage }, 'asset-target');
   assert.deepEqual(references, []);
+});
+
+function createDeletionDependencies(overrides = {}) {
+  const calls = [];
+  const asset = {
+    ...referenceTestBase,
+    id: 'asset-delete',
+    tripId: 'trip-1',
+    usage: 'trip',
+    storageType: 'local',
+    mimeType: 'image/jpeg',
+    mediaSyncStatus: 'local_only',
+  };
+  return {
+    calls,
+    dependencies: {
+      mediaAssets: {
+        getById: async () => { calls.push('metadata:get'); return asset; },
+        softDelete: async () => { calls.push('metadata:softDelete'); },
+      },
+      mediaAssetBlobs: {
+        deleteByAssetId: async () => { calls.push('blobs:delete'); },
+      },
+      findReferences: async () => { calls.push('references:find'); return []; },
+      ...overrides,
+    },
+  };
+}
+
+await test('参照ゼロ写真の削除は直前確認後にMetadataと2種Blobを順に削除する', async () => {
+  const { calls, dependencies } = createDeletionDependencies();
+  const result = await deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies);
+  assert.deepEqual(calls, ['metadata:get', 'references:find', 'metadata:softDelete', 'blobs:delete']);
+  assert.deepEqual(result, {
+    assetId: 'asset-delete',
+    tripId: 'trip-1',
+    usage: 'trip',
+    metadataWasPresent: true,
+    metadataDeleted: true,
+    blobsDeleted: true,
+    removeFromLists: true,
+  });
+  assert.match(mediaAssetDeletionServiceSource, /findReferences: findMediaAssetReferences/);
+});
+
+await test('表紙・旧表紙・ハイライト・各Blockの参照が1件でもあれば削除しない', async () => {
+  const referenceTypes = [
+    ['scrapbook-cover', 'coverSettings.photoId'],
+    ['scrapbook-legacy-cover', 'coverAssetId'],
+    ['scrapbook-highlight', 'highlightPhotoIds'],
+    ['scrapbook-block', 'assetId'],
+    ['scrapbook-block', 'assetIds'],
+  ];
+  for (const [type, field] of referenceTypes) {
+    const { calls, dependencies } = createDeletionDependencies({
+      findReferences: async () => [{
+        type,
+        field,
+        assetId: 'asset-delete',
+        tripId: 'trip-1',
+        scrapbookId: 'scrapbook-1',
+      }],
+    });
+    await assert.rejects(
+      deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies),
+      (error) => error instanceof MediaAssetDeletionError && error.code === 'referenced' && error.references.length === 1,
+    );
+    assert.deepEqual(calls, ['metadata:get']);
+  }
+});
+
+await test('参照検索失敗時は専用Errorで削除を禁止する', async () => {
+  const { calls, dependencies } = createDeletionDependencies({
+    findReferences: async () => { throw new Error('reference failed'); },
+  });
+  await assert.rejects(
+    deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies),
+    (error) => error instanceof MediaAssetDeletionError
+      && error.code === 'reference-search-failed'
+      && error.retryable
+      && !error.metadataDeleted,
+  );
+  assert.deepEqual(calls, ['metadata:get']);
+});
+
+await test('Metadata更新失敗時はBlobを削除しない', async () => {
+  const calls = [];
+  const { dependencies } = createDeletionDependencies({
+    mediaAssets: {
+      getById: async () => ({ ...referenceTestBase, id: 'asset-delete', tripId: 'trip-1', usage: 'trip' }),
+      softDelete: async () => { calls.push('metadata:softDelete'); throw new Error('metadata failed'); },
+    },
+    mediaAssetBlobs: { deleteByAssetId: async () => { calls.push('blobs:delete'); } },
+  });
+  await assert.rejects(
+    deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies),
+    (error) => error instanceof MediaAssetDeletionError && error.code === 'metadata-delete-failed' && !error.metadataDeleted,
+  );
+  assert.deepEqual(calls, ['metadata:softDelete']);
+});
+
+await test('Blob削除失敗はMetadata削除済みと再試行可能状態を明示する', async () => {
+  let blobAttempts = 0;
+  let metadataVisible = true;
+  const { dependencies } = createDeletionDependencies({
+    mediaAssets: {
+      getById: async () => metadataVisible
+        ? { ...referenceTestBase, id: 'asset-delete', tripId: 'trip-1', usage: 'cover-only', ownerScrapbookId: 'scrapbook-1' }
+        : undefined,
+      softDelete: async () => { metadataVisible = false; },
+    },
+    mediaAssetBlobs: {
+      deleteByAssetId: async () => {
+        blobAttempts += 1;
+        if (blobAttempts === 1) throw new Error('blob failed');
+      },
+    },
+  });
+  await assert.rejects(
+    deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies),
+    (error) => error instanceof MediaAssetDeletionError
+      && error.code === 'blob-delete-failed'
+      && error.metadataDeleted
+      && error.retryable,
+  );
+  const retryResult = await deleteUnreferencedMediaAssetWithDependencies({ assetId: 'asset-delete' }, dependencies);
+  assert.equal(retryResult.metadataWasPresent, false);
+  assert.equal(retryResult.blobsDeleted, true);
+  assert.equal(blobAttempts, 2);
+});
+
+await test('削除処理はtripとcover-onlyを扱い、未保存Draft選択中は変更しない', async () => {
+  for (const usage of ['trip', 'cover-only']) {
+    const calls = [];
+    const { dependencies } = createDeletionDependencies({
+      mediaAssets: {
+        getById: async () => ({
+          ...referenceTestBase,
+          id: `asset-${usage}`,
+          tripId: 'trip-1',
+          usage,
+          ownerScrapbookId: usage === 'cover-only' ? 'scrapbook-1' : undefined,
+        }),
+        softDelete: async () => { calls.push('metadata:softDelete'); },
+      },
+      mediaAssetBlobs: { deleteByAssetId: async () => { calls.push('blobs:delete'); } },
+    });
+    const result = await deleteUnreferencedMediaAssetWithDependencies({ assetId: `asset-${usage}` }, dependencies);
+    assert.equal(result.usage, usage);
+    assert.deepEqual(calls, ['metadata:softDelete', 'blobs:delete']);
+  }
+
+  const { calls, dependencies } = createDeletionDependencies();
+  await assert.rejects(
+    deleteUnreferencedMediaAssetWithDependencies({
+      assetId: 'asset-delete',
+      protectedAssetIds: ['asset-delete'],
+    }, dependencies),
+    (error) => error instanceof MediaAssetDeletionError && error.code === 'transient-reference',
+  );
+  assert.deepEqual(calls, []);
+});
+
+await test('削除確認UIは写真・用途・使用中状態を示し成功時だけ候補一覧を更新する', () => {
+  assert.match(mediaDeleteDialogSource, /写真を削除/);
+  assert.match(mediaDeleteDialogSource, /isCoverOnlyMediaAsset\(asset\) \? '表紙専用' : '旅行写真'/);
+  assert.match(mediaDeleteDialogSource, /表紙や本文で使用中のため削除できません/);
+  assert.match(mediaDeleteDialogSource, /protectedByDraft/);
+  assert.match(mediaDeleteDialogSource, /deleteUnreferencedMediaAsset/);
+  assert.match(coverPhotoPanelSource, /scrapbook-cover-editor__photo-delete/);
+  assert.match(coverPhotoPanelSource, /aria-label=\{`\$\{asset\.originalFileName \|\| '写真'\}を削除`\}/);
+  assert.match(scrapbookEditorSource, /setAddedMediaAssets\(\(current\) => current\.filter\(\(asset\) => asset\.id !== assetId\)\)/);
+  assert.match(stylesSource, /\.scrapbook-cover-editor__photo-delete\s*\{[\s\S]*min-height: var\(--tap-target-min\)/);
 });
 
 await test('表紙写真追加はPending確認後に保存し、古い非同期結果とObject URLを管理する', () => {

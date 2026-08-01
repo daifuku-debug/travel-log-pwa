@@ -342,6 +342,11 @@ export function ScrapbookEditor({
     });
   }
 
+  function handleDeletedPhoto(assetId: string) {
+    setAddedMediaAssets((current) => current.filter((asset) => asset.id !== assetId));
+    showToast({ title: '写真を端末から削除しました。', variant: 'success' });
+  }
+
   return (
     <div className="scrapbook-editor-mode">
       <header className="scrapbook-editor-toolbar">
@@ -455,6 +460,8 @@ export function ScrapbookEditor({
               onReuseDuplicatePhoto={reuseExistingCoverPhoto}
               onBypassDuplicateReview={coverPhotoImport.bypassDuplicateReview}
               onRetryDuplicateReview={() => void coverPhotoImport.retryDuplicateCheck()}
+              protectedPhotoId={draft.coverPhotoId !== baseline.coverPhotoId ? draft.coverPhotoId : undefined}
+              onDeletedPhoto={handleDeletedPhoto}
               previewTemplateId={coverPreviewTemplateId}
               onPreviewTemplate={setCoverPreviewTemplateId}
               onApplyTemplate={applyCoverTemplate}

@@ -7,6 +7,7 @@ import type { PendingCoverPhoto } from '../useCoverPhotoImport';
 import type { TripDetail } from '../../trips/tripService';
 import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
 import { DuplicatePhotoReview } from './DuplicatePhotoReview';
+import { MediaDeleteDialog } from './MediaDeleteDialog';
 import { ScrapbookMediaImage } from './ScrapbookMediaImage';
 
 export function CoverPhotoPanel({
@@ -23,6 +24,8 @@ export function CoverPhotoPanel({
   onReuseDuplicate,
   onBypassDuplicateReview,
   onRetryDuplicateReview,
+  protectedPhotoId,
+  onDeleted,
 }: {
   selectedPhotoId?: EntityId;
   mediaAssets: MediaAsset[];
@@ -37,8 +40,11 @@ export function CoverPhotoPanel({
   onReuseDuplicate: () => void;
   onBypassDuplicateReview: () => void;
   onRetryDuplicateReview: () => void;
+  protectedPhotoId?: EntityId;
+  onDeleted: (assetId: EntityId) => void;
 }) {
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<MediaAsset>();
   const libraryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const sourcePrimaryActionRef = useRef<HTMLButtonElement>(null);
@@ -214,19 +220,28 @@ export function CoverPhotoPanel({
                 {mediaAssets.map((asset) => {
                   const selected = selectedPhotoId === asset.id;
                   return (
-                    <button
-                      key={asset.id}
-                      type="button"
-                      className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
-                      role="radio"
-                      aria-checked={selected}
-                      aria-label={`${asset.originalFileName || '旅行写真'}${isCoverOnlyMediaAsset(asset) ? '、表紙専用' : ''}を表紙にする${selected ? '、現在選択中' : ''}`}
-                      onClick={() => onSelect(asset.id)}
-                    >
-                      <ScrapbookMediaImage asset={asset} alt="" />
-                      {isCoverOnlyMediaAsset(asset) && <span className="scrapbook-cover-editor__usage-badge">表紙専用</span>}
-                      {selected && <span>選択中</span>}
-                    </button>
+                    <div key={asset.id} className="scrapbook-cover-editor__photo-item">
+                      <button
+                        type="button"
+                        className={`scrapbook-cover-editor__photo${selected ? ' is-selected' : ''}`}
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={`${asset.originalFileName || '旅行写真'}${isCoverOnlyMediaAsset(asset) ? '、表紙専用' : ''}を表紙にする${selected ? '、現在選択中' : ''}`}
+                        onClick={() => onSelect(asset.id)}
+                      >
+                        <ScrapbookMediaImage asset={asset} alt="" />
+                        {isCoverOnlyMediaAsset(asset) && <span className="scrapbook-cover-editor__usage-badge">表紙専用</span>}
+                        {selected && <span>選択中</span>}
+                      </button>
+                      <button
+                        type="button"
+                        className="scrapbook-cover-editor__photo-delete"
+                        aria-label={`${asset.originalFileName || '写真'}を削除`}
+                        onClick={() => setDeleteTarget(asset)}
+                      >
+                        削除
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -254,6 +269,15 @@ export function CoverPhotoPanel({
           <Button variant="ghost" onClick={() => setSourceOpen(false)}>キャンセル</Button>
         </div>
       </BottomSheet>
+      <MediaDeleteDialog
+        asset={deleteTarget}
+        protectedByDraft={deleteTarget?.id === protectedPhotoId}
+        onClose={() => setDeleteTarget(undefined)}
+        onDeleted={(result) => {
+          onDeleted(result.assetId);
+          setDeleteTarget(undefined);
+        }}
+      />
     </section>
   );
 }
