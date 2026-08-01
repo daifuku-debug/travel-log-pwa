@@ -14,9 +14,11 @@ import {
   isCoverAssetAvailableToScrapbook,
   isCoverOnlyMediaAsset,
   isTripMediaAsset,
+  normalizeMediaAsset,
   normalizeMediaAssetOwnership,
   normalizeMediaAssetUsage,
 } from '../src/domain/media/mediaAssetUsage.ts';
+import { normalizeMediaAssetContentHash } from '../src/domain/media/mediaAssetContentHash.ts';
 import {
   collectScrapbookMediaAssetIds,
   mergeGeneratedScrapbookFields,
@@ -42,6 +44,8 @@ import {
   validateImageFile,
 } from '../src/features/media/mediaAssetValidation.ts';
 import { persistPreparedTripMediaAsset } from '../src/features/media/mediaAssetPersistence.ts';
+import { webCryptoContentHasher } from '../src/features/media/contentHasher.ts';
+import { findExactDuplicateMediaAssetsWithDependencies } from '../src/features/media/mediaAssetDuplicateLogic.ts';
 import { calculateLevelProgress, expRequiredForNextLevel } from '../src/features/rpg/rpgLevel.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
@@ -398,23 +402,35 @@ await test('用途別MediaAsset一覧は通常写真と所有する表紙専用�
   );
 });
 
-await test('Backup v11はMediaAsset用途を正規化して往復できる', () => {
+await test('MediaAsset contentHashはSHA-256形式だけを小文字で保持する', () => {
+  const upperHash = `sha256:${'AB'.repeat(32)}`;
+  assert.equal(normalizeMediaAssetContentHash(upperHash), `sha256:${'ab'.repeat(32)}`);
+  assert.equal(normalizeMediaAssetContentHash(`sha256:${'a'.repeat(63)}`), undefined);
+  assert.equal(normalizeMediaAssetContentHash(`sha256:${'g'.repeat(64)}`), undefined);
+  assert.equal(normalizeMediaAssetContentHash(`sha1:${'a'.repeat(64)}`), undefined);
+  assert.equal(normalizeMediaAssetContentHash(''), undefined);
+  assert.equal(normalizeMediaAssetContentHash(undefined), undefined);
+  assert.equal(normalizeMediaAsset({ id: 'asset', tripId: 'trip', contentHash: 'invalid' }).contentHash, undefined);
+});
+
+await test('Backup v12はMediaAsset用途とcontentHashを正規化して往復できる', () => {
   const payload = {
     app: 'travel-log-pwa',
-    schemaVersion: 11,
+    schemaVersion: 12,
     data: {
       scrapbooks: [{ id: 'scrapbook-1', tripId: 'trip-1', title: '旅', status: 'draft', layoutMode: 'pages', themeId: 'journal' }],
       mediaAssets: [
-        { id: 'trip-photo', tripId: 'trip-1', usage: 'trip', ownerScrapbookId: 'ignored', storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' },
+        { id: 'trip-photo', tripId: 'trip-1', usage: 'trip', ownerScrapbookId: 'ignored', contentHash: `sha256:${'AB'.repeat(32)}`, storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' },
         { id: 'cover-photo', tripId: 'trip-1', usage: 'cover-only', ownerScrapbookId: 'scrapbook-1', storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' },
       ],
     },
   };
   const normalized = normalizeBackupPayload(JSON.parse(JSON.stringify(payload)));
-  assert.equal(BACKUP_SCHEMA_VERSION, 11);
-  assert.equal(normalized.schemaVersion, 11);
+  assert.equal(BACKUP_SCHEMA_VERSION, 12);
+  assert.equal(normalized.schemaVersion, 12);
   assert.equal(normalized.data.mediaAssets[0].usage, 'trip');
   assert.equal(normalized.data.mediaAssets[0].ownerScrapbookId, undefined);
+  assert.equal(normalized.data.mediaAssets[0].contentHash, `sha256:${'ab'.repeat(32)}`);
   assert.equal(normalized.data.mediaAssets[1].usage, 'cover-only');
   assert.equal(normalized.data.mediaAssets[1].ownerScrapbookId, 'scrapbook-1');
 });
@@ -434,6 +450,23 @@ await test('Backup v11は不正な表紙専用写真を通常旅行写真へ戻�
   });
   assert.deepEqual(normalized.data.mediaAssets.map((asset) => asset.usage), ['trip', 'trip', 'trip']);
   assert.ok(normalized.data.mediaAssets.every((asset) => asset.ownerScrapbookId === undefined));
+  assert.equal(normalized.schemaVersion, 12);
+});
+
+await test('Backup v12は不正contentHashを除去し、Hashなしの旧Backupを維持する', () => {
+  const invalid = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 12,
+    data: { mediaAssets: [{ id: 'invalid-hash', tripId: 'trip-1', contentHash: 'sha256:invalid', storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' }] },
+  });
+  const legacy = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 11,
+    data: { mediaAssets: [{ id: 'legacy', tripId: 'trip-1', storageType: 'local', mimeType: 'image/jpeg', mediaSyncStatus: 'local_only' }] },
+  });
+  assert.equal(invalid.data.mediaAssets[0].contentHash, undefined);
+  assert.equal(legacy.data.mediaAssets[0].contentHash, undefined);
+  assert.equal(legacy.schemaVersion, 12);
 });
 
 await test('v10以前のMediaAssetは通常旅行写真として復元する', () => {
@@ -451,7 +484,7 @@ await test('v10以前のMediaAssetは通常旅行写真として復元する', (
 
 await test('将来VersionのBackupは読み込まない', () => {
   assert.throws(
-    () => normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 12, data: {} }),
+    () => normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 13, data: {} }),
     /新しいバージョン/,
   );
 });
@@ -488,7 +521,7 @@ await test('v8スクラップブックを既存情報を保ったままv10へ移
     },
   });
 
-  assert.equal(normalized.schemaVersion, 11);
+  assert.equal(normalized.schemaVersion, 12);
   assert.equal(normalized.data.scrapbooks[0].title, '既存の旅');
   assert.equal(normalized.data.scrapbooks[0].subtitle, '残したい説明');
   assert.equal(normalized.data.scrapbooks[0].origin, 'generated');
@@ -600,7 +633,7 @@ await test('JSONエクスポート/インポートでタイムマシン手動補
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 11);
+  assert.equal(normalized.schemaVersion, 12);
   assert.equal(normalized.data.manualTimelineEntries.length, 1);
 });
 
@@ -678,7 +711,7 @@ await test('JSONエクスポート/インポートで旅ガチャ履歴が復元
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 11);
+  assert.equal(normalized.schemaVersion, 12);
   assert.equal(normalized.data.travelGachaDraws.length, 1);
   assert.equal(normalized.data.travelGachaDraws[0].selectedCandidateId, 'prefecture:13');
 });
@@ -710,7 +743,7 @@ await test('JSONエクスポート/インポートで旅行の移動区間が復
       ],
     },
   });
-  assert.equal(normalized.schemaVersion, 11);
+  assert.equal(normalized.schemaVersion, 12);
   assert.equal(normalized.data.tripTransportLegs.length, 1);
   assert.equal(normalized.data.tripTransportLegs[0].transportMode, 'shinkansen');
 });
@@ -1159,6 +1192,28 @@ await test('スクラップブックは写真と写真グリッドを端末内Bl
   assert.match(scrapbookViewerSource, /<ScrapbookMediaImage/);
 });
 
+await test('MediaAsset Blob削除は対象2キーだけを同一Transactionで削除する', () => {
+  assert.match(localScrapbookRepository, /deleteManyById\('mediaAssetBlobs'/);
+  assert.match(localScrapbookRepository, /`\$\{assetId\}:original`/);
+  assert.match(localScrapbookRepository, /`\$\{assetId\}:thumbnail`/);
+  assert.doesNotMatch(localScrapbookRepository, /clearStore\('mediaAssetBlobs'\)/);
+  assert.match(localDbSource, /function deleteManyById/);
+  assert.match(localDbSource, /const transaction = db\.transaction\(storeName, 'readwrite'\)/);
+  assert.match(localDbSource, /ids\.forEach\(\(id\) => store\.delete\(id\)\)/);
+});
+
+await test('SHA-256 ContentHasherは原本Blobの完全一致Hashを返す', async () => {
+  const sameA = new Blob(['same-photo']);
+  const sameB = new Blob(['same-photo']);
+  const different = new Blob(['different-photo']);
+  const first = await webCryptoContentHasher.sha256(sameA);
+  assert.equal(first, await webCryptoContentHasher.sha256(sameB));
+  assert.notEqual(first, await webCryptoContentHasher.sha256(different));
+  assert.match(first, /^sha256:[0-9a-f]{64}$/);
+  const nearLimit = new Blob([new Uint8Array(MAX_MEDIA_FILE_BYTES)]);
+  assert.match(await webCryptoContentHasher.sha256(nearLimit), /^sha256:[0-9a-f]{64}$/);
+});
+
 await test('端末写真はJPEG、PNG、WebPを検証し、容量超過と非画像を拒否する', async () => {
   const processor = {
     decode: async () => ({ source: {}, width: 1200, height: 800 }),
@@ -1205,6 +1260,38 @@ await test('画像デコードまたはサムネイル生成失敗時は保存�
   assert.equal(blobSaves, 0);
 });
 
+await test('Hash計算失敗時はThumbnail生成とBlob保存へ進まない', async () => {
+  const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' });
+  let thumbnailCreates = 0;
+  await assert.rejects(
+    prepareMediaImage(file, {
+      decode: async () => ({ source: {}, width: 640, height: 480 }),
+      createThumbnail: async () => { thumbnailCreates += 1; return new Blob(['thumbnail']); },
+    }, {
+      sha256: async () => { throw new Error('crypto unavailable'); },
+    }),
+    /重複確認に必要な情報/,
+  );
+  assert.equal(thumbnailCreates, 0);
+
+  let blobSaves = 0;
+  await assert.rejects(
+    persistPreparedTripMediaAsset('trip-1', {
+      file,
+      mimeType: 'image/jpeg',
+      width: 640,
+      height: 480,
+      thumbnailBlob: new Blob(['thumbnail']),
+    }, {
+      contentHasher: { sha256: async () => { throw new Error('crypto unavailable'); } },
+      mediaAssetBlobs: { getById: async () => undefined, save: async (value) => { blobSaves += 1; return value; }, deleteByAssetId: async () => {} },
+      mediaAssets: { list: async () => [], getById: async () => undefined, save: async (value) => value, softDelete: async () => {}, listByTripId: async () => [] },
+    }),
+    /端末に保存できませんでした/,
+  );
+  assert.equal(blobSaves, 0);
+});
+
 await test('MediaAsset保存は既定で通常旅行写真になり表紙専用optionsを保持する', async () => {
   const prepared = {
     file: new File(['image'], 'photo.jpg', { type: 'image/jpeg' }),
@@ -1236,6 +1323,9 @@ await test('MediaAsset保存は既定で通常旅行写真になり表紙専用o
   assert.equal(explicitTripAsset.usage, 'trip');
   assert.equal(coverAsset.usage, 'cover-only');
   assert.equal(coverAsset.ownerScrapbookId, 'scrapbook-1');
+  assert.match(tripAsset.contentHash, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(tripAsset.contentHash, explicitTripAsset.contentHash);
+  assert.equal(tripAsset.contentHash, coverAsset.contentHash);
   assert.equal(savedAssets.length, 3);
 });
 
@@ -1321,6 +1411,87 @@ await test('MediaAssetメタデータ保存失敗時もBlobと見かけ上のAss
   await assert.rejects(persistPreparedTripMediaAsset('trip-1', prepared, persistence), /端末に保存できませんでした/);
   assert.equal(blobDeletes, 1);
   assert.equal(assetDeletes, 1);
+});
+
+await test('完全一致検索はTrip写真と所有中の表紙専用写真だけを返す', async () => {
+  const targetBlob = new Blob(['same-photo']);
+  const targetHash = await webCryptoContentHasher.sha256(targetBlob);
+  const now = '2026-07-25T00:00:00.000Z';
+  const base = {
+    userId: 'local-user', tripId: 'trip-1', usage: 'trip', storageType: 'local', mimeType: 'image/jpeg',
+    fileSize: targetBlob.size, width: 640, height: 480, mediaSyncStatus: 'local_only', createdAt: now, updatedAt: now, syncStatus: 'pending',
+  };
+  const assets = [
+    { ...base, id: 'trip-match', contentHash: targetHash, createdAt: '2026-07-20T00:00:00.000Z' },
+    { ...base, id: 'own-cover', usage: 'cover-only', ownerScrapbookId: 'scrapbook-1', contentHash: targetHash, createdAt: '2026-07-24T00:00:00.000Z' },
+    { ...base, id: 'other-cover', usage: 'cover-only', ownerScrapbookId: 'scrapbook-2', contentHash: targetHash },
+    { ...base, id: 'deleted', contentHash: targetHash, deletedAt: now },
+    { ...base, id: 'other-trip', tripId: 'trip-2', contentHash: targetHash },
+    { ...base, id: 'different', contentHash: await webCryptoContentHasher.sha256(new Blob(['different'])) },
+  ];
+  const dependencies = {
+    mediaAssets: {
+      list: async () => assets,
+      getById: async () => undefined,
+      save: async (asset) => asset,
+      softDelete: async () => {},
+      listByTripId: async () => assets,
+    },
+    mediaAssetBlobs: { getById: async () => undefined, save: async (value) => value, deleteByAssetId: async () => {} },
+  };
+  const matches = await findExactDuplicateMediaAssetsWithDependencies({
+    tripId: 'trip-1',
+    scrapbookId: 'scrapbook-1',
+    contentHash: targetHash,
+    fileInfo: { fileSize: targetBlob.size, mimeType: 'image/jpeg', width: 640, height: 480 },
+  }, dependencies);
+  assert.deepEqual(matches.map((match) => match.asset.id), ['trip-match', 'own-cover']);
+  assert.ok(matches.every((match) => match.matchType === 'exact'));
+});
+
+await test('完全一致検索は候補を絞ってHashなしAssetを遅延計算しMissing Blobを無視する', async () => {
+  const targetBlob = new Blob(['same-photo']);
+  const targetHash = await webCryptoContentHasher.sha256(targetBlob);
+  const now = '2026-07-25T00:00:00.000Z';
+  const base = {
+    userId: 'local-user', tripId: 'trip-1', usage: 'trip', storageType: 'local', mimeType: 'image/jpeg',
+    width: 640, height: 480, mediaSyncStatus: 'local_only', createdAt: now, updatedAt: now, syncStatus: 'pending',
+  };
+  const assets = [
+    { ...base, id: 'lazy-match', fileSize: targetBlob.size, localReference: 'lazy:original' },
+    { ...base, id: 'size-mismatch', fileSize: targetBlob.size + 1, localReference: 'size:original' },
+    { ...base, id: 'missing-original', fileSize: targetBlob.size, localReference: 'missing:original' },
+  ];
+  const hashedBlobIds = [];
+  const saved = [];
+  const matches = await findExactDuplicateMediaAssetsWithDependencies({
+    tripId: 'trip-1',
+    contentHash: targetHash,
+    fileInfo: { fileSize: targetBlob.size, width: 640, height: 480 },
+  }, {
+    contentHasher: {
+      sha256: async (blob) => {
+        hashedBlobIds.push(blob === targetBlob ? 'lazy:original' : 'unknown');
+        return webCryptoContentHasher.sha256(blob);
+      },
+    },
+    mediaAssets: {
+      list: async () => assets,
+      getById: async () => undefined,
+      save: async (asset) => { saved.push(asset); return asset; },
+      softDelete: async () => {},
+      listByTripId: async () => assets,
+    },
+    mediaAssetBlobs: {
+      getById: async (id) => id === 'lazy:original' ? { id, assetId: 'lazy-match', kind: 'original', blob: targetBlob, mimeType: 'image/jpeg', createdAt: now } : undefined,
+      save: async (value) => value,
+      deleteByAssetId: async () => {},
+    },
+  });
+  assert.deepEqual(matches.map((match) => match.asset.id), ['lazy-match']);
+  assert.deepEqual(hashedBlobIds, ['lazy:original']);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].contentHash, targetHash);
 });
 
 await test('表紙写真追加はPending確認後に保存し、古い非同期結果とObject URLを管理する', () => {

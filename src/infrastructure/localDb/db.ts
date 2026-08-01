@@ -122,6 +122,18 @@ export async function putMany<T>(storeName: StoreName, values: T[]): Promise<voi
   });
 }
 
+export async function deleteManyById(storeName: StoreName, ids: readonly string[]): Promise<void> {
+  const db = await getLocalDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readwrite');
+    const store = transaction.objectStore(storeName);
+    ids.forEach((id) => store.delete(id));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(new AppError('端末内データの削除に失敗しました', transaction.error));
+    transaction.onabort = () => reject(new AppError('端末内データの削除に失敗しました', transaction.error));
+  });
+}
+
 export async function clearStore(storeName: StoreName): Promise<void> {
   const db = await getLocalDb();
   return new Promise((resolve, reject) => {

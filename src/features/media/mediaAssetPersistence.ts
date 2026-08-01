@@ -1,16 +1,19 @@
 import type { EntityId } from '../../domain/models/common.ts';
 import type { MediaAsset, MediaAssetUsage } from '../../domain/models/scrapbook.ts';
-import { normalizeMediaAssetOwnership } from '../../domain/media/mediaAssetUsage.ts';
+import { normalizeMediaAssetContentHash } from '../../domain/media/mediaAssetContentHash.ts';
+import { normalizeMediaAsset } from '../../domain/media/mediaAssetUsage.ts';
 import type { MediaAssetBlobRepository, MediaAssetRepository } from '../../domain/repositories/ScrapbookRepository.ts';
 import { AppError } from '../../shared/errors.ts';
 import { createId } from '../../shared/id.ts';
 import type { PreparedMediaImage } from './mediaAssetValidation.ts';
+import { webCryptoContentHasher, type ContentHasher } from './contentHasher.ts';
 
 const LOCAL_USER_ID = 'local-user';
 
 export interface MediaAssetPersistence {
   mediaAssets: MediaAssetRepository;
   mediaAssetBlobs: MediaAssetBlobRepository;
+  contentHasher?: ContentHasher;
 }
 
 export interface SaveMediaAssetOptions {
@@ -46,6 +49,8 @@ export async function persistPreparedTripMediaAsset(
   let metadataSaveStarted = false;
 
   try {
+    const contentHash = normalizeMediaAssetContentHash(prepared.contentHash)
+      ?? await (persistence.contentHasher ?? webCryptoContentHasher).sha256(prepared.file);
     await persistence.mediaAssetBlobs.save({
       id: originalBlobId,
       assetId,
@@ -65,12 +70,13 @@ export async function persistPreparedTripMediaAsset(
     });
 
     metadataSaveStarted = true;
-    return await persistence.mediaAssets.save(normalizeMediaAssetOwnership({
+    return await persistence.mediaAssets.save(normalizeMediaAsset({
       id: assetId,
       userId: LOCAL_USER_ID,
       tripId,
       usage,
       ownerScrapbookId: options.ownerScrapbookId,
+      contentHash,
       storageType: 'local',
       localReference: originalBlobId,
       thumbnailReference: thumbnailBlobId,

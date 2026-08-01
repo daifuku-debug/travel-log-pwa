@@ -1,6 +1,6 @@
 import type { EntityId } from '../../domain/models/common';
 import type { MediaAsset, MediaAssetBlob, Scrapbook, ScrapbookBlock, ScrapbookPage } from '../../domain/models/scrapbook';
-import { normalizeMediaAssetOwnership } from '../../domain/media/mediaAssetUsage';
+import { normalizeMediaAsset } from '../../domain/media/mediaAssetUsage';
 import type {
   MediaAssetBlobRepository,
   MediaAssetRepository,
@@ -13,7 +13,7 @@ import {
   migrateScrapbookPageToV10,
   migrateScrapbookToV10,
 } from '../../domain/scrapbooks/scrapbookMigration';
-import { readAll, readById, putOne, clearStore } from './db';
+import { deleteManyById, readById, putOne } from './db';
 import { LocalBaseRepository } from './LocalBaseRepository';
 
 export class LocalScrapbookRepository extends LocalBaseRepository<Scrapbook> implements ScrapbookRepository {
@@ -100,16 +100,16 @@ export class LocalMediaAssetRepository extends LocalBaseRepository<MediaAsset> i
   }
 
   override async list(): Promise<MediaAsset[]> {
-    return (await super.list()).map(normalizeMediaAssetOwnership);
+    return (await super.list()).map(normalizeMediaAsset);
   }
 
   override async getById(id: EntityId): Promise<MediaAsset | undefined> {
     const asset = await super.getById(id);
-    return asset ? normalizeMediaAssetOwnership(asset) : undefined;
+    return asset ? normalizeMediaAsset(asset) : undefined;
   }
 
   override async save(asset: MediaAsset): Promise<MediaAsset> {
-    return super.save(normalizeMediaAssetOwnership(asset));
+    return super.save(normalizeMediaAsset(asset));
   }
 
   async listByTripId(tripId: EntityId): Promise<MediaAsset[]> {
@@ -130,12 +130,9 @@ export class LocalMediaAssetBlobRepository implements MediaAssetBlobRepository {
   }
 
   async deleteByAssetId(assetId: EntityId): Promise<void> {
-    const blobs = await readAll<MediaAssetBlob>('mediaAssetBlobs');
-    await clearStore('mediaAssetBlobs');
-    await Promise.all(
-      blobs
-        .filter((blob) => blob.assetId !== assetId)
-        .map((blob) => putOne('mediaAssetBlobs', blob)),
-    );
+    await deleteManyById('mediaAssetBlobs', [
+      `${assetId}:original`,
+      `${assetId}:thumbnail`,
+    ]);
   }
 }

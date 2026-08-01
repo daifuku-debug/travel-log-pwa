@@ -1,5 +1,6 @@
 import type { EntityId } from '../models/common';
 import type { MediaAsset, MediaAssetUsage } from '../models/scrapbook';
+import { normalizeMediaAssetContentHash } from './mediaAssetContentHash.ts';
 
 export function normalizeMediaAssetUsage(value: unknown): MediaAssetUsage {
   return value === 'cover-only' ? 'cover-only' : 'trip';
@@ -15,6 +16,14 @@ export function normalizeMediaAssetOwnership(asset: MediaAsset): MediaAsset {
 
   const { ownerScrapbookId: _ownerScrapbookId, ...rest } = asset;
   return { ...rest, usage: 'trip' };
+}
+
+export function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
+  const normalized = normalizeMediaAssetOwnership(asset);
+  const contentHash = normalizeMediaAssetContentHash(normalized.contentHash);
+  if (contentHash) return { ...normalized, contentHash };
+  const { contentHash: _contentHash, ...rest } = normalized;
+  return rest;
 }
 
 export function isTripMediaAsset(asset: MediaAsset): boolean {

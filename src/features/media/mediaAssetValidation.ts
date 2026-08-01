@@ -1,4 +1,5 @@
 import { AppError } from '../../shared/errors.ts';
+import { webCryptoContentHasher, type ContentHasher } from './contentHasher.ts';
 
 export const MAX_MEDIA_FILE_BYTES = 12 * 1024 * 1024;
 
@@ -36,6 +37,7 @@ export interface PreparedMediaImage {
   width: number;
   height: number;
   thumbnailBlob: Blob;
+  contentHash?: string;
 }
 
 export function resolveImageMimeType(file: File): string {
@@ -59,6 +61,7 @@ export function validateImageFile(file: File): string {
 export async function prepareMediaImage(
   file: File,
   processor: MediaImageProcessor = browserMediaImageProcessor,
+  contentHasher: ContentHasher = webCryptoContentHasher,
 ): Promise<PreparedMediaImage> {
   const mimeType = validateImageFile(file);
   let decoded: DecodedMediaImage;
@@ -73,10 +76,16 @@ export async function prepareMediaImage(
   if (!decoded.width || !decoded.height) {
     throw new AppError('この画像を読み込めませんでした。別の写真を選択してください。');
   }
+  let contentHash: string;
+  try {
+    contentHash = await contentHasher.sha256(file);
+  } catch (error) {
+    throw new AppError('写真の重複確認に必要な情報を作成できませんでした。', error);
+  }
   try {
     const thumbnailBlob = await processor.createThumbnail(decoded, mimeType);
     if (!thumbnailBlob.size) throw new Error('Empty thumbnail');
-    return { file, mimeType, width: decoded.width, height: decoded.height, thumbnailBlob };
+    return { file, mimeType, width: decoded.width, height: decoded.height, thumbnailBlob, contentHash };
   } catch (error) {
     throw new AppError('写真のプレビューを作成できませんでした。別の写真を選択してください。', error);
   }

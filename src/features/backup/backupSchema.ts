@@ -14,14 +14,14 @@ import type { ManualTimelineEntry } from '../../domain/models/timeMachine';
 import type { TravelGachaDraw } from '../../domain/models/travelGacha';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../../domain/models/trip';
 import type { WishlistItem } from '../../domain/models/wishlist';
-import { normalizeMediaAssetOwnership } from '../../domain/media/mediaAssetUsage.ts';
+import { normalizeMediaAsset } from '../../domain/media/mediaAssetUsage.ts';
 import {
   migrateScrapbookBlockToV10,
   migrateScrapbookPageToV10,
   migrateScrapbookToV10,
 } from '../../domain/scrapbooks/scrapbookMigration.ts';
 
-export const BACKUP_SCHEMA_VERSION = 11;
+export const BACKUP_SCHEMA_VERSION = 12;
 
 export interface TravelLogBackup {
   app: 'travel-log-pwa';
@@ -271,9 +271,9 @@ function sanitizeMediaAssets(value: unknown, scrapbookIds: ReadonlySet<string>):
         && ['local', 'remote', 'external'].includes(asset.storageType)
         && ['local_only', 'pending', 'synced', 'failed'].includes(asset.mediaSyncStatus),
       )
-      .map(normalizeMediaAssetOwnership)
+      .map(normalizeMediaAsset)
       .map((asset) => asset.usage === 'cover-only' && !scrapbookIds.has(asset.ownerScrapbookId ?? '')
-        ? normalizeMediaAssetOwnership({ ...asset, usage: 'trip' })
+        ? normalizeMediaAsset({ ...asset, usage: 'trip' })
         : asset),
     (asset) => asset.id,
   );

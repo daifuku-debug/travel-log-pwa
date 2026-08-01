@@ -216,6 +216,7 @@ export interface MediaAsset extends BaseEntity {
   tripId: EntityId;
   usage?: MediaAssetUsage;
   ownerScrapbookId?: EntityId;
+  contentHash?: string;
   storageType: MediaStorageType;
   localReference?: string;
   remoteKey?: string;
