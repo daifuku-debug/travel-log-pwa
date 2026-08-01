@@ -53,38 +53,49 @@ interface BlockReferenceContext {
   page: ScrapbookPage;
 }
 
+export interface PersistentMediaAssetReferenceEntry {
+  assetId: EntityId;
+  field: MediaAssetReferenceField;
+  occurrenceIndex?: number;
+}
+
 export function findScrapbookMediaAssetReferences(
   scrapbook: Scrapbook,
   assetId: EntityId,
 ): MediaAssetReference[] {
   if (scrapbook.deletedAt) return [];
 
-  const base = {
-    assetId,
-    tripId: scrapbook.tripId,
-    scrapbookId: scrapbook.id,
-    ownerLabel: optionalLabel(scrapbook.title),
-  };
-  const references: MediaAssetReference[] = [];
+  return collectScrapbookMediaAssetReferenceEntries(scrapbook)
+    .filter((entry) => entry.assetId === assetId)
+    .map((entry) => ({
+      type: entry.field === 'coverSettings.photoId'
+        ? 'scrapbook-cover'
+        : entry.field === 'coverAssetId'
+          ? 'scrapbook-legacy-cover'
+          : 'scrapbook-highlight',
+      assetId,
+      tripId: scrapbook.tripId,
+      scrapbookId: scrapbook.id,
+      ownerLabel: optionalLabel(scrapbook.title),
+      field: entry.field,
+      occurrenceIndex: entry.occurrenceIndex,
+    }));
+}
 
-  if (scrapbook.coverSettings?.photoId === assetId) {
-    references.push({ ...base, type: 'scrapbook-cover', field: 'coverSettings.photoId' });
+export function collectScrapbookMediaAssetReferenceEntries(
+  scrapbook: Scrapbook,
+): PersistentMediaAssetReferenceEntry[] {
+  const entries: PersistentMediaAssetReferenceEntry[] = [];
+  if (scrapbook.coverSettings?.photoId) {
+    entries.push({ assetId: scrapbook.coverSettings.photoId, field: 'coverSettings.photoId' });
   }
-  if (scrapbook.coverAssetId === assetId) {
-    references.push({ ...base, type: 'scrapbook-legacy-cover', field: 'coverAssetId' });
+  if (scrapbook.coverAssetId) {
+    entries.push({ assetId: scrapbook.coverAssetId, field: 'coverAssetId' });
   }
-  scrapbook.highlightPhotoIds?.forEach((highlightId, occurrenceIndex) => {
-    if (highlightId === assetId) {
-      references.push({
-        ...base,
-        type: 'scrapbook-highlight',
-        field: 'highlightPhotoIds',
-        occurrenceIndex,
-      });
-    }
+  scrapbook.highlightPhotoIds?.forEach((assetId, occurrenceIndex) => {
+    entries.push({ assetId, field: 'highlightPhotoIds', occurrenceIndex });
   });
-
-  return references;
+  return entries;
 }
 
 export function findBlockMediaAssetReferences(
@@ -108,15 +119,27 @@ export function findBlockMediaAssetReferences(
     blockSortOrder: block.sortOrder,
   };
 
+  return collectBlockMediaAssetReferenceEntries(block)
+    .filter((entry) => entry.assetId === assetId)
+    .map((entry) => ({
+      ...base,
+      field: entry.field,
+      occurrenceIndex: entry.occurrenceIndex,
+    }));
+}
+
+export function collectBlockMediaAssetReferenceEntries(
+  block: ScrapbookBlock,
+): PersistentMediaAssetReferenceEntry[] {
   switch (block.type) {
     case 'photo':
-      return block.assetId === assetId ? [{ ...base, field: 'assetId' }] : [];
+      return [{ assetId: block.assetId, field: 'assetId' }];
     case 'photo_grid':
     case 'meal':
     case 'purchase':
-      return collectArrayReferences(block.assetIds, assetId, base);
+      return block.assetIds.map((assetId, occurrenceIndex) => ({ assetId, field: 'assetIds', occurrenceIndex }));
     case 'ticket':
-      return block.assetId === assetId ? [{ ...base, field: 'assetId' }] : [];
+      return block.assetId ? [{ assetId: block.assetId, field: 'assetId' }] : [];
     case 'text':
     case 'heading':
     case 'place':
@@ -192,18 +215,6 @@ export function summarizeMediaAssetReferences(
     blockCount,
     canDeleteWithoutDetaching: references.length === 0,
   };
-}
-
-function collectArrayReferences(
-  assetIds: EntityId[],
-  assetId: EntityId,
-  base: Omit<MediaAssetReference, 'field' | 'occurrenceIndex'>,
-): MediaAssetReference[] {
-  const references: MediaAssetReference[] = [];
-  assetIds.forEach((candidateId, occurrenceIndex) => {
-    if (candidateId === assetId) references.push({ ...base, field: 'assetIds', occurrenceIndex });
-  });
-  return references;
 }
 
 function getBlockLabel(block: ScrapbookBlock): string | undefined {

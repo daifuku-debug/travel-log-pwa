@@ -20,6 +20,10 @@ import {
 } from '../src/domain/media/mediaAssetUsage.ts';
 import { normalizeMediaAssetContentHash } from '../src/domain/media/mediaAssetContentHash.ts';
 import {
+  buildMediaIntegrityReport,
+  MEDIA_INTEGRITY_ISSUE_TYPES,
+} from '../src/domain/media/mediaIntegrity.ts';
+import {
   collectMediaAssetReferencesFromScrapbookGraph,
   findBlockMediaAssetReferences,
   findScrapbookMediaAssetReferences,
@@ -62,6 +66,10 @@ import {
   detachMediaAssetReferencesWithDependencies,
   MediaAssetReferenceDetachmentError,
 } from '../src/features/media/mediaAssetReferenceDetachmentLogic.ts';
+import {
+  MediaIntegrityScanError,
+  scanMediaAssetIntegrityWithDependencies,
+} from '../src/features/media/mediaIntegrityLogic.ts';
 import {
   deleteUnreferencedMediaAssetWithDependencies,
   MediaAssetDeletionError,
@@ -115,6 +123,8 @@ const coverPhotoPanelSource = await readFile(new URL('../src/features/scrapbooks
 const mediaDeleteDialogSource = await readFile(new URL('../src/features/scrapbooks/components/MediaDeleteDialog.tsx', import.meta.url), 'utf8');
 const mediaAssetDeletionServiceSource = await readFile(new URL('../src/features/media/mediaAssetDeletionService.ts', import.meta.url), 'utf8');
 const mediaAssetReferenceDetachmentServiceSource = await readFile(new URL('../src/features/media/mediaAssetReferenceDetachmentService.ts', import.meta.url), 'utf8');
+const mediaIntegrityDataSourceSource = await readFile(new URL('../src/infrastructure/localDb/mediaIntegrityDataSource.ts', import.meta.url), 'utf8');
+const mediaIntegrityServiceSource = await readFile(new URL('../src/features/media/mediaIntegrityService.ts', import.meta.url), 'utf8');
 const duplicatePhotoReviewSource = await readFile(new URL('../src/features/scrapbooks/components/DuplicatePhotoReview.tsx', import.meta.url), 'utf8');
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
@@ -1918,6 +1928,268 @@ await test('参照解除UIは明示選択・解除可否・解除後の別段階
   assert.match(mediaDeleteDialogSource, /new Set\(\)/);
   assert.match(mediaDeleteDialogSource, /protectedByDraft/);
   assert.match(stylesSource, /\.scrapbook-media-references__list > label[\s\S]*min-height: var\(--tap-target-min\)/);
+});
+
+const integrityHash = `sha256:${'a'.repeat(64)}`;
+
+function createIntegrityAsset(id, overrides = {}) {
+  return {
+    ...referenceTestBase,
+    id,
+    tripId: 'trip-1',
+    usage: 'trip',
+    contentHash: integrityHash,
+    storageType: 'local',
+    localReference: `${id}:original`,
+    thumbnailReference: `${id}:thumbnail`,
+    mimeType: 'image/png',
+    mediaSyncStatus: 'local_only',
+    ...overrides,
+  };
+}
+
+function createIntegrityBlob(assetId, kind, overrides = {}) {
+  return {
+    id: `${assetId}:${kind}`,
+    assetId,
+    kind,
+    blob: new Blob([`${assetId}:${kind}`], { type: 'image/png' }),
+    ...overrides,
+  };
+}
+
+function createIntegritySnapshot(overrides = {}) {
+  return {
+    mediaAssets: [],
+    mediaAssetBlobs: [],
+    scrapbooks: [],
+    scrapbookPages: [],
+    scrapbookBlocks: [],
+    ...overrides,
+  };
+}
+
+await test('Integrity Scanは正常なtrip写真と未使用cover-only素材を異常扱いしない', () => {
+  const tripAsset = createIntegrityAsset('asset-trip');
+  const coverAsset = createIntegrityAsset('asset-cover', {
+    usage: 'cover-only', ownerScrapbookId: 'scrapbook-owner',
+  });
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [tripAsset, coverAsset],
+    mediaAssetBlobs: [
+      createIntegrityBlob(tripAsset.id, 'original'), createIntegrityBlob(tripAsset.id, 'thumbnail'),
+      createIntegrityBlob(coverAsset.id, 'original'), createIntegrityBlob(coverAsset.id, 'thumbnail'),
+    ],
+    scrapbooks: [{ ...referenceTestScrapbook, id: 'scrapbook-owner', coverSettings: undefined, coverAssetId: undefined, highlightPhotoIds: [] }],
+  }), referenceTestNow);
+  assert.equal(report.status, 'success');
+  assert.deepEqual(report.issues, []);
+  assert.equal(report.summary.totalIssues, 0);
+  assert.equal(report.scanned.mediaAssets, 2);
+});
+
+await test('Integrity ScanはOrphan・不正Blob ID・Missing Blob・Cleanup Pendingを区別する', () => {
+  const missingOriginal = createIntegrityAsset('asset-missing-original');
+  const missingThumbnail = createIntegrityAsset('asset-missing-thumbnail');
+  const missingBoth = createIntegrityAsset('asset-missing-both');
+  const deleted = createIntegrityAsset('asset-deleted', { deletedAt: referenceTestNow });
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [missingOriginal, missingThumbnail, missingBoth, deleted],
+    mediaAssetBlobs: [
+      createIntegrityBlob(missingOriginal.id, 'thumbnail'),
+      createIntegrityBlob(missingThumbnail.id, 'original'),
+      createIntegrityBlob(deleted.id, 'original'),
+      createIntegrityBlob(deleted.id, 'thumbnail'),
+      createIntegrityBlob('asset-orphan', 'original'),
+      createIntegrityBlob('asset-orphan', 'thumbnail'),
+      createIntegrityBlob('asset-malformed', 'original', { id: 'not-a-valid-blob-id' }),
+    ],
+  }), referenceTestNow);
+  assert.equal(report.summary.byType['orphan-blob'], 2);
+  assert.equal(report.summary.byType['invalid-blob-id'], 1);
+  assert.equal(report.summary.byType['missing-original'], 2);
+  assert.equal(report.summary.byType['missing-thumbnail'], 2);
+  assert.equal(report.summary.byType['cleanup-pending'], 2);
+  assert.ok(report.issues.filter((issue) => issue.type === 'cleanup-pending').every((issue) => issue.repairability === 'repair-candidate'));
+  assert.ok(report.issues.filter((issue) => issue.assetId === missingBoth.id).every((issue) => !['orphan-blob', 'cleanup-pending'].includes(issue.type)));
+});
+
+await test('Integrity ScanはBackup由来のBlob欠損を検出だけに留め削除可能とは判定しない', () => {
+  const asset = createIntegrityAsset('asset-restored');
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({ mediaAssets: [asset] }), referenceTestNow);
+  assert.deepEqual(report.issues.map((issue) => issue.type), ['missing-original', 'missing-thumbnail']);
+  assert.equal(report.issues.find((issue) => issue.type === 'missing-original').repairability, 'manual');
+  assert.equal('canDelete' in report.summary, false);
+});
+
+await test('Integrity Scanはcover-only所有先の欠損・不存在・削除済み・Trip不一致を生データから検出する', () => {
+  const assets = [
+    createIntegrityAsset('cover-owner-missing', { usage: 'cover-only', ownerScrapbookId: undefined }),
+    createIntegrityAsset('cover-owner-unknown', { usage: 'cover-only', ownerScrapbookId: 'scrapbook-unknown' }),
+    createIntegrityAsset('cover-owner-deleted', { usage: 'cover-only', ownerScrapbookId: 'scrapbook-deleted' }),
+    createIntegrityAsset('cover-owner-mismatch', { usage: 'cover-only', ownerScrapbookId: 'scrapbook-other-trip' }),
+  ];
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: assets,
+    mediaAssetBlobs: assets.flatMap((asset) => [createIntegrityBlob(asset.id, 'original'), createIntegrityBlob(asset.id, 'thumbnail')]),
+    scrapbooks: [
+      { ...referenceTestScrapbook, id: 'scrapbook-deleted', deletedAt: referenceTestNow },
+      { ...referenceTestScrapbook, id: 'scrapbook-other-trip', tripId: 'trip-2' },
+    ],
+  }), referenceTestNow);
+  assert.deepEqual(report.issues.filter((issue) => issue.type === 'invalid-cover-owner').map((issue) => issue.reason), [
+    'owner-deleted', 'trip-mismatch', 'owner-missing', 'owner-not-found',
+  ]);
+});
+
+await test('Integrity ScanはBlob参照とcontentHashの形式不整合を内容再Hashなしで報告する', () => {
+  const asset = createIntegrityAsset('asset-invalid-fields', {
+    localReference: 'other:original',
+    thumbnailReference: 'other:thumbnail',
+    contentHash: `sha256:${'A'.repeat(64)}`,
+  });
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [asset],
+    mediaAssetBlobs: [createIntegrityBlob(asset.id, 'original'), createIntegrityBlob(asset.id, 'thumbnail')],
+  }), referenceTestNow);
+  assert.deepEqual(report.issues.map((issue) => [issue.type, issue.field]), [
+    ['invalid-blob-reference', 'localReference'],
+    ['invalid-blob-reference', 'thumbnailReference'],
+    ['invalid-content-hash', 'contentHash'],
+  ]);
+});
+
+await test('Integrity Scanは全写真参照Blockの不存在・論理削除Asset参照を検出する', () => {
+  const missingId = 'asset-missing-reference';
+  const deletedId = 'asset-deleted-reference';
+  const scrapbook = {
+    ...referenceTestScrapbook,
+    coverSettings: { photoId: missingId },
+    coverAssetId: missingId,
+    highlightPhotoIds: [missingId, missingId],
+  };
+  const blocks = createDetachmentBlocks().map((block) => {
+    if (block.type === 'photo' || block.type === 'ticket') return { ...block, assetId: missingId };
+    return { ...block, assetIds: block.assetIds.map(() => missingId) };
+  });
+  blocks.push({ ...referenceTestBase, id: 'deleted-target-ticket', pageId: 'page-1', type: 'ticket', assetId: deletedId, itemType: 'ticket', title: '削除済み', sortOrder: 60 });
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [createIntegrityAsset(deletedId, { deletedAt: referenceTestNow })],
+    scrapbooks: [scrapbook],
+    scrapbookPages: [referenceTestPage],
+    scrapbookBlocks: blocks,
+  }), referenceTestNow);
+  const dangling = report.issues.filter((issue) => issue.type === 'dangling-reference');
+  assert.equal(dangling.filter((issue) => issue.reason === 'metadata-missing').length, 14);
+  assert.equal(dangling.filter((issue) => issue.reason === 'metadata-deleted').length, 1);
+  assert.deepEqual(new Set(dangling.map((issue) => issue.field)), new Set([
+    'coverSettings.photoId', 'coverAssetId', 'highlightPhotoIds', 'assetId', 'assetIds',
+  ]));
+});
+
+await test('Integrity Scanは削除済み・所有元欠損のPage／Block参照を通常参照と分けて報告する', () => {
+  const asset = createIntegrityAsset('asset-valid-reference');
+  const deletedScrapbook = { ...referenceTestScrapbook, id: 'scrapbook-deleted-source', coverSettings: { photoId: asset.id }, coverAssetId: undefined, highlightPhotoIds: [], deletedAt: referenceTestNow };
+  const deletedPage = { ...referenceTestPage, id: 'page-deleted-source', deletedAt: referenceTestNow };
+  const deletedBlock = { ...referenceTestBase, id: 'block-deleted-source', pageId: 'page-1', type: 'ticket', assetId: asset.id, itemType: 'ticket', title: '削除済み', sortOrder: 10, deletedAt: referenceTestNow };
+  const missingPageBlock = { ...referenceTestBase, id: 'block-missing-page', pageId: 'page-missing', type: 'photo_grid', assetIds: [asset.id], columns: 2, sortOrder: 20 };
+  const pageDeletedBlock = { ...referenceTestBase, id: 'block-on-deleted-page', pageId: deletedPage.id, type: 'meal', name: '記録', assetIds: [asset.id], isBestMeal: false, sortOrder: 30 };
+  const activeScrapbook = { ...referenceTestScrapbook, coverSettings: undefined, coverAssetId: undefined, highlightPhotoIds: [] };
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [asset],
+    mediaAssetBlobs: [createIntegrityBlob(asset.id, 'original'), createIntegrityBlob(asset.id, 'thumbnail')],
+    scrapbooks: [activeScrapbook, deletedScrapbook],
+    scrapbookPages: [referenceTestPage, deletedPage],
+    scrapbookBlocks: [deletedBlock, missingPageBlock, pageDeletedBlock],
+  }), referenceTestNow);
+  assert.deepEqual(
+    report.issues.filter((issue) => issue.type === 'stale-reference-source').map((issue) => issue.reason).sort(),
+    ['block-deleted', 'page-deleted', 'page-missing', 'scrapbook-deleted'],
+  );
+  assert.equal(report.issues.some((issue) => issue.type === 'dangling-reference'), false);
+});
+
+await test('Integrity Reportはtype・旅行・Asset・参照位置の安定順とSummaryを持つ', () => {
+  const report = buildMediaIntegrityReport(createIntegritySnapshot({
+    mediaAssets: [createIntegrityAsset('z-asset'), createIntegrityAsset('a-asset')],
+    mediaAssetBlobs: [createIntegrityBlob('orphan-z', 'thumbnail'), createIntegrityBlob('orphan-a', 'original')],
+  }), referenceTestNow);
+  const typeIndexes = report.issues.map((issue) => MEDIA_INTEGRITY_ISSUE_TYPES.indexOf(issue.type));
+  assert.deepEqual(typeIndexes, typeIndexes.slice().sort((left, right) => left - right));
+  assert.deepEqual(report.issues.filter((issue) => issue.type === 'orphan-blob').map((issue) => issue.assetId), ['orphan-a', 'orphan-z']);
+  assert.equal(report.summary.totalIssues, report.issues.length);
+  assert.equal(report.summary.errorCount + report.summary.warningCount, report.issues.length);
+  assert.equal(Object.keys(report.summary.byType).length, MEDIA_INTEGRITY_ISSUE_TYPES.length);
+});
+
+function createIntegrityScanDependencies(overrides = {}) {
+  const calls = [];
+  const track = (name, value) => async () => { calls.push(name); return value; };
+  return {
+    calls,
+    dependencies: {
+      listMediaAssetsRaw: track('media-assets', []),
+      listMediaAssetBlobsRaw: track('media-asset-blobs', []),
+      listScrapbooksRaw: track('scrapbooks', []),
+      listScrapbookPagesRaw: track('scrapbook-pages', []),
+      listScrapbookBlocksRaw: track('scrapbook-blocks', []),
+      now: () => referenceTestNow,
+      ...overrides,
+    },
+  };
+}
+
+await test('Integrity Scan Serviceは5 Storeを各1回だけ走査し入力データを変更しない', async () => {
+  const asset = createIntegrityAsset('asset-read-once');
+  const snapshot = createIntegritySnapshot({
+    mediaAssets: [asset],
+    mediaAssetBlobs: [createIntegrityBlob(asset.id, 'original'), createIntegrityBlob(asset.id, 'thumbnail')],
+  });
+  const before = structuredClone(snapshot);
+  const state = createIntegrityScanDependencies({
+    listMediaAssetsRaw: async () => { state.calls.push('media-assets'); return snapshot.mediaAssets; },
+    listMediaAssetBlobsRaw: async () => { state.calls.push('media-asset-blobs'); return snapshot.mediaAssetBlobs; },
+    listScrapbooksRaw: async () => { state.calls.push('scrapbooks'); return snapshot.scrapbooks; },
+    listScrapbookPagesRaw: async () => { state.calls.push('scrapbook-pages'); return snapshot.scrapbookPages; },
+    listScrapbookBlocksRaw: async () => { state.calls.push('scrapbook-blocks'); return snapshot.scrapbookBlocks; },
+  });
+  const report = await scanMediaAssetIntegrityWithDependencies(state.dependencies);
+  assert.equal(report.summary.totalIssues, 0);
+  assert.deepEqual(state.calls.slice().sort(), ['media-asset-blobs', 'media-assets', 'scrapbook-blocks', 'scrapbook-pages', 'scrapbooks']);
+  assert.deepEqual(snapshot, before);
+  assert.equal((mediaIntegrityDataSourceSource.match(/readAll</g) ?? []).length, 5);
+  assert.doesNotMatch(mediaIntegrityDataSourceSource, /putOne|delete|clearStore/);
+  assert.match(mediaIntegrityServiceSource, /scanMediaAssetIntegrityWithDependencies/);
+});
+
+await test('Integrity Scanは部分取得失敗と完全取得失敗を空の正常結果にしない', async () => {
+  const partial = createIntegrityScanDependencies({
+    listMediaAssetBlobsRaw: async () => { partial.calls.push('media-asset-blobs'); throw new Error('blob read failed'); },
+  });
+  await assert.rejects(
+    scanMediaAssetIntegrityWithDependencies(partial.dependencies),
+    (error) => error instanceof MediaIntegrityScanError
+      && error.code === 'partial-read-failure'
+      && error.failedStages.includes('media-asset-blobs')
+      && error.completedStages.length === 4,
+  );
+  assert.equal(partial.calls.length, 5);
+
+  const failure = async () => { throw new Error('read failed'); };
+  const complete = createIntegrityScanDependencies({
+    listMediaAssetsRaw: failure,
+    listMediaAssetBlobsRaw: failure,
+    listScrapbooksRaw: failure,
+    listScrapbookPagesRaw: failure,
+    listScrapbookBlocksRaw: failure,
+  });
+  await assert.rejects(
+    scanMediaAssetIntegrityWithDependencies(complete.dependencies),
+    (error) => error instanceof MediaIntegrityScanError
+      && error.code === 'complete-read-failure'
+      && error.failedStages.length === 5
+      && error.completedStages.length === 0,
+  );
 });
 
 function createDeletionDependencies(overrides = {}) {
