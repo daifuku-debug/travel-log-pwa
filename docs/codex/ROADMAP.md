@@ -10,10 +10,10 @@
 | Phase 5-A.2.3-D-B1 | 完了 | 原本SHA-256、`contentHash`、完全一致検索、Backup v12 |
 | Phase 5-A.2.3-D-B2 | 完了 | 完全一致重複確認、既存写真再利用、明示的新規追加 |
 | Phase 5-A.2.3-D-C1 | 完了 | MediaAssetの永続参照検索と参照サマリー |
-| Phase 5-A.2.3-D-C2 | 次 | 参照ゼロ写真だけを対象にした安全なmetadata＋Blob削除 |
-| Phase 5-A.2.3-D-C3 | 未着手 | 参照一覧UI、明示的な参照解除、使用中写真の削除方針 |
+| Phase 5-A.2.3-D-C2 | 完了 | 参照ゼロ写真だけを対象にした安全なmetadata＋Blob削除 |
+| Phase 5-A.2.3-D-C3 | 次 | 参照一覧UI、明示的な参照解除、使用中写真の削除方針 |
 | Phase 5-A.2.3-D-D | 未着手 | Integrity Scan、Orphan Blob検出、Missing thumbnail修復 |
 | Trip削除カスケード | 別系統 | Trip、Scrapbook、Page、Block、MediaAsset、Blobの整合した削除 |
 | 写真込みBackup／R2同期 | 別系統 | Blobを含む復元可能なBackupとCloudflare同期 |
 
-次Phaseでは、参照検索が成功し`references.length === 0`である写真だけを削除対象とし、参照付き写真の自動解除、Integrity Scan、Trip削除カスケードを混ぜません。
+次Phaseでは、使用中写真の参照先をユーザーへ示し、明示的な参照解除を安全に行う設計へ進みます。Integrity ScanとTrip削除カスケードは混ぜません。
