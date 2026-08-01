@@ -20,6 +20,12 @@ import {
 } from '../src/domain/media/mediaAssetUsage.ts';
 import { normalizeMediaAssetContentHash } from '../src/domain/media/mediaAssetContentHash.ts';
 import {
+  collectMediaAssetReferencesFromScrapbookGraph,
+  findBlockMediaAssetReferences,
+  findScrapbookMediaAssetReferences,
+  summarizeMediaAssetReferences,
+} from '../src/domain/media/mediaAssetReferences.ts';
+import {
   collectScrapbookMediaAssetIds,
   mergeGeneratedScrapbookFields,
 } from '../src/features/scrapbooks/scrapbookRevision.ts';
@@ -46,6 +52,7 @@ import {
 import { persistPreparedTripMediaAsset } from '../src/features/media/mediaAssetPersistence.ts';
 import { webCryptoContentHasher } from '../src/features/media/contentHasher.ts';
 import { findExactDuplicateMediaAssetsWithDependencies } from '../src/features/media/mediaAssetDuplicateLogic.ts';
+import { findMediaAssetReferencesWithDependencies } from '../src/features/media/mediaAssetReferenceLogic.ts';
 import { calculateLevelProgress, expRequiredForNextLevel } from '../src/features/rpg/rpgLevel.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
@@ -1493,6 +1500,207 @@ await test('完全一致検索は候補を絞ってHashなしAssetを遅延計�
   assert.deepEqual(hashedBlobIds, ['lazy:original']);
   assert.equal(saved.length, 1);
   assert.equal(saved[0].contentHash, targetHash);
+});
+
+const referenceTestNow = '2026-07-26T00:00:00.000Z';
+const referenceTestBase = {
+  userId: 'local-user',
+  createdAt: referenceTestNow,
+  updatedAt: referenceTestNow,
+  syncStatus: 'pending',
+};
+const referenceTestScrapbook = {
+  ...referenceTestBase,
+  id: 'scrapbook-1',
+  tripId: 'trip-1',
+  origin: 'generated',
+  title: '京都の旅',
+  coverSettings: { photoId: 'asset-target' },
+  coverAssetId: 'asset-target',
+  highlightPhotoIds: ['asset-target', 'asset-other', 'asset-target'],
+  coverLayout: 'journal',
+  themeId: 'journal',
+  layoutMode: 'pages',
+  status: 'draft',
+  isFavorite: false,
+  version: 1,
+};
+const referenceTestPage = {
+  ...referenceTestBase,
+  id: 'page-1',
+  scrapbookId: 'scrapbook-1',
+  title: '旅の景色',
+  sortOrder: 10,
+  pageKind: 'photo',
+  layoutType: 'section',
+};
+
+await test('MediaAsset参照抽出は表紙・旧表紙・ハイライトの永続フィールドを個別に返す', () => {
+  const references = findScrapbookMediaAssetReferences(referenceTestScrapbook, 'asset-target');
+  assert.deepEqual(references.map((reference) => [reference.type, reference.field, reference.occurrenceIndex]), [
+    ['scrapbook-cover', 'coverSettings.photoId', undefined],
+    ['scrapbook-legacy-cover', 'coverAssetId', undefined],
+    ['scrapbook-highlight', 'highlightPhotoIds', 0],
+    ['scrapbook-highlight', 'highlightPhotoIds', 2],
+  ]);
+  assert.ok(references.every((reference) => reference.ownerLabel === '京都の旅'));
+  assert.deepEqual(findScrapbookMediaAssetReferences(referenceTestScrapbook, 'missing'), []);
+});
+
+await test('MediaAsset参照抽出は写真を保持する5種類のBlockと配列内重複を網羅する', () => {
+  const context = { tripId: 'trip-1', scrapbookId: 'scrapbook-1', page: referenceTestPage };
+  const blocks = [
+    { ...referenceTestBase, id: 'photo', pageId: 'page-1', type: 'photo', assetId: 'asset-target', title: '一枚', displaySize: 'large', sortOrder: 10 },
+    { ...referenceTestBase, id: 'grid', pageId: 'page-1', type: 'photo_grid', assetIds: ['asset-target', 'asset-other', 'asset-target'], title: '景色', columns: 3, sortOrder: 20 },
+    { ...referenceTestBase, id: 'meal', pageId: 'page-1', type: 'meal', name: '昼食', assetIds: ['asset-target'], isBestMeal: false, sortOrder: 30 },
+    { ...referenceTestBase, id: 'ticket', pageId: 'page-1', type: 'ticket', assetId: 'asset-target', itemType: 'ticket', title: '乗車券', sortOrder: 40 },
+    { ...referenceTestBase, id: 'purchase', pageId: 'page-1', type: 'purchase', name: 'お土産', assetIds: ['asset-target'], sortOrder: 50 },
+    { ...referenceTestBase, id: 'place', pageId: 'page-1', type: 'place', locationId: 'place-1', snapshotName: '京都駅', sortOrder: 60 },
+  ];
+  const references = blocks.flatMap((block) => findBlockMediaAssetReferences(block, context, 'asset-target'));
+  assert.deepEqual(references.map((reference) => [reference.blockType, reference.field, reference.occurrenceIndex]), [
+    ['photo', 'assetId', undefined],
+    ['photo_grid', 'assetIds', 0],
+    ['photo_grid', 'assetIds', 2],
+    ['meal', 'assetIds', 0],
+    ['ticket', 'assetId', undefined],
+    ['purchase', 'assetIds', 0],
+  ]);
+  assert.equal(references.some((reference) => reference.blockType === 'place'), false);
+  assert.deepEqual(findBlockMediaAssetReferences({
+    ...referenceTestBase, id: 'ticket-empty', pageId: 'page-1', type: 'ticket', itemType: 'ticket', title: '未設定', sortOrder: 70,
+  }, context, 'asset-target'), []);
+  assert.deepEqual(findBlockMediaAssetReferences({
+    ...referenceTestBase, id: 'grid-empty', pageId: 'page-1', type: 'photo_grid', assetIds: [], columns: 2, sortOrder: 80,
+  }, context, 'asset-target'), []);
+});
+
+await test('MediaAsset参照Graphは論理削除を除外し表紙・ページ・Block・配列順で安定する', () => {
+  const pageLater = { ...referenceTestPage, id: 'page-z', title: '後のページ', sortOrder: 20 };
+  const pageEarlier = { ...referenceTestPage, id: 'page-a', title: '先のページ', sortOrder: 10 };
+  const pageDeleted = { ...referenceTestPage, id: 'page-deleted', deletedAt: referenceTestNow, sortOrder: 1 };
+  const photoBlock = (id, pageId, sortOrder, extra = {}) => ({
+    ...referenceTestBase, id, pageId, type: 'photo_grid', assetIds: ['asset-target'], columns: 2, sortOrder, ...extra,
+  });
+  const references = collectMediaAssetReferencesFromScrapbookGraph({
+    scrapbook: referenceTestScrapbook,
+    pages: [
+      { page: pageLater, blocks: [photoBlock('block-z', pageLater.id, 10), photoBlock('block-a', pageLater.id, 10)] },
+      { page: pageDeleted, blocks: [photoBlock('deleted-page-block', pageDeleted.id, 1)] },
+      { page: pageEarlier, blocks: [
+        photoBlock('deleted-block', pageEarlier.id, 1, { deletedAt: referenceTestNow }),
+        photoBlock('block-first', pageEarlier.id, 5),
+      ] },
+    ],
+  }, 'asset-target');
+  assert.deepEqual(references.map((reference) => reference.type), [
+    'scrapbook-cover', 'scrapbook-legacy-cover', 'scrapbook-highlight', 'scrapbook-highlight',
+    'scrapbook-block', 'scrapbook-block', 'scrapbook-block',
+  ]);
+  assert.deepEqual(references.filter((reference) => reference.blockId).map((reference) => reference.blockId), [
+    'block-first', 'block-a', 'block-z',
+  ]);
+  assert.equal(references.some((reference) => reference.blockId?.includes('deleted')), false);
+  assert.deepEqual(collectMediaAssetReferencesFromScrapbookGraph({
+    scrapbook: { ...referenceTestScrapbook, deletedAt: referenceTestNow },
+    pages: [{ page: pageEarlier, blocks: [photoBlock('block', pageEarlier.id, 1)] }],
+  }, 'asset-target'), []);
+});
+
+await test('MediaAsset参照サマリーは削除前の参照解除要否を集計する', () => {
+  const references = collectMediaAssetReferencesFromScrapbookGraph({
+    scrapbook: referenceTestScrapbook,
+    pages: [{
+      page: referenceTestPage,
+      blocks: [{ ...referenceTestBase, id: 'photo', pageId: 'page-1', type: 'photo', assetId: 'asset-target', displaySize: 'large', sortOrder: 10 }],
+    }],
+  }, 'asset-target');
+  assert.deepEqual(summarizeMediaAssetReferences(references), {
+    totalCount: 5,
+    coverCount: 2,
+    highlightCount: 2,
+    blockCount: 1,
+    canDeleteWithoutDetaching: false,
+  });
+  assert.deepEqual(summarizeMediaAssetReferences([]), {
+    totalCount: 0,
+    coverCount: 0,
+    highlightCount: 0,
+    blockCount: 0,
+    canDeleteWithoutDetaching: true,
+  });
+});
+
+function createReferenceServiceDependencies(overrides = {}) {
+  const photoBlock = { ...referenceTestBase, id: 'photo', pageId: 'page-1', type: 'photo', assetId: 'asset-target', displaySize: 'large', sortOrder: 10 };
+  return {
+    mediaAssets: { getById: async () => ({ ...referenceTestBase, id: 'asset-target', tripId: 'trip-1' }) },
+    scrapbooks: { list: async () => [referenceTestScrapbook, { ...referenceTestScrapbook, id: 'scrapbook-other', tripId: 'trip-2' }] },
+    scrapbookPages: { listByScrapbookId: async (scrapbookId) => scrapbookId === 'scrapbook-1' ? [referenceTestPage] : [] },
+    scrapbookBlocks: { listByPageId: async (pageId) => pageId === 'page-1' ? [photoBlock] : [] },
+    ...overrides,
+  };
+}
+
+await test('MediaAsset参照ServiceはAssetのTripへ範囲を絞り永続Graphだけを検索する', async () => {
+  const calls = [];
+  const dependencies = createReferenceServiceDependencies({
+    scrapbookPages: {
+      listByScrapbookId: async (scrapbookId) => {
+        calls.push(scrapbookId);
+        return scrapbookId === 'scrapbook-1' ? [referenceTestPage] : [];
+      },
+    },
+  });
+  const references = await findMediaAssetReferencesWithDependencies({ assetId: 'asset-target' }, dependencies);
+  assert.deepEqual(calls, ['scrapbook-1']);
+  assert.deepEqual(references.map((reference) => reference.type), [
+    'scrapbook-cover', 'scrapbook-legacy-cover', 'scrapbook-highlight', 'scrapbook-highlight', 'scrapbook-block',
+  ]);
+  assert.ok(references.every((reference) => reference.tripId === 'trip-1'));
+});
+
+await test('MediaAsset参照Serviceはmetadata欠損時も全ScrapbookからDangling参照を検索できる', async () => {
+  const dependencies = createReferenceServiceDependencies({
+    mediaAssets: { getById: async () => undefined },
+    scrapbookPages: {
+      listByScrapbookId: async (scrapbookId) => scrapbookId === 'scrapbook-1' ? [referenceTestPage] : [],
+    },
+  });
+  const references = await findMediaAssetReferencesWithDependencies({ assetId: 'asset-target' }, dependencies);
+  assert.ok(references.length > 0);
+  assert.deepEqual([...new Set(references.map((reference) => reference.scrapbookId))], [
+    'scrapbook-1', 'scrapbook-other',
+  ]);
+});
+
+await test('MediaAsset参照Serviceは取得失敗を参照0件として扱わず段階付きErrorを返す', async () => {
+  await assert.rejects(findMediaAssetReferencesWithDependencies({ assetId: 'asset-target' }, createReferenceServiceDependencies({
+    mediaAssets: { getById: async () => { throw new Error('asset failed'); } },
+  })), /写真情報の取得中/);
+  await assert.rejects(findMediaAssetReferencesWithDependencies({ assetId: 'asset-target', tripId: 'trip-1' }, createReferenceServiceDependencies({
+    scrapbooks: { list: async () => { throw new Error('scrapbooks failed'); } },
+  })), /スクラップブック一覧の取得中/);
+  await assert.rejects(findMediaAssetReferencesWithDependencies({ assetId: 'asset-target' }, createReferenceServiceDependencies({
+    scrapbookPages: { listByScrapbookId: async () => { throw new Error('pages failed'); } },
+  })), /ページ取得中/);
+  await assert.rejects(findMediaAssetReferencesWithDependencies({ assetId: 'asset-target' }, createReferenceServiceDependencies({
+    scrapbookBlocks: { listByPageId: async () => { throw new Error('blocks failed'); } },
+  })), /ブロック取得中/);
+});
+
+await test('MediaAsset参照検索は派生表示・Draft・Pending・Blob参照を永続参照へ数えない', () => {
+  const references = findBlockMediaAssetReferences({
+    ...referenceTestBase,
+    id: 'text',
+    pageId: 'page-1',
+    type: 'text',
+    title: 'Home Hero TimeMachine Draft Pending localReference asset-target',
+    text: 'asset-target',
+    textStyle: 'body',
+    sortOrder: 10,
+  }, { tripId: 'trip-1', scrapbookId: 'scrapbook-1', page: referenceTestPage }, 'asset-target');
+  assert.deepEqual(references, []);
 });
 
 await test('表紙写真追加はPending確認後に保存し、古い非同期結果とObject URLを管理する', () => {
