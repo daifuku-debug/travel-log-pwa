@@ -92,6 +92,7 @@ const mediaAssetPersistenceSource = await readFile(new URL('../src/features/medi
 const backupServiceSource = await readFile(new URL('../src/features/backup/backupService.ts', import.meta.url), 'utf8');
 const coverPhotoImportSource = await readFile(new URL('../src/features/scrapbooks/useCoverPhotoImport.ts', import.meta.url), 'utf8');
 const coverPhotoPanelSource = await readFile(new URL('../src/features/scrapbooks/components/CoverPhotoPanel.tsx', import.meta.url), 'utf8');
+const duplicatePhotoReviewSource = await readFile(new URL('../src/features/scrapbooks/components/DuplicatePhotoReview.tsx', import.meta.url), 'utf8');
 const scrapbookPage = await readFile(new URL('../src/pages/ScrapbookPage.tsx', import.meta.url), 'utf8');
 const localScrapbookRepository = await readFile(new URL('../src/infrastructure/localDb/LocalScrapbookRepository.ts', import.meta.url), 'utf8');
 const localDbSource = await readFile(new URL('../src/infrastructure/localDb/db.ts', import.meta.url), 'utf8');
@@ -1541,6 +1542,50 @@ await test('表紙写真追加はPending内で保存先を選び用途に応じ�
   assert.match(coverPhotoPanelSource, /表紙専用として追加/);
   assert.match(coverPhotoPanelSource, /disabled=\{isBusy\}/);
   assert.match(coverPhotoPanelSource, /表紙専用/);
+});
+
+await test('表紙写真追加は保存前に完全一致検索を行い古い検索結果を無視する', () => {
+  assert.match(coverPhotoImportSource, /prepareMediaImage\(file\)[\s\S]*checkForDuplicates/);
+  assert.match(coverPhotoImportSource, /findExactDuplicateMediaAssets/);
+  assert.match(coverPhotoImportSource, /requestIdRef\.current !== requestId/);
+  assert.match(coverPhotoImportSource, /status: 'checking-duplicates'/);
+  assert.match(coverPhotoPanelSource, /同じ写真がないか確認しています/);
+});
+
+await test('完全一致写真はPending内で既存写真と比較できる', () => {
+  assert.match(duplicatePhotoReviewSource, /同じ写真がすでに保存されています/);
+  assert.match(duplicatePhotoReviewSource, /既存の写真/);
+  assert.match(duplicatePhotoReviewSource, /今回選んだ写真/);
+  assert.match(duplicatePhotoReviewSource, /既存写真を使う/);
+  assert.match(duplicatePhotoReviewSource, /新しく追加する/);
+  assert.match(duplicatePhotoReviewSource, /aria-live="polite"/);
+  assert.match(duplicatePhotoReviewSource, /role="radiogroup"/);
+});
+
+await test('既存写真の再利用は新規保存せず表紙Draftだけを更新する', () => {
+  const reuseImplementation = coverPhotoImportSource.match(/const reuseDuplicate[\s\S]*?\n  }, \[pending, releasePreview\]\);/)?.[0] ?? '';
+  assert.match(reuseImplementation, /releasePreview\(\)/);
+  assert.match(reuseImplementation, /setPending\(undefined\)/);
+  assert.doesNotMatch(reuseImplementation, /savePreparedTripMediaAsset/);
+  assert.match(scrapbookEditorSource, /const asset = coverPhotoImport\.reuseDuplicate\(\)/);
+  assert.match(scrapbookEditorSource, /coverPhotoId: asset\.id/);
+  assert.match(scrapbookEditorSource, /setAddedMediaAssets/);
+});
+
+await test('新規追加を選ぶと保存先とPendingを維持して重複確認を再表示しない', () => {
+  assert.match(coverPhotoImportSource, /duplicateReviewStatus: 'bypassed'/);
+  assert.match(coverPhotoImportSource, /\['none', 'bypassed'\]\.includes\(pending\.duplicateReviewStatus\)/);
+  assert.match(coverPhotoPanelSource, /同じ写真を新しく追加します/);
+  assert.match(coverPhotoPanelSource, /isDuplicateReview \?/);
+  assert.match(coverPhotoPanelSource, /<fieldset className="scrapbook-cover-destination"/);
+});
+
+await test('重複検索失敗時はPendingを保ち再確認か確認なし追加を選べる', () => {
+  assert.match(coverPhotoImportSource, /duplicateReviewStatus: 'error'/);
+  assert.match(coverPhotoImportSource, /確認せずに新しく追加できます/);
+  assert.match(coverPhotoPanelSource, /もう一度確認/);
+  assert.match(coverPhotoPanelSource, /確認せず追加/);
+  assert.match(coverPhotoPanelSource, /role="alert"/);
 });
 
 await test('表紙専用写真は通常写真の件数・本文・タイムマシンから除外する', () => {

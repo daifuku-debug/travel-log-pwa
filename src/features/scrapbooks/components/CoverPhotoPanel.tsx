@@ -6,6 +6,7 @@ import { BottomSheet, Button, InlineError } from '../../../shared/ui';
 import type { PendingCoverPhoto } from '../useCoverPhotoImport';
 import type { TripDetail } from '../../trips/tripService';
 import { TripJournalVisual } from '../../trips/components/TripJournalVisual';
+import { DuplicatePhotoReview } from './DuplicatePhotoReview';
 import { ScrapbookMediaImage } from './ScrapbookMediaImage';
 
 export function CoverPhotoPanel({
@@ -18,6 +19,10 @@ export function CoverPhotoPanel({
   onApplyPending,
   onCancelPending,
   onDestinationChange,
+  onSelectDuplicate,
+  onReuseDuplicate,
+  onBypassDuplicateReview,
+  onRetryDuplicateReview,
 }: {
   selectedPhotoId?: EntityId;
   mediaAssets: MediaAsset[];
@@ -28,15 +33,28 @@ export function CoverPhotoPanel({
   onApplyPending: () => void;
   onCancelPending: () => void;
   onDestinationChange: (destination: PendingCoverPhoto['destination']) => void;
+  onSelectDuplicate: (assetId: EntityId) => void;
+  onReuseDuplicate: () => void;
+  onBypassDuplicateReview: () => void;
+  onRetryDuplicateReview: () => void;
 }) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const libraryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const sourcePrimaryActionRef = useRef<HTMLButtonElement>(null);
   const selectedAsset = mediaAssets.find((asset) => asset.id === selectedPhotoId);
-  const isBusy = pendingPhoto?.status === 'validating' || pendingPhoto?.status === 'saving';
-  const canApplyPending = Boolean(pendingPhoto?.previewUrl) && pendingPhoto?.status !== 'validating';
+  const isBusy = pendingPhoto?.status === 'validating'
+    || pendingPhoto?.status === 'checking-duplicates'
+    || pendingPhoto?.status === 'saving';
+  const canApplyPending = Boolean(pendingPhoto?.previewUrl)
+    && ['none', 'bypassed'].includes(pendingPhoto?.duplicateReviewStatus ?? '')
+    && pendingPhoto?.status !== 'saving';
   const isSaveError = pendingPhoto?.status === 'error' && Boolean(pendingPhoto.previewUrl);
+  const isDuplicateReview = pendingPhoto?.duplicateReviewStatus === 'found';
+  const isDuplicateCheckError = pendingPhoto?.duplicateReviewStatus === 'error';
+  const showPendingForm = Boolean(pendingPhoto?.previewUrl)
+    && pendingPhoto?.status !== 'validating'
+    && pendingPhoto?.status !== 'checking-duplicates';
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -86,60 +104,97 @@ export function CoverPhotoPanel({
           className={`scrapbook-cover-import${pendingPhoto.status === 'error' ? ' has-error' : ''}`}
           aria-busy={isBusy || undefined}
         >
-          <div className="scrapbook-cover-import__heading">
-            <span>追加前の写真</span>
-            <p>保存先を選んで、表紙の候補として追加します。</p>
-          </div>
-          {pendingPhoto.previewUrl && (
-            <div className="scrapbook-cover-import__preview">
-              <img src={pendingPhoto.previewUrl} alt={`${pendingPhoto.file.name}の追加前プレビュー`} />
-            </div>
+          {isDuplicateReview ? (
+            <DuplicatePhotoReview
+              pendingPhoto={pendingPhoto}
+              onSelectDuplicate={onSelectDuplicate}
+              onReuseDuplicate={onReuseDuplicate}
+              onAddNew={onBypassDuplicateReview}
+              onCancel={onCancelPending}
+            />
+          ) : (
+            <>
+              <div className="scrapbook-cover-import__heading">
+                <span>追加前の写真</span>
+                <p>保存先を選んで、表紙の候補として追加します。</p>
+              </div>
+              {pendingPhoto.previewUrl && (
+                <div className="scrapbook-cover-import__preview">
+                  <img src={pendingPhoto.previewUrl} alt={`${pendingPhoto.file.name}の追加前プレビュー`} />
+                </div>
+              )}
+              <div className="scrapbook-cover-import__details">
+                <strong>{pendingPhoto.file.name || '選択した写真'}</strong>
+                <span>
+                  {formatFileSize(pendingPhoto.file.size)}
+                  {pendingPhoto.width && pendingPhoto.height ? ` · ${pendingPhoto.width} × ${pendingPhoto.height}px` : ''}
+                </span>
+              </div>
+              {pendingPhoto.status === 'validating' && <p className="scrapbook-cover-import__status" role="status">写真を確認しています…</p>}
+              {pendingPhoto.status === 'checking-duplicates' && <p className="scrapbook-cover-import__status" role="status">同じ写真がないか確認しています…</p>}
+              {isDuplicateCheckError ? (
+                <div className="scrapbook-cover-import__check-error" role="alert">
+                  <InlineError message={pendingPhoto.error ?? '同じ写真があるか確認できませんでした。'} />
+                  <div className="scrapbook-cover-import__actions">
+                    <Button variant="primary" onClick={onRetryDuplicateReview}>もう一度確認</Button>
+                    <Button onClick={onBypassDuplicateReview}>確認せず追加</Button>
+                    <Button variant="ghost" onClick={onCancelPending}>キャンセル</Button>
+                  </div>
+                </div>
+              ) : showPendingForm ? (
+                <>
+                  {pendingPhoto.duplicateReviewStatus === 'bypassed' && (
+                    <p className="scrapbook-cover-import__notice" role="status">同じ写真を新しく追加します</p>
+                  )}
+                  <fieldset className="scrapbook-cover-destination" disabled={isBusy}>
+                    <legend>保存先</legend>
+                    <label className={pendingPhoto.destination === 'trip' ? 'is-selected' : ''}>
+                      <input
+                        type="radio"
+                        name="cover-photo-destination"
+                        value="trip"
+                        checked={pendingPhoto.destination === 'trip'}
+                        onChange={() => onDestinationChange('trip')}
+                      />
+                      <span><strong>旅行写真として追加</strong><small>旅行の写真一覧や本文でも使用できます</small></span>
+                    </label>
+                    <label className={pendingPhoto.destination === 'cover-only' ? 'is-selected' : ''}>
+                      <input
+                        type="radio"
+                        name="cover-photo-destination"
+                        value="cover-only"
+                        checked={pendingPhoto.destination === 'cover-only'}
+                        onChange={() => onDestinationChange('cover-only')}
+                      />
+                      <span><strong>表紙専用として追加</strong><small>この旅行雑誌の表紙素材として保存します</small></span>
+                    </label>
+                  </fieldset>
+                  {pendingPhoto.status === 'saving' && <p className="scrapbook-cover-import__status" role="status">写真を保存しています…</p>}
+                  {pendingPhoto.error && <InlineError message={pendingPhoto.error} />}
+                  <div className="scrapbook-cover-import__actions">
+                    <Button
+                      variant="primary"
+                      loading={pendingPhoto.status === 'saving'}
+                      disabled={!canApplyPending}
+                      onClick={onApplyPending}
+                    >
+                      {isSaveError ? 'もう一度試す' : pendingPhoto.status === 'saving' ? '写真を保存しています' : 'この写真を使う'}
+                    </Button>
+                    <Button disabled={isBusy} onClick={() => setSourceOpen(true)}>別の写真を選ぶ</Button>
+                    <Button variant="ghost" disabled={isBusy} onClick={onCancelPending}>キャンセル</Button>
+                  </div>
+                </>
+              ) : pendingPhoto.status === 'error' ? (
+                <>
+                  {pendingPhoto.error && <InlineError message={pendingPhoto.error} />}
+                  <div className="scrapbook-cover-import__actions">
+                    <Button onClick={() => setSourceOpen(true)}>別の写真を選ぶ</Button>
+                    <Button variant="ghost" onClick={onCancelPending}>キャンセル</Button>
+                  </div>
+                </>
+              ) : null}
+            </>
           )}
-          <div className="scrapbook-cover-import__details">
-            <strong>{pendingPhoto.file.name || '選択した写真'}</strong>
-            <span>
-              {formatFileSize(pendingPhoto.file.size)}
-              {pendingPhoto.width && pendingPhoto.height ? ` · ${pendingPhoto.width} × ${pendingPhoto.height}px` : ''}
-            </span>
-          </div>
-          <fieldset className="scrapbook-cover-destination" disabled={isBusy}>
-            <legend>保存先</legend>
-            <label className={pendingPhoto.destination === 'trip' ? 'is-selected' : ''}>
-              <input
-                type="radio"
-                name="cover-photo-destination"
-                value="trip"
-                checked={pendingPhoto.destination === 'trip'}
-                onChange={() => onDestinationChange('trip')}
-              />
-              <span><strong>旅行写真として追加</strong><small>旅行の写真一覧や本文でも使用できます</small></span>
-            </label>
-            <label className={pendingPhoto.destination === 'cover-only' ? 'is-selected' : ''}>
-              <input
-                type="radio"
-                name="cover-photo-destination"
-                value="cover-only"
-                checked={pendingPhoto.destination === 'cover-only'}
-                onChange={() => onDestinationChange('cover-only')}
-              />
-              <span><strong>表紙専用として追加</strong><small>この旅行雑誌の表紙素材として保存します</small></span>
-            </label>
-          </fieldset>
-          {pendingPhoto.status === 'validating' && <p className="scrapbook-cover-import__status" role="status">写真を確認しています…</p>}
-          {pendingPhoto.status === 'saving' && <p className="scrapbook-cover-import__status" role="status">写真を保存しています…</p>}
-          {pendingPhoto.error && <InlineError message={pendingPhoto.error} />}
-          <div className="scrapbook-cover-import__actions">
-            <Button
-              variant="primary"
-              loading={pendingPhoto.status === 'saving'}
-              disabled={!canApplyPending}
-              onClick={onApplyPending}
-            >
-              {isSaveError ? 'もう一度試す' : pendingPhoto.status === 'saving' ? '写真を保存しています' : 'この写真を使う'}
-            </Button>
-            <Button disabled={isBusy} onClick={() => setSourceOpen(true)}>別の写真を選ぶ</Button>
-            <Button variant="ghost" disabled={isBusy} onClick={onCancelPending}>キャンセル</Button>
-          </div>
         </div>
       ) : (
         <div className="scrapbook-cover-photo-library">

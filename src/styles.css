@@ -4442,6 +4442,207 @@ body.scrapbook-editor-active .bottom-sheet .field select {
   width: 100%;
 }
 
+.scrapbook-cover-import__notice {
+  margin: 0;
+  border-left: 2px solid rgba(112, 189, 177, .65);
+  color: rgba(237, 242, 240, .72);
+  padding: 7px 10px;
+  font-size: var(--font-size-xs);
+}
+
+.scrapbook-cover-import__check-error {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scrapbook-duplicate-review {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.scrapbook-duplicate-review__heading {
+  display: grid;
+  gap: 5px;
+}
+
+.scrapbook-duplicate-review__heading > span {
+  color: #f1c77c;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.scrapbook-duplicate-review__heading h4,
+.scrapbook-duplicate-review__heading p,
+.scrapbook-duplicate-review__comparison h5 {
+  margin: 0;
+}
+
+.scrapbook-duplicate-review__heading h4 {
+  color: #f4f7f6;
+  font-size: var(--font-size-md);
+}
+
+.scrapbook-duplicate-review__heading p {
+  color: rgba(237, 242, 240, .62);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+}
+
+.scrapbook-duplicate-review__comparison {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.scrapbook-duplicate-review__comparison > section {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.scrapbook-duplicate-review__comparison h5,
+.scrapbook-duplicate-review__candidates legend {
+  color: rgba(247, 250, 248, .78);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-duplicate-review__selected,
+.scrapbook-duplicate-review__pending {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: var(--radius-md);
+  background: rgba(7, 17, 17, .52);
+}
+
+.scrapbook-duplicate-review__selected > img,
+.scrapbook-duplicate-review__selected > .scrapbook-media-placeholder,
+.scrapbook-duplicate-review__pending > img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  border: 0;
+  border-radius: 0;
+  background: #091110;
+  object-fit: contain;
+}
+
+.scrapbook-duplicate-review__selected > div,
+.scrapbook-duplicate-review__pending > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 11px 12px 12px;
+}
+
+.scrapbook-duplicate-review__selected strong,
+.scrapbook-duplicate-review__pending strong {
+  overflow: hidden;
+  color: #f4f7f6;
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrapbook-duplicate-review__selected span,
+.scrapbook-duplicate-review__selected small,
+.scrapbook-duplicate-review__pending span {
+  color: rgba(237, 242, 240, .58);
+  font-size: var(--font-size-xs);
+}
+
+.scrapbook-duplicate-review__selected > .scrapbook-cover-editor__usage-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(9, 22, 22, .84);
+  color: #fff;
+  padding: 5px 8px;
+  font-size: .68rem;
+  font-weight: var(--font-weight-bold);
+}
+
+.scrapbook-duplicate-review__candidates {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.scrapbook-duplicate-review__candidates legend {
+  margin-bottom: var(--space-2);
+}
+
+.scrapbook-duplicate-review__candidates > div {
+  display: grid;
+  grid-auto-columns: minmax(104px, 128px);
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scroll-snap-type: x mandatory;
+}
+
+.scrapbook-duplicate-review__candidates button {
+  position: relative;
+  min-width: 0;
+  min-height: 108px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: var(--radius-md);
+  background: #111d1c;
+  color: #fff;
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.scrapbook-duplicate-review__candidates button:is(:hover, :focus-visible),
+.scrapbook-duplicate-review__candidates button.is-selected {
+  border-color: rgba(112, 189, 177, .72);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(112, 189, 177, .15);
+}
+
+.scrapbook-duplicate-review__candidates img,
+.scrapbook-duplicate-review__candidates .scrapbook-media-placeholder {
+  width: 100%;
+  height: 108px;
+  border: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.scrapbook-duplicate-review__candidates button > span,
+.scrapbook-duplicate-review__candidates button > strong {
+  position: absolute;
+  bottom: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(9, 22, 22, .84);
+  padding: 3px 6px;
+  font-size: .65rem;
+}
+
+.scrapbook-duplicate-review__candidates button > span { left: 6px; }
+.scrapbook-duplicate-review__candidates button > strong { right: 6px; }
+
+.scrapbook-duplicate-review__actions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.scrapbook-duplicate-review__actions .button {
+  width: 100%;
+}
+
 .scrapbook-photo-source-actions {
   display: grid;
   gap: var(--space-3);
@@ -5062,6 +5263,15 @@ body.scrapbook-editor-active .bottom-sheet .checkbox-field {
 
   .scrapbook-cover-studio__canvas {
     width: min(100%, 340px);
+  }
+
+  .scrapbook-duplicate-review__comparison {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scrapbook-duplicate-review__actions {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto;
+    align-items: center;
   }
 }
 

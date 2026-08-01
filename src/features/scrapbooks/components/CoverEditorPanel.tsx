@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
+import type { EntityId } from '../../../domain/models/common';
 import type { MediaAsset, ScrapbookCoverLayout } from '../../../domain/models/scrapbook';
 import type { TripDetail } from '../../trips/tripService';
 import type { ScrapbookPageDraft } from '../scrapbookEditorDraft';
@@ -27,6 +28,10 @@ export function CoverEditorPanel({
   onApplyPendingPhoto,
   onCancelPendingPhoto,
   onPendingPhotoDestinationChange,
+  onSelectDuplicatePhoto,
+  onReuseDuplicatePhoto,
+  onBypassDuplicateReview,
+  onRetryDuplicateReview,
   onChange,
 }: {
   draft: ScrapbookPageDraft;
@@ -40,6 +45,10 @@ export function CoverEditorPanel({
   onApplyPendingPhoto: () => void;
   onCancelPendingPhoto: () => void;
   onPendingPhotoDestinationChange: (destination: PendingCoverPhoto['destination']) => void;
+  onSelectDuplicatePhoto: (assetId: EntityId) => void;
+  onReuseDuplicatePhoto: () => void;
+  onBypassDuplicateReview: () => void;
+  onRetryDuplicateReview: () => void;
   onChange: (draft: ScrapbookPageDraft) => void;
 }) {
   const [activeTab, setActiveTab] = useState<CoverEditorTab>('photo');
@@ -95,6 +104,10 @@ export function CoverEditorPanel({
             onApplyPending={onApplyPendingPhoto}
             onCancelPending={onCancelPendingPhoto}
             onDestinationChange={onPendingPhotoDestinationChange}
+            onSelectDuplicate={onSelectDuplicatePhoto}
+            onReuseDuplicate={onReuseDuplicatePhoto}
+            onBypassDuplicateReview={onBypassDuplicateReview}
+            onRetryDuplicateReview={onRetryDuplicateReview}
             onSelect={(coverPhotoId) => onChange({ ...draft, coverPhotoId })}
           />
         )}

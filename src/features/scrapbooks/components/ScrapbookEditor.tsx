@@ -324,6 +324,24 @@ export function ScrapbookEditor({
     });
   }
 
+  function reuseExistingCoverPhoto() {
+    const asset = coverPhotoImport.reuseDuplicate();
+    if (!asset) {
+      showToast({ title: '再利用する写真を選択してください。', variant: 'error' });
+      return;
+    }
+    setAddedMediaAssets((current) => current.some((item) => item.id === asset.id)
+      ? current
+      : [asset, ...current]);
+    setDraft((current) => ({ ...current, coverPhotoId: asset.id }));
+    showToast({
+      title: isCoverOnlyMediaAsset(asset)
+        ? '保存済みの表紙専用写真を使用します。記録を更新すると完成版へ反映されます。'
+        : '保存済みの旅行写真を使用します。記録を更新すると完成版へ反映されます。',
+      variant: 'success',
+    });
+  }
+
   return (
     <div className="scrapbook-editor-mode">
       <header className="scrapbook-editor-toolbar">
@@ -433,6 +451,10 @@ export function ScrapbookEditor({
               onApplyPendingPhoto={() => void applyPendingCoverPhoto()}
               onCancelPendingPhoto={coverPhotoImport.cancel}
               onPendingPhotoDestinationChange={coverPhotoImport.setDestination}
+              onSelectDuplicatePhoto={coverPhotoImport.selectDuplicate}
+              onReuseDuplicatePhoto={reuseExistingCoverPhoto}
+              onBypassDuplicateReview={coverPhotoImport.bypassDuplicateReview}
+              onRetryDuplicateReview={() => void coverPhotoImport.retryDuplicateCheck()}
               previewTemplateId={coverPreviewTemplateId}
               onPreviewTemplate={setCoverPreviewTemplateId}
               onApplyTemplate={applyCoverTemplate}
