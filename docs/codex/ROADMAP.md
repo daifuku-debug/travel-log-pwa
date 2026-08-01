@@ -13,8 +13,9 @@
 | Phase 5-A.2.3-D-C2 | 完了 | 参照ゼロ写真だけを対象にした安全なmetadata＋Blob削除 |
 | Phase 5-A.2.3-D-C3 | 完了 | 参照一覧UI、安全な参照の明示解除、解除後再検索と段階的削除 |
 | Phase 5-A.2.3-D-D1 | 完了 | Metadata、Blob、永続参照、cover-only所有関係の読み取り専用Integrity Scan |
-| Phase 5-A.2.3-D-D2 | 次 | 診断結果の表示と、安全な修復単位・確認フローの実装 |
+| Phase 5-A.2.3-D-D2 | 完了 | 診断Summary、種類別Issue表示、再検証付きの安全な修復と再Scan |
+| Phase 5-A.2.3-D-D3 | 次 | Missing Original、Dangling Reference、Invalid Cover Ownerの手動復旧設計 |
 | Trip削除カスケード | 別系統 | Trip、Scrapbook、Page、Block、MediaAsset、Blobの整合した削除 |
 | 写真込みBackup／R2同期 | 別系統 | Blobを含む復元可能なBackupとCloudflare同期 |
 
-次Phaseでは、D-D1の診断結果を確認できる導線と安全な修復方針へ進みます。自動修復とTrip削除カスケードは混ぜません。
+次Phaseでは、自動修復できない要確認Issueの安全な手動復旧方針を設計します。Trip削除カスケードは混ぜません。

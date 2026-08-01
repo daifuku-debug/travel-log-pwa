@@ -80,7 +80,7 @@ Draft、Pending File、Object URLは永続参照ではありません。保存�
 
 ## テスト
 
-`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在230件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
+`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在240件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
 
 ## 主要ディレクトリ
 

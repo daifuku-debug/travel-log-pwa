@@ -92,7 +92,16 @@ ${assetId}:thumbnail
 - 存在しない、または論理削除済みAssetへの永続参照
 - 論理削除済み、または所有元が欠損したPage／Block／Scrapbook内の写真参照
 
-未参照の`trip`写真と未使用の`cover-only`素材は正常です。JSON Backup復元後のMissing Blobも報告しますが、削除可能とは判定しません。一部Storeでも取得に失敗した場合はReportを返さず、部分失敗と完全失敗を区別したErrorにします。現在はServiceからの明示実行のみで、起動時Scan、UI接続、修復はありません。
+未参照の`trip`写真と未使用の`cover-only`素材は正常です。JSON Backup復元後のMissing Blobも報告しますが、削除可能とは判定しません。一部Storeでも取得に失敗した場合はReportを返さず、部分失敗と完全失敗を区別したErrorにします。設定画面の「写真データ診断」から明示実行し、起動時やBackup前には自動実行しません。
+
+安全に再検証できる次のIssueだけを、ユーザー操作後に修復できます。
+
+- Missing Thumbnail: original Blobから既存画像処理で再生成し、失敗時はMetadataを変更しない
+- Cleanup Pending: MediaAssetの論理削除を再確認して決定的な2 Blobキーだけを削除
+- Orphan／不正形式Blob: Metadataや有効参照がないことを再確認し、Confirm後に対象キーだけを削除
+- Invalid Blob Reference: 既定キーの実Blobと古い参照値を再確認してMetadata参照だけを更新
+
+各処理は`success`／`skipped`／`failed`を区別し、処理後に必ず再Scanします。Missing Original、Dangling Reference、Invalid Cover Owner、Scrapbook／Block参照は表示のみです。
 
 ## Backup
 
@@ -103,7 +112,7 @@ ${assetId}:thumbnail
 
 ## 未対応
 
-- Integrity Scan結果のUI表示とOrphan Blob／Missing Blobの修復
+- Missing Original、Dangling Reference、Invalid Cover Ownerの安全な手動復旧
 - 複数Repositoryをまたぐ参照解除の一括Transaction
 - Trip／Scrapbook削除時のMediaAssetカスケード
 - 写真Blobを含むBackup
