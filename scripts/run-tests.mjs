@@ -90,6 +90,18 @@ import {
   MediaAssetDeletionError,
 } from '../src/features/media/mediaAssetDeletionLogic.ts';
 import { calculateLevelProgress, expRequiredForNextLevel } from '../src/features/rpg/rpgLevel.ts';
+import {
+  dateInputToIsoDateTime,
+  dateTimeInputToIsoDateTime,
+  isoDateTimeToDateInput,
+  isoDateTimeToTimeInput,
+} from '../src/shared/date/dateUtils.ts';
+import {
+  buildPlaceVisitDateTimeFields,
+  formatPlaceVisitTimeRange,
+  getPlaceVisitDate,
+  validatePlaceVisitDateTimeInput,
+} from '../src/features/trips/placeVisitDateTime.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
 import {
@@ -3436,6 +3448,101 @@ await test('旅行詳細タイムラインは訪問場所と移動区間を統�
   assert.match(tripJournalTimeline, /places\.map/);
   assert.match(tripJournalTimeline, /transportLegs\.map/);
   assert.match(tripJournalTimeline, /localeCompare/);
+});
+
+await test('訪問場所の日時入力は到着のみ・出発のみ・日付またぎを検証する', () => {
+  const baseInput = {
+    name: '夜の展望台',
+    address: '',
+    visitedDate: '2026-08-08',
+    arrivalTime: '',
+    departureDate: '2026-08-08',
+    departureTime: '',
+    memo: '',
+    castleId: '',
+  };
+  assert.deepEqual(validatePlaceVisitDateTimeInput({ ...baseInput, arrivalTime: '20:30' }), []);
+  assert.deepEqual(validatePlaceVisitDateTimeInput({ ...baseInput, departureTime: '22:00' }), []);
+  assert.deepEqual(validatePlaceVisitDateTimeInput({
+    ...baseInput,
+    arrivalTime: '23:30',
+    departureDate: '2026-08-09',
+    departureTime: '00:30',
+  }), []);
+  assert.match(
+    validatePlaceVisitDateTimeInput({ ...baseInput, arrivalTime: '20:30', departureTime: '19:30' }).join(' '),
+    /出発日時は到着日時以降/,
+  );
+  assert.match(
+    validatePlaceVisitDateTimeInput({ ...baseInput, visitedDate: '', arrivalTime: '20:30' }).join(' '),
+    /訪問日/,
+  );
+});
+
+await test('訪問日時はローカル日付と時刻をISOへ変換して復元できる', () => {
+  const value = dateTimeInputToIsoDateTime('2026-08-08', '09:05');
+  assert.ok(value);
+  assert.equal(isoDateTimeToDateInput(value), '2026-08-08');
+  assert.equal(isoDateTimeToTimeInput(value), '09:05');
+});
+
+await test('訪問場所保存値は明示時刻だけを到着・出発へ保持する', () => {
+  const dateOnly = buildPlaceVisitDateTimeFields({
+    visitedDate: '2026-08-08', arrivalTime: '', departureDate: '2026-08-08', departureTime: '',
+  });
+  assert.ok(dateOnly.visitedAt);
+  assert.equal(dateOnly.arrivalAt, undefined);
+  assert.equal(dateOnly.departureAt, undefined);
+
+  const stay = buildPlaceVisitDateTimeFields({
+    visitedDate: '2026-08-08', arrivalTime: '23:30', departureDate: '2026-08-09', departureTime: '00:30',
+  });
+  assert.equal(isoDateTimeToTimeInput(stay.arrivalAt), '23:30');
+  assert.equal(isoDateTimeToDateInput(stay.departureAt), '2026-08-09');
+  assert.equal(stay.visitedAt, stay.arrivalAt);
+});
+
+await test('訪問場所の表示は時刻なし・到着のみ・日付またぎを区別する', () => {
+  const arrivalAt = dateTimeInputToIsoDateTime('2026-08-08', '23:30');
+  const departureAt = dateTimeInputToIsoDateTime('2026-08-09', '00:30');
+  assert.equal(formatPlaceVisitTimeRange({ visitedAt: dateInputToIsoDateTime('2026-08-08') }), '時刻未設定');
+  assert.equal(formatPlaceVisitTimeRange({ arrivalAt }), '23:30 到着');
+  assert.equal(formatPlaceVisitTimeRange({ arrivalAt, departureAt }), '23:30–8/9 00:30');
+  assert.equal(getPlaceVisitDate({ arrivalAt, departureAt }), '2026-08-08');
+});
+
+await test('訪問場所日時はBackup v12で維持し旧データも時刻なしで読める', () => {
+  const arrivalAt = dateTimeInputToIsoDateTime('2026-08-08', '10:00');
+  const departureAt = dateTimeInputToIsoDateTime('2026-08-08', '11:30');
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 12,
+    data: {
+      placeVisits: [
+        { id: 'place-new', tripId: 'trip-1', visitedAt: arrivalAt, arrivalAt, departureAt },
+        { id: 'place-old', tripId: 'trip-1', visitedAt: dateInputToIsoDateTime('2026-08-07') },
+      ],
+    },
+  });
+  assert.equal(normalized.data.placeVisits[0].arrivalAt, arrivalAt);
+  assert.equal(normalized.data.placeVisits[0].departureAt, departureAt);
+  assert.equal(formatPlaceVisitTimeRange(normalized.data.placeVisits[1]), '時刻未設定');
+});
+
+await test('訪問場所フォームはスマホ向け日時入力と現在時刻操作を提供する', () => {
+  assert.match(placeVisitForm, /type="time"/);
+  assert.match(placeVisitForm, /place-arrival-time/);
+  assert.match(placeVisitForm, /place-departure-date/);
+  assert.match(placeVisitForm, /place-departure-time/);
+  assert.equal((placeVisitForm.match(/>\s*今\s*</g) ?? []).length, 2);
+  assert.match(stylesSource, /\.visit-time-now[\s\S]*min-height: var\(--tap-target-min\)/);
+});
+
+await test('TimeMachineは訪問の到着・出発をrangeとして扱い旧訪問日はday精度を維持する', () => {
+  assert.match(timeMachineService, /const startAt = place\.arrivalAt \?\? place\.departureAt/);
+  assert.match(timeMachineService, /endAt,/);
+  assert.match(timeMachineService, /timePrecision: startAt && endAt \? 'range'/);
+  assert.match(timeMachineService, /dateSource = place\.arrivalAt \?\? place\.departureAt \?\? place\.visitedAt/);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {

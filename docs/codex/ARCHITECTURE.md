@@ -80,9 +80,16 @@ Draft、Pending File、Object URLは永続参照ではありません。保存�
 - Backup Importは旧形式を現在形式へ正規化し、未知の将来Versionを拒否します。
 - 後方互換フィールドは、削除Phaseが明示されるまで読み取り互換を維持します。
 
+## 訪問日時
+
+- `PlaceVisit.visitedAt`は既存互換の訪問日基準値として維持します。
+- 明示された到着・出発は任意の`arrivalAt`／`departureAt`へISO日時で保存します。
+- 時刻のない旧データは日付精度として扱い、画面へ`00:00`を補いません。
+- 入力は端末のローカル日時、保存はISO日時とし、表示時に端末のローカル日時へ戻します。
+
 ## テスト
 
-`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在240件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
+`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在258件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
 
 ## 主要ディレクトリ
 

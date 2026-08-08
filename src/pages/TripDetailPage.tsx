@@ -5,6 +5,7 @@ import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
+import { formatPlaceVisitRecordMeta } from '../features/trips/placeVisitDateTime.ts';
 import {
   createPlaceVisit,
   createTripTransportLeg,
@@ -19,7 +20,7 @@ import {
 import { getTripDisplayStatus, getTripDisplayStatusLabel } from '../features/trips/tripUi';
 import { useTripJournalMedia } from '../features/trips/useTripJournalMedia';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
-import { formatCompactDateRange, isoDateTimeToDateInput } from '../shared/date/dateUtils';
+import { formatCompactDateRange } from '../shared/date/dateUtils';
 import { useAsyncData } from '../shared/hooks/useAsyncData';
 import { Button, ConfirmDialog, InlineError, PageHeader } from '../shared/ui';
 
@@ -259,7 +260,7 @@ function TripJournalEditor({
       <details className="trip-journal-editor__panel" open={Boolean(editingPlace) || undefined}>
         <summary>訪問場所を追加・編集 <span>{data.places.length}件</span></summary>
         <div className="trip-journal-editor__body">
-          {data.places.map((place) => <RecordEditorRow key={place.id} title={place.name} meta={`${isoDateTimeToDateInput(place.visitedAt) || '訪問日未設定'}${place.address ? ` / ${place.address}` : ''}`} onEdit={() => setEditingPlace(place)} onDelete={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })} />)}
+          {data.places.map((place) => <RecordEditorRow key={place.id} title={place.name} meta={formatPlaceVisitRecordMeta(place)} onEdit={() => setEditingPlace(place)} onDelete={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })} />)}
           <PlaceVisitForm
             key={editingPlace?.id ?? 'new-place'} place={editingPlace} defaultVisitedDate={data.trip.startDate}
             submitLabel={editingPlace ? '場所を更新' : '場所を追加'} onCancel={editingPlace ? () => setEditingPlace(undefined) : undefined}

@@ -1,7 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react';
 import type { PlaceVisit } from '../../../domain/models/trip';
 import { listCastleOptions, type CastleOption } from '../../castles/castleService';
-import { isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
+import {
+  isoDateTimeToDateInput,
+  isoDateTimeToTimeInput,
+  toDateInputValue,
+  toTimeInputValue,
+} from '../../../shared/date/dateUtils';
 import { useAsyncData } from '../../../shared/hooks/useAsyncData';
 import { type PlaceVisitInput, validatePlaceVisitInput } from '../tripService';
 
@@ -20,16 +25,14 @@ export function PlaceVisitForm({
   onCancel,
   onSubmit,
 }: PlaceVisitFormProps) {
-  const [input, setInput] = useState<PlaceVisitInput>(() => ({
-    name: place?.name ?? '',
-    address: place?.address ?? '',
-    visitedDate: isoDateTimeToDateInput(place?.visitedAt) || defaultVisitedDate,
-    memo: place?.memo ?? '',
-    castleId: place?.castleId ?? '',
-  }));
+  const [input, setInput] = useState<PlaceVisitInput>(() => createInitialInput(place, defaultVisitedDate));
   const { data: castleOptions } = useAsyncData<CastleOption[]>(listCastleOptions, []);
   const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const fieldIdPrefix = useId();
+  const arrivalTimeId = `${fieldIdPrefix}-place-arrival-time`;
+  const departureDateId = `${fieldIdPrefix}-place-departure-date`;
+  const departureTimeId = `${fieldIdPrefix}-place-departure-time`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +47,7 @@ export function PlaceVisitForm({
     try {
       await onSubmit(input);
       if (!place) {
-        setInput({ name: '', address: '', visitedDate: defaultVisitedDate, memo: '', castleId: '' });
+        setInput(createInitialInput(undefined, defaultVisitedDate));
       }
     } catch (error) {
       setErrors([error instanceof Error ? error.message : '保存に失敗しました。']);
@@ -78,7 +81,16 @@ export function PlaceVisitForm({
           <input
             type="date"
             value={input.visitedDate}
-            onChange={(event) => setInput({ ...input, visitedDate: event.target.value })}
+            onChange={(event) => {
+              const visitedDate = event.target.value;
+              setInput({
+                ...input,
+                visitedDate,
+                departureDate: !input.departureDate || input.departureDate === input.visitedDate
+                  ? visitedDate
+                  : input.departureDate,
+              });
+            }}
           />
         </label>
 
@@ -91,6 +103,48 @@ export function PlaceVisitForm({
           />
         </label>
       </div>
+
+      <fieldset className="visit-time-fields">
+        <legend>滞在時間 <span>任意</span></legend>
+        <div className="visit-time-row">
+          <label className="field" htmlFor={arrivalTimeId}>
+            <span>到着時刻</span>
+            <input
+              id={arrivalTimeId}
+              type="time"
+              value={input.arrivalTime}
+              onChange={(event) => setInput({ ...input, arrivalTime: event.target.value })}
+            />
+          </label>
+          <button className="button visit-time-now" type="button" onClick={() => setArrivalToNow(setInput)}>
+            今
+          </button>
+        </div>
+
+        <div className="visit-time-row visit-time-row--departure">
+          <label className="field" htmlFor={departureDateId}>
+            <span>出発日</span>
+            <input
+              id={departureDateId}
+              type="date"
+              value={input.departureDate}
+              onChange={(event) => setInput({ ...input, departureDate: event.target.value })}
+            />
+          </label>
+          <label className="field" htmlFor={departureTimeId}>
+            <span>出発時刻</span>
+            <input
+              id={departureTimeId}
+              type="time"
+              value={input.departureTime}
+              onChange={(event) => setInput({ ...input, departureTime: event.target.value })}
+            />
+          </label>
+          <button className="button visit-time-now" type="button" onClick={() => setDepartureToNow(setInput)}>
+            今
+          </button>
+        </div>
+      </fieldset>
 
       <label className="field">
         <span>城コレクション連携</span>
@@ -126,4 +180,40 @@ export function PlaceVisitForm({
       </div>
     </form>
   );
+}
+
+function createInitialInput(place?: PlaceVisit, defaultVisitedDate = ''): PlaceVisitInput {
+  const visitedDate = isoDateTimeToDateInput(place?.arrivalAt ?? place?.visitedAt) || defaultVisitedDate;
+  return {
+    name: place?.name ?? '',
+    address: place?.address ?? '',
+    visitedDate,
+    arrivalTime: isoDateTimeToTimeInput(place?.arrivalAt),
+    departureDate: isoDateTimeToDateInput(place?.departureAt) || visitedDate,
+    departureTime: isoDateTimeToTimeInput(place?.departureAt),
+    memo: place?.memo ?? '',
+    castleId: place?.castleId ?? '',
+  };
+}
+
+function setArrivalToNow(setInput: Dispatch<SetStateAction<PlaceVisitInput>>) {
+  const now = new Date();
+  const visitedDate = toDateInputValue(now);
+  setInput((current) => ({
+    ...current,
+    visitedDate,
+    arrivalTime: toTimeInputValue(now),
+    departureDate: !current.departureDate || current.departureDate === current.visitedDate
+      ? visitedDate
+      : current.departureDate,
+  }));
+}
+
+function setDepartureToNow(setInput: Dispatch<SetStateAction<PlaceVisitInput>>) {
+  const now = new Date();
+  setInput((current) => ({
+    ...current,
+    departureDate: toDateInputValue(now),
+    departureTime: toTimeInputValue(now),
+  }));
 }

@@ -231,10 +231,13 @@ function buildPlaceVisitEvents(
 ): TimelineEvent[] {
   return places.flatMap((place) => {
     const trip = tripsById.get(place.tripId);
-    const localDate = place.visitedAt ? isoToLocalDate(place.visitedAt) : trip && dateInRange(date, trip.startDate, trip.endDate) ? date : undefined;
+    const dateSource = place.arrivalAt ?? place.departureAt ?? place.visitedAt;
+    const startAt = place.arrivalAt ?? place.departureAt;
+    const endAt = place.arrivalAt ? place.departureAt : undefined;
+    const localDate = dateSource ? isoToLocalDate(dateSource) : trip && dateInRange(date, trip.startDate, trip.endDate) ? date : undefined;
     if (localDate !== date) return [];
-    if (queryAt && place.visitedAt && !withinHours(place.visitedAt, queryAt, TIME_QUERY_WINDOW_HOURS)) return [];
-    const hasTime = Boolean(place.visitedAt);
+    if (queryAt && startAt && !matchesVisitTime(startAt, endAt, queryAt)) return [];
+    const hasTime = Boolean(startAt);
     return createEvent({
       id: `place:${place.id}`,
       eventType: place.castleId ? 'castle_visit' : 'visit',
@@ -242,9 +245,10 @@ function buildPlaceVisitEvents(
       sourceId: place.id,
       title: place.name,
       description: place.memo,
-      startAt: place.visitedAt,
+      startAt,
+      endAt,
       localDate,
-      timePrecision: hasTime ? 'minute' : 'day',
+      timePrecision: startAt && endAt ? 'range' : hasTime ? 'minute' : 'day',
       latitude: validCoordinate(place.latitude) ? place.latitude : undefined,
       longitude: validCoordinate(place.longitude) ? place.longitude : undefined,
       locationName: place.name,
@@ -255,6 +259,11 @@ function buildPlaceVisitEvents(
       detailPath: `/trips/${place.tripId}`,
     });
   });
+}
+
+function matchesVisitTime(startAt: string, endAt: string | undefined, queryAt: string): boolean {
+  if (endAt && queryAt >= startAt && queryAt <= endAt) return true;
+  return withinHours(startAt, queryAt, TIME_QUERY_WINDOW_HOURS);
 }
 
 function buildPhotoEvents(

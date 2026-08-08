@@ -1,5 +1,5 @@
 import type { PlaceVisit, TripTransportLeg } from '../../../domain/models/trip';
-import { isoDateTimeToDateInput } from '../../../shared/date/dateUtils';
+import { getPlaceVisitDate, formatPlaceVisitTimeRange } from '../placeVisitDateTime.ts';
 
 interface TimelineEntry {
   id: string;
@@ -36,8 +36,8 @@ export function TripJournalTimeline({ places, transportLegs }: { places: PlaceVi
 export function buildTimelineEntries(places: PlaceVisit[], transportLegs: TripTransportLeg[]): TimelineEntry[] {
   const placeEntries = places.map((place) => ({
     id: place.id,
-    date: isoDateTimeToDateInput(place.visitedAt),
-    time: formatVisitedTime(place.visitedAt),
+    date: getPlaceVisitDate(place),
+    time: formatPlaceVisitTimeRange(place),
     title: place.name,
     detail: place.memo || place.address || '',
     kind: 'place' as const,
@@ -58,13 +58,6 @@ const TRANSPORT_LABELS: Record<TripTransportLeg['transportMode'], string> = {
   flight: '飛行機', ship: '船', taxi: 'タクシー', other: 'その他',
 };
 
-function formatVisitedTime(value?: string): string {
-  if (!value || !value.includes('T')) return '訪問';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '訪問';
-  return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-}
-
 function formatDayLabel(date: string): string {
   if (!date) return '日付未設定';
   const parsed = new Date(`${date}T00:00:00`);
@@ -72,5 +65,6 @@ function formatDayLabel(date: string): string {
 }
 
 function sortTime(value: string): string {
-  return /^\d{2}:\d{2}$/.test(value) ? value : '99:99';
+  const match = value.match(/^\d{2}:\d{2}/);
+  return match?.[0] ?? '99:99';
 }

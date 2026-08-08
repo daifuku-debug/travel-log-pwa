@@ -33,11 +33,12 @@
 
 ## 現在のPhase
 
-スクラップブックPhase 5-AのMediaAssetライフサイクル整備中です。現在までに端末写真追加、`trip`／`cover-only`分類、安全なBlobキー削除、SHA-256完全一致検出、重複確認UI、永続参照の検索・解除・参照ゼロ削除、Integrity診断と安全な限定修復が完成しています。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
+現在は、実際の旅行中に素早く使える旅行記録MVPを優先しています。Phase T1で訪問場所の訪問日、到着・出発時刻、日付をまたぐ滞在、現在時刻のワンタップ入力を整備しました。スクラップブックPhase 5-AのMediaAssetライフサイクルと写真込みBackup ZIP Exportは完成済みで、写真込みBackup Restoreは保留中です。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
 
 ## 大きな残課題
 
 - Missing Original、Dangling Reference、Invalid Cover Ownerの手動復旧
 - Trip削除時の関連データ削除
-- 写真込み完全Backup ZIPの復元、Cloudflare D1／R2同期
+- 旅行中の記録導線の継続改善
+- 写真込み完全Backup ZIPの復元、Cloudflare D1／R2同期（現在保留）
 - 写真クロップ、焦点位置、より高度なスクラップブック編集

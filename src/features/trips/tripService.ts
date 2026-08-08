@@ -1,13 +1,17 @@
 import type { EntityId } from '../../domain/models/common';
 import type { PlaceVisit, Trip, TripTransportLeg, TripTransportMode, TripType } from '../../domain/models/trip';
 import { repositories } from '../../infrastructure/repositories/repositoryFactory';
-import { compareDateInputValuesDesc, dateInputToIsoDateTime, isValidDateInputValue } from '../../shared/date/dateUtils';
+import {
+  compareDateInputValuesDesc,
+  isValidDateInputValue,
+} from '../../shared/date/dateUtils';
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
 import { bootstrapAppData } from '../bootstrap/bootstrapService';
 import { linkCastleVisitFromTripPlace, removeTripRelationFromCastle } from '../castles/castleService';
 import { grantPlaceVisitExperience, grantTripCompletionExperience, refreshRpgProgress } from '../rpg/rpgProgressService';
 import { createTripResultIfNeeded } from '../rpg/tripResultService';
+import { buildPlaceVisitDateTimeFields, validatePlaceVisitDateTimeInput } from './placeVisitDateTime.ts';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -32,6 +36,9 @@ export interface PlaceVisitInput {
   name: string;
   address: string;
   visitedDate: string;
+  arrivalTime: string;
+  departureDate: string;
+  departureTime: string;
   memo: string;
   castleId: string;
 }
@@ -73,9 +80,7 @@ export function validateTripInput(input: TripInput): string[] {
 export function validatePlaceVisitInput(input: PlaceVisitInput): string[] {
   const errors: string[] = [];
   if (!input.name.trim()) errors.push('場所名を入力してください。');
-  if (input.visitedDate && !isValidDateInputValue(input.visitedDate)) {
-    errors.push('訪問日を正しく入力してください。');
-  }
+  errors.push(...validatePlaceVisitDateTimeInput(input));
   return errors;
 }
 
@@ -130,7 +135,7 @@ export async function getTripDetail(tripId: EntityId): Promise<TripDetail | unde
     const sortedTransportLegs = sortTransportLegs(transportLegs);
     return {
       trip,
-      places: places.slice().sort((a, b) => String(a.visitedAt || '').localeCompare(String(b.visitedAt || ''))),
+      places: places.slice().sort((a, b) => String(a.arrivalAt || a.visitedAt || '').localeCompare(String(b.arrivalAt || b.visitedAt || ''))),
       transportLegs: sortedTransportLegs,
       transportSummary: summarizeTripTransportLegs(sortedTransportLegs),
     };
@@ -274,7 +279,7 @@ export async function createPlaceVisit(tripId: EntityId, input: PlaceVisitInput)
       tripId,
       name: input.name.trim(),
       address: optionalText(input.address),
-      visitedAt: dateInputToIsoDateTime(input.visitedDate),
+      ...buildPlaceVisitDateTimeFields(input),
       memo: optionalText(input.memo),
       castleId: optionalText(input.castleId),
       collectionItemIds: [],
@@ -301,7 +306,7 @@ export async function updatePlaceVisit(placeId: EntityId, input: PlaceVisitInput
       ...current,
       name: input.name.trim(),
       address: optionalText(input.address),
-      visitedAt: dateInputToIsoDateTime(input.visitedDate),
+      ...buildPlaceVisitDateTimeFields(input),
       memo: optionalText(input.memo),
       castleId: optionalText(input.castleId),
       updatedAt: new Date().toISOString(),
