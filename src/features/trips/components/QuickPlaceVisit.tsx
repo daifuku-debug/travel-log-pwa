@@ -13,9 +13,11 @@ interface QuickPlaceVisitProps {
   places: PlaceVisit[];
   onChanged: () => void;
   onEdit: (place: PlaceVisit) => void;
+  onStartTransport: (place: PlaceVisit) => void;
+  transportInProgress: boolean;
 }
 
-export function QuickPlaceVisit({ tripId, places, onChanged, onEdit }: QuickPlaceVisitProps) {
+export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTransport, transportInProgress }: QuickPlaceVisitProps) {
   const { showToast } = useToast();
   const formId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +123,11 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit }: QuickPlac
                       onClick={() => saveDeparture(place)}
                     >
                       今出発
+                    </Button>
+                  )}
+                  {!inProgress && place.departureAt && (
+                    <Button variant="primary" onClick={() => onStartTransport(place)} disabled={Boolean(departingId) || transportInProgress}>
+                      移動を記録
                     </Button>
                   )}
                   <Button onClick={() => onEdit(place)} disabled={Boolean(departingId)}>

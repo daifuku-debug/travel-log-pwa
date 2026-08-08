@@ -43,10 +43,12 @@ export interface TripTransportLeg extends BaseEntity {
   tripId: EntityId;
   date: IsoDateString;
   fromName: string;
-  toName: string;
+  toName?: string;
   transportMode: TripTransportMode;
   departureTime?: string;
   arrivalTime?: string;
+  departureAt?: IsoDateTimeString;
+  arrivalAt?: IsoDateTimeString;
   durationMinutes?: number;
   distanceKm?: number;
   oneWayCost?: number;

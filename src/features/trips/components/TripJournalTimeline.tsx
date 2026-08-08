@@ -1,5 +1,12 @@
 import type { PlaceVisit, TripTransportLeg } from '../../../domain/models/trip';
 import { getPlaceVisitDate, formatPlaceVisitTimeRange } from '../placeVisitDateTime.ts';
+import {
+  formatTransportLegTimeRange,
+  formatTransportLegTitle,
+  getTransportLegDepartureDate,
+  isTransportLegInProgress,
+} from '../transportLegDateTime.ts';
+import { TRANSPORT_MODE_LABELS } from '../tripUi.ts';
 
 interface TimelineEntry {
   id: string;
@@ -44,19 +51,14 @@ export function buildTimelineEntries(places: PlaceVisit[], transportLegs: TripTr
   }));
   const legEntries = transportLegs.map((leg) => ({
     id: leg.id,
-    date: leg.date,
-    time: leg.departureTime || leg.arrivalTime || '移動',
-    title: `${leg.fromName} → ${leg.toName}`,
-    detail: [TRANSPORT_LABELS[leg.transportMode], leg.durationMinutes ? `約${leg.durationMinutes}分` : '', leg.memo || ''].filter(Boolean).join(' ・ '),
+    date: getTransportLegDepartureDate(leg),
+    time: formatTransportLegTimeRange(leg),
+    title: formatTransportLegTitle(leg),
+    detail: [TRANSPORT_MODE_LABELS[leg.transportMode], isTransportLegInProgress(leg) ? '移動中' : '', leg.durationMinutes ? `約${leg.durationMinutes}分` : '', leg.memo || ''].filter(Boolean).join(' ・ '),
     kind: 'transport' as const,
   }));
   return [...placeEntries, ...legEntries].sort((a, b) => `${a.date} ${sortTime(a.time)}`.localeCompare(`${b.date} ${sortTime(b.time)}`));
 }
-
-const TRANSPORT_LABELS: Record<TripTransportLeg['transportMode'], string> = {
-  walk: '徒歩', bike: '自転車', train: '電車', shinkansen: '新幹線', bus: 'バス', car: '車',
-  flight: '飛行機', ship: '船', taxi: 'タクシー', other: 'その他',
-};
 
 function formatDayLabel(date: string): string {
   if (!date) return '日付未設定';

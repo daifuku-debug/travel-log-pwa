@@ -106,6 +106,18 @@ import {
   isPlaceVisitInProgress,
   validatePlaceVisitDateTimeInput,
 } from '../src/features/trips/placeVisitDateTime.ts';
+import {
+  buildTransportLegDateTimeFields,
+  createTransportArrivalNowInput,
+  createTransportDepartureNowInput,
+  findInProgressTransportLegs,
+  formatTransportLegTimeRange,
+  formatTransportLegTitle,
+  getTransportLegArrivalDate,
+  getTransportLegDepartureDate,
+  isTransportLegInProgress,
+  validateTransportLegDateTimeInput,
+} from '../src/features/trips/transportLegDateTime.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
 import {
@@ -143,6 +155,7 @@ const castlePage = await readFile(new URL('../src/pages/CastleCollectionPage.tsx
 const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.url), 'utf8');
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
 const quickPlaceVisit = await readFile(new URL('../src/features/trips/components/QuickPlaceVisit.tsx', import.meta.url), 'utf8');
+const quickTransportLeg = await readFile(new URL('../src/features/trips/components/QuickTransportLeg.tsx', import.meta.url), 'utf8');
 const updateCastleMasterScript = await readFile(new URL('../scripts/update-castle-master.mjs', import.meta.url), 'utf8');
 const scrapbookModel = await readFile(new URL('../src/domain/models/scrapbook.ts', import.meta.url), 'utf8');
 const scrapbookService = await readFile(new URL('../src/features/scrapbooks/scrapbookService.ts', import.meta.url), 'utf8');
@@ -3616,6 +3629,104 @@ await test('クイック訪問UIはモバイル操作領域と固定要素に干
   assert.match(stylesSource, /\.quick-visit__actions \.button \{ min-height: var\(--tap-target-min\)/);
   assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.quick-visit__heading/);
   assert.doesNotMatch(stylesSource.match(/\.quick-visit[\s\S]*?@media \(max-width: 560px\)/)?.[0] ?? '', /position:\s*fixed/);
+});
+
+await test('移動日時は現在時刻入力と日付またぎを安全に扱う', () => {
+  const departure = new Date(2026, 5, 8, 23, 45);
+  const arrival = new Date(2026, 5, 9, 0, 20);
+  assert.deepEqual(createTransportDepartureNowInput(departure), {
+    date: '2026-06-08', departureTime: '23:45', arrivalDate: '2026-06-08', arrivalTime: '',
+  });
+  assert.deepEqual(createTransportArrivalNowInput(arrival), {
+    arrivalDate: '2026-06-09', arrivalTime: '00:20',
+  });
+  assert.deepEqual(validateTransportLegDateTimeInput({
+    date: '2026-06-08', departureTime: '23:45', arrivalDate: '2026-06-09', arrivalTime: '00:20',
+  }), []);
+  assert.match(validateTransportLegDateTimeInput({
+    date: '2026-06-08', departureTime: '23:45', arrivalDate: '2026-06-08', arrivalTime: '00:20',
+  }).join(' '), /到着日時は出発日時以降/);
+});
+
+await test('移動日時保存値は旧時刻を維持しながら完全日時を保持する', () => {
+  const fields = buildTransportLegDateTimeFields({
+    date: '2026-06-08', departureTime: '23:45', arrivalDate: '2026-06-09', arrivalTime: '00:20',
+  });
+  assert.equal(fields.departureTime, '23:45');
+  assert.equal(fields.arrivalTime, '00:20');
+  assert.equal(getTransportLegDepartureDate(fields), '2026-06-08');
+  assert.equal(getTransportLegArrivalDate(fields), '2026-06-09');
+  assert.equal(formatTransportLegTimeRange(fields), '23:45–6/9 00:20');
+});
+
+await test('完全日時を持つ未到着区間だけを移動中として扱う', () => {
+  const active = { id: 'active', departureAt: dateTimeInputToIsoDateTime('2026-06-08', '09:15') };
+  const finished = { id: 'finished', departureAt: active.departureAt, arrivalAt: dateTimeInputToIsoDateTime('2026-06-08', '10:00') };
+  const legacy = { id: 'legacy', departureTime: '09:00' };
+  assert.equal(isTransportLegInProgress(active), true);
+  assert.equal(isTransportLegInProgress(finished), false);
+  assert.equal(isTransportLegInProgress(legacy), false);
+  assert.deepEqual(findInProgressTransportLegs([finished, active, legacy]), [active]);
+});
+
+await test('移動表示は未到着・時刻なし・未確定目的地を自然に表す', () => {
+  assert.equal(formatTransportLegTimeRange({ date: '2026-06-08' }), '時刻未設定');
+  assert.equal(formatTransportLegTimeRange({ date: '2026-06-08', departureAt: dateTimeInputToIsoDateTime('2026-06-08', '09:15') }), '09:15 出発・移動中');
+  assert.equal(formatTransportLegTitle({ fromName: '京都駅' }), '京都駅 → 目的地未定');
+});
+
+await test('クイック移動Serviceは二重開始を防ぎ到着を冪等に記録する', () => {
+  assert.match(tripService, /export async function createQuickTripTransportLeg/);
+  assert.match(tripService, /findInProgressTransportLegs\(currentLegs\)/);
+  assert.match(tripService, /移動中の区間を到着済みにしてから/);
+  assert.match(tripService, /departureAt: departure\.toISOString\(\)/);
+  assert.match(tripService, /export async function arriveTripTransportLegNow/);
+  assert.match(tripService, /if \(current\.arrivalAt\) return current/);
+  assert.match(tripService, /arrivalAt: now\.toISOString\(\)/);
+});
+
+await test('クイック移動UIは開始・移動中・到着・詳細編集を段階表示する', () => {
+  assert.match(quickTransportLeg, /移動を開始/);
+  assert.match(quickTransportLeg, /移動中/);
+  assert.match(quickTransportLeg, /今到着/);
+  assert.match(quickTransportLeg, /詳細を編集/);
+  assert.match(quickTransportLeg, /到着地（任意）/);
+  assert.match(quickTransportLeg, /TRANSPORT_MODE_OPTIONS/);
+  assert.match(quickTransportLeg, /disabled=\{activeLegs\.length > 0\}/);
+  assert.match(quickTransportLeg, /loading=\{arrivingId === leg\.id\}/);
+});
+
+await test('訪問の出発からクイック移動へつながり既存詳細フォームも維持する', () => {
+  assert.match(quickPlaceVisit, /移動を記録/);
+  assert.match(quickPlaceVisit, /onStartTransport\(place\)/);
+  assert.match(tripDetailPage, /<QuickTransportLeg/);
+  assert.match(tripDetailPage, /quickTransportSeed/);
+  assert.match(tripDetailPage, /<TransportLegForm/);
+  assert.match(transportLegForm, /到着日/);
+  assert.match(transportLegForm, /getTransportLegArrivalDate/);
+});
+
+await test('移動の完全日時と未確定目的地はBackup v12で維持される', () => {
+  const departureAt = dateTimeInputToIsoDateTime('2026-06-08', '09:15');
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa',
+    schemaVersion: 12,
+    data: {
+      tripTransportLegs: [{
+        id: 'leg-quick', tripId: 'trip-1', date: '2026-06-08', fromName: '京都駅',
+        transportMode: 'walk', departureTime: '09:15', departureAt, partyCount: 1,
+        totalCost: 0, costSource: 'manual', estimatePrecision: 'exact', sortOrder: 1,
+      }],
+    },
+  });
+  assert.equal(normalized.data.tripTransportLegs[0].departureAt, departureAt);
+  assert.equal(normalized.data.tripTransportLegs[0].toName, undefined);
+});
+
+await test('クイック移動UIはモバイル操作領域と固定要素に干渉しない', () => {
+  assert.match(stylesSource, /\.quick-visit__form select \{ min-height: var\(--tap-target-min\)/);
+  assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.quick-visit__actions/);
+  assert.doesNotMatch(quickTransportLeg, /position:\s*fixed/);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {

@@ -192,7 +192,6 @@ function sanitizeTripTransportLegs(value: unknown): TripTransportLeg[] {
       && Boolean(leg.tripId)
       && /^\d{4}-\d{2}-\d{2}$/.test(leg.date)
       && Boolean(leg.fromName)
-      && Boolean(leg.toName)
       && modes.includes(leg.transportMode)
       && Number.isFinite(leg.partyCount)
       && Number.isFinite(leg.totalCost)

@@ -1,8 +1,25 @@
-import type { Trip } from '../../domain/models/trip';
+import type { Trip, TripTransportMode } from '../../domain/models/trip';
 import { toDateInputValue } from '../../shared/date/dateUtils';
 
 export type TripDisplayStatus = 'ongoing' | 'upcoming' | 'completed';
 export type TripListFilter = 'all' | 'upcoming' | 'completed';
+
+export const TRANSPORT_MODE_OPTIONS: ReadonlyArray<{ value: TripTransportMode; label: string }> = [
+  { value: 'train', label: '電車' },
+  { value: 'shinkansen', label: '新幹線' },
+  { value: 'bus', label: 'バス' },
+  { value: 'car', label: '車' },
+  { value: 'flight', label: '飛行機' },
+  { value: 'ship', label: '船' },
+  { value: 'taxi', label: 'タクシー' },
+  { value: 'bike', label: '自転車' },
+  { value: 'walk', label: '徒歩' },
+  { value: 'other', label: 'その他' },
+];
+
+export const TRANSPORT_MODE_LABELS: Record<TripTransportMode, string> = Object.fromEntries(
+  TRANSPORT_MODE_OPTIONS.map((option) => [option.value, option.label]),
+) as Record<TripTransportMode, string>;
 
 export function getTripDisplayStatus(trip: Pick<Trip, 'startDate' | 'endDate'>, now = new Date()): TripDisplayStatus {
   const today = toDateInputValue(now);

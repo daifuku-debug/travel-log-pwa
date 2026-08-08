@@ -3,10 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../domain/models/trip';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
 import { QuickPlaceVisit } from '../features/trips/components/QuickPlaceVisit';
+import { QuickTransportLeg, type QuickTransportStartSeed } from '../features/trips/components/QuickTransportLeg';
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
 import { formatPlaceVisitRecordMeta } from '../features/trips/placeVisitDateTime.ts';
+import {
+  findInProgressTransportLegs,
+  formatTransportLegTimeRange,
+  formatTransportLegTitle,
+} from '../features/trips/transportLegDateTime.ts';
 import {
   createPlaceVisit,
   createTripTransportLeg,
@@ -18,7 +24,7 @@ import {
   updateTripTransportLeg,
   type TripDetail,
 } from '../features/trips/tripService';
-import { getTripDisplayStatus, getTripDisplayStatusLabel } from '../features/trips/tripUi';
+import { getTripDisplayStatus, getTripDisplayStatusLabel, TRANSPORT_MODE_LABELS } from '../features/trips/tripUi';
 import { useTripJournalMedia } from '../features/trips/useTripJournalMedia';
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/PageState';
 import { formatCompactDateRange } from '../shared/date/dateUtils';
@@ -36,10 +42,12 @@ export function TripDetailPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [editingPlace, setEditingPlace] = useState<PlaceVisit>();
   const [editingTransportLeg, setEditingTransportLeg] = useState<TripTransportLeg>();
+  const [quickTransportSeed, setQuickTransportSeed] = useState<QuickTransportStartSeed>();
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
   const [deleting, setDeleting] = useState(false);
   const placeEditorRef = useRef<HTMLDetailsElement>(null);
+  const transportEditorRef = useRef<HTMLDetailsElement>(null);
   const media = useTripJournalMedia(tripId);
   const { data, error, loading } = useAsyncData(
     () => (tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
@@ -89,6 +97,11 @@ export function TripDetailPage() {
     requestAnimationFrame(() => placeEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
+  function openTransportEditor(leg: TripTransportLeg) {
+    setEditingTransportLeg(leg);
+    requestAnimationFrame(() => transportEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   if (loading) return <JournalState title="旅行詳細" description="旅の記録を読み込んでいます。"><LoadingState variant="skeleton" message="旅行詳細を読み込み中..." /></JournalState>;
   if (error) return <JournalState title="旅行詳細" description="旅の記録を確認します。"><ErrorState error={error} /></JournalState>;
   if (!data) return (
@@ -113,6 +126,18 @@ export function TripDetailPage() {
           places={places}
           onChanged={() => setReloadKey((value) => value + 1)}
           onEdit={openPlaceEditor}
+          onStartTransport={(place) => setQuickTransportSeed({ requestId: Date.now(), place })}
+          transportInProgress={findInProgressTransportLegs(transportLegs).length > 0}
+        />
+
+        <QuickTransportLeg
+          tripId={trip.id}
+          places={places}
+          transportLegs={transportLegs}
+          startSeed={quickTransportSeed}
+          onStartSeedConsumed={() => setQuickTransportSeed(undefined)}
+          onChanged={() => setReloadKey((value) => value + 1)}
+          onEdit={openTransportEditor}
         />
 
         <JournalSection id="trip-memory-title" eyebrow="Memories" title="旅の思い出" className="trip-journal-memory">
@@ -150,6 +175,7 @@ export function TripDetailPage() {
           setEditingPlace={setEditingPlace}
           onEditPlace={openPlaceEditor}
           placeEditorRef={placeEditorRef}
+          transportEditorRef={transportEditorRef}
           setEditingTransportLeg={setEditingTransportLeg}
           setPendingDelete={setPendingDelete}
           runAction={runAction}
@@ -254,7 +280,7 @@ function TripKeepsakes({ data, photoCount }: { data: TripDetail; photoCount: num
 }
 
 function TripJournalEditor({
-  data, tripId, editingPlace, editingTransportLeg, setEditingPlace, onEditPlace, placeEditorRef, setEditingTransportLeg, setPendingDelete, runAction,
+  data, tripId, editingPlace, editingTransportLeg, setEditingPlace, onEditPlace, placeEditorRef, transportEditorRef, setEditingTransportLeg, setPendingDelete, runAction,
 }: {
   data: TripDetail;
   tripId?: string;
@@ -263,6 +289,7 @@ function TripJournalEditor({
   setEditingPlace: (place?: PlaceVisit) => void;
   onEditPlace: (place: PlaceVisit) => void;
   placeEditorRef: RefObject<HTMLDetailsElement | null>;
+  transportEditorRef: RefObject<HTMLDetailsElement | null>;
   setEditingTransportLeg: (leg?: TripTransportLeg) => void;
   setPendingDelete: (value?: PendingDelete) => void;
   runAction: (action: () => Promise<void>, fallback: string) => Promise<void>;
@@ -294,10 +321,10 @@ function TripJournalEditor({
         </div>
       </details>
 
-      <details className="trip-journal-editor__panel" open={Boolean(editingTransportLeg) || undefined}>
+      <details ref={transportEditorRef} className="trip-journal-editor__panel" open={Boolean(editingTransportLeg) || undefined}>
         <summary>交通費・移動を追加・編集 <span>{data.transportLegs.length}区間 / {formatYen(data.transportSummary.totalCost)}</span></summary>
         <div className="trip-journal-editor__body">
-          {data.transportLegs.map((leg) => <RecordEditorRow key={leg.id} title={`${leg.fromName} → ${leg.toName}`} meta={`${leg.date} / ${TRANSPORT_MODE_LABELS[leg.transportMode]} / ${formatYen(leg.totalCost)}`} onEdit={() => setEditingTransportLeg(leg)} onDelete={() => setPendingDelete({ kind: 'leg', id: leg.id, label: `${leg.fromName} → ${leg.toName}` })} />)}
+          {data.transportLegs.map((leg) => <RecordEditorRow key={leg.id} title={formatTransportLegTitle(leg)} meta={`${leg.date} / ${formatTransportLegTimeRange(leg)} / ${TRANSPORT_MODE_LABELS[leg.transportMode]} / ${formatYen(leg.totalCost)}`} onEdit={() => setEditingTransportLeg(leg)} onDelete={() => setPendingDelete({ kind: 'leg', id: leg.id, label: formatTransportLegTitle(leg) })} />)}
           <TransportLegForm
             key={editingTransportLeg?.id ?? 'new-transport-leg'} leg={editingTransportLeg} defaultDate={data.trip.startDate}
             submitLabel={editingTransportLeg ? '移動区間を更新' : '移動区間を追加'} onCancel={editingTransportLeg ? () => setEditingTransportLeg(undefined) : undefined}
@@ -343,11 +370,6 @@ function JournalIcon({ kind }: { kind: JournalIconKind }) {
   };
   return <span className="trip-journal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[kind]}</svg></span>;
 }
-
-const TRANSPORT_MODE_LABELS: Record<TripTransportLeg['transportMode'], string> = {
-  walk: '徒歩', bike: '自転車', train: '電車', shinkansen: '新幹線', bus: 'バス', car: '車',
-  flight: '飛行機', ship: '船', taxi: 'タクシー', other: 'その他',
-};
 
 function tripDayLabel(trip: Trip): string {
   if (trip.tripType === 'dayTrip') return '日帰り';

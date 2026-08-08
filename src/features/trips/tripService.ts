@@ -20,6 +20,13 @@ import {
   findInProgressPlaceVisits,
   validatePlaceVisitDateTimeInput,
 } from './placeVisitDateTime.ts';
+import {
+  buildTransportLegDateTimeFields,
+  createTransportArrivalNowInput,
+  createTransportDepartureNowInput,
+  findInProgressTransportLegs,
+  validateTransportLegDateTimeInput,
+} from './transportLegDateTime.ts';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -57,6 +64,7 @@ export interface TripTransportLegInput {
   toName: string;
   transportMode: TripTransportMode;
   departureTime: string;
+  arrivalDate: string;
   arrivalTime: string;
   durationMinutes: string;
   distanceKm: string;
@@ -64,6 +72,14 @@ export interface TripTransportLegInput {
   partyCount: string;
   totalCost: string;
   memo: string;
+}
+
+export interface QuickTripTransportLegInput {
+  fromName: string;
+  toName?: string;
+  transportMode: TripTransportMode;
+  departureAt?: string;
+  memo?: string;
 }
 
 export interface TripTransportSummary {
@@ -94,7 +110,7 @@ export function validatePlaceVisitInput(input: PlaceVisitInput): string[] {
 
 export function validateTripTransportLegInput(input: TripTransportLegInput): string[] {
   const errors: string[] = [];
-  if (!isValidDateInputValue(input.date)) errors.push('移動日を正しく入力してください。');
+  errors.push(...validateTransportLegDateTimeInput(input));
   if (!input.fromName.trim()) errors.push('出発地を入力してください。');
   if (!input.toName.trim()) errors.push('到着地を入力してください。');
   if (!Number.isFinite(parsePositiveNumber(input.partyCount)) || parsePositiveNumber(input.partyCount) < 1) {
@@ -243,6 +259,80 @@ export async function createTripTransportLeg(tripId: EntityId, input: TripTransp
     });
   } catch (error) {
     throw toAppError(error, '移動区間の追加に失敗しました');
+  }
+}
+
+export async function createQuickTripTransportLeg(
+  tripId: EntityId,
+  input: QuickTripTransportLegInput,
+  now = new Date(),
+): Promise<TripTransportLeg> {
+  try {
+    await bootstrapAppData();
+    const trip = await repositories.trips.getById(tripId);
+    if (!trip) throw new Error('旅行が見つかりません。');
+    const currentLegs = await repositories.tripTransportLegs.listByTripId(tripId);
+    if (findInProgressTransportLegs(currentLegs).length > 0) {
+      throw new Error('移動中の区間を到着済みにしてから、次の移動を記録してください。');
+    }
+    if (!input.fromName.trim()) throw new Error('出発地を入力してください。');
+
+    const departure = input.departureAt ? new Date(input.departureAt) : now;
+    if (Number.isNaN(departure.getTime())) throw new Error('出発日時を正しく入力してください。');
+    if (departure.getTime() > now.getTime()) throw new Error('出発日時は現在以前にしてください。');
+    const createdAt = now.toISOString();
+    const departureFields = buildTransportLegDateTimeFields(createTransportDepartureNowInput(departure));
+    return await repositories.tripTransportLegs.save({
+      ...departureFields,
+      id: createId('transport-leg'),
+      userId: LOCAL_USER_ID,
+      tripId,
+      fromName: input.fromName.trim(),
+      toName: optionalText(input.toName ?? ''),
+      transportMode: input.transportMode,
+      departureAt: departure.toISOString(),
+      partyCount: 1,
+      totalCost: 0,
+      costSource: 'manual',
+      estimatePrecision: 'exact',
+      memo: optionalText(input.memo ?? ''),
+      sortOrder: currentLegs.length + 1,
+      createdAt,
+      updatedAt: createdAt,
+      syncStatus: 'pending',
+    });
+  } catch (error) {
+    throw toAppError(error, error instanceof Error ? error.message : '移動を開始できませんでした。');
+  }
+}
+
+export async function arriveTripTransportLegNow(
+  legId: EntityId,
+  toName?: string,
+  now = new Date(),
+): Promise<TripTransportLeg> {
+  try {
+    await bootstrapAppData();
+    const current = await repositories.tripTransportLegs.getById(legId);
+    if (!current) throw new Error('移動区間が見つかりません。');
+    if (current.arrivalAt) return current;
+    if (!current.departureAt) throw new Error('出発日時がないため、詳細編集から到着時刻を記録してください。');
+    if (now.getTime() < new Date(current.departureAt).getTime()) {
+      throw new Error('到着日時は出発日時以降にしてください。');
+    }
+    const arrival = createTransportArrivalNowInput(now);
+    const durationMinutes = Math.max(0, Math.round((now.getTime() - new Date(current.departureAt).getTime()) / 60_000));
+    return await repositories.tripTransportLegs.save({
+      ...current,
+      toName: optionalText(toName ?? '') ?? current.toName,
+      arrivalTime: arrival.arrivalTime,
+      arrivalAt: now.toISOString(),
+      durationMinutes: current.durationMinutes ?? durationMinutes,
+      updatedAt: now.toISOString(),
+      syncStatus: 'pending',
+    });
+  } catch (error) {
+    throw toAppError(error, error instanceof Error ? error.message : '到着時刻を記録できませんでした。');
   }
 }
 
@@ -413,6 +503,8 @@ function buildTripTransportLegFields(input: TripTransportLegInput): Pick<
   | 'transportMode'
   | 'departureTime'
   | 'arrivalTime'
+  | 'departureAt'
+  | 'arrivalAt'
   | 'durationMinutes'
   | 'distanceKm'
   | 'oneWayCost'
@@ -424,12 +516,10 @@ function buildTripTransportLegFields(input: TripTransportLegInput): Pick<
   const oneWayCost = optionalNumber(input.oneWayCost);
   const explicitTotalCost = optionalNumber(input.totalCost);
   return {
-    date: input.date,
+    ...buildTransportLegDateTimeFields(input),
     fromName: input.fromName.trim(),
     toName: input.toName.trim(),
     transportMode: input.transportMode,
-    departureTime: optionalText(input.departureTime),
-    arrivalTime: optionalText(input.arrivalTime),
     durationMinutes: optionalInteger(input.durationMinutes),
     distanceKm: optionalNumber(input.distanceKm),
     oneWayCost,
@@ -454,7 +544,7 @@ function summarizeTripTransportLegs(legs: TripTransportLeg[]): TripTransportSumm
 
 function sortTransportLegs(legs: TripTransportLeg[]): TripTransportLeg[] {
   return legs.slice().sort((a, b) =>
-    a.date.localeCompare(b.date)
+    String(a.departureAt || a.date).localeCompare(String(b.departureAt || b.date))
     || a.sortOrder - b.sortOrder
     || String(a.departureTime || '').localeCompare(String(b.departureTime || '')),
   );

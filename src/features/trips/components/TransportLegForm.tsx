@@ -1,19 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import type { TripTransportLeg, TripTransportMode } from '../../../domain/models/trip';
 import { type TripTransportLegInput, validateTripTransportLegInput } from '../tripService';
-
-const TRANSPORT_MODE_OPTIONS: Array<{ value: TripTransportMode; label: string }> = [
-  { value: 'train', label: '電車' },
-  { value: 'shinkansen', label: '新幹線' },
-  { value: 'bus', label: 'バス' },
-  { value: 'car', label: '車' },
-  { value: 'flight', label: '飛行機' },
-  { value: 'ship', label: '船' },
-  { value: 'taxi', label: 'タクシー' },
-  { value: 'bike', label: '自転車' },
-  { value: 'walk', label: '徒歩' },
-  { value: 'other', label: 'その他' },
-];
+import { TRANSPORT_MODE_OPTIONS } from '../tripUi.ts';
+import {
+  getTransportLegArrivalDate,
+  getTransportLegArrivalTime,
+  getTransportLegDepartureDate,
+  getTransportLegDepartureTime,
+} from '../transportLegDateTime.ts';
 
 interface TransportLegFormProps {
   leg?: TripTransportLeg;
@@ -31,12 +25,13 @@ export function TransportLegForm({
   onSubmit,
 }: TransportLegFormProps) {
   const [input, setInput] = useState<TripTransportLegInput>(() => ({
-    date: leg?.date ?? defaultDate,
+    date: leg ? getTransportLegDepartureDate(leg) : defaultDate,
     fromName: leg?.fromName ?? '',
     toName: leg?.toName ?? '',
     transportMode: leg?.transportMode ?? 'train',
-    departureTime: leg?.departureTime ?? '',
-    arrivalTime: leg?.arrivalTime ?? '',
+    departureTime: leg ? getTransportLegDepartureTime(leg) : '',
+    arrivalDate: leg ? getTransportLegArrivalDate(leg) : defaultDate,
+    arrivalTime: leg ? getTransportLegArrivalTime(leg) : '',
     durationMinutes: String(leg?.durationMinutes ?? ''),
     distanceKm: String(leg?.distanceKm ?? ''),
     oneWayCost: String(leg?.oneWayCost ?? ''),
@@ -66,6 +61,7 @@ export function TransportLegForm({
           toName: '',
           transportMode: 'train',
           departureTime: '',
+          arrivalDate: defaultDate,
           arrivalTime: '',
           durationMinutes: '',
           distanceKm: '',
@@ -92,14 +88,12 @@ export function TransportLegForm({
 
       <div className="form-grid">
         <label className="field">
-          <span>移動日</span>
+          <span>出発日</span>
           <input type="date" value={input.date} onChange={(event) => setInput({ ...input, date: event.target.value })} />
         </label>
         <label className="field">
-          <span>交通手段</span>
-          <select value={input.transportMode} onChange={(event) => setInput({ ...input, transportMode: event.target.value as TripTransportMode })}>
-            {TRANSPORT_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          <span>出発時刻</span>
+          <input type="time" value={input.departureTime} onChange={(event) => setInput({ ...input, departureTime: event.target.value })} />
         </label>
       </div>
 
@@ -116,14 +110,21 @@ export function TransportLegForm({
 
       <div className="form-grid">
         <label className="field">
-          <span>出発時刻</span>
-          <input type="time" value={input.departureTime} onChange={(event) => setInput({ ...input, departureTime: event.target.value })} />
+          <span>到着日</span>
+          <input type="date" value={input.arrivalDate} onChange={(event) => setInput({ ...input, arrivalDate: event.target.value })} />
         </label>
         <label className="field">
           <span>到着時刻</span>
           <input type="time" value={input.arrivalTime} onChange={(event) => setInput({ ...input, arrivalTime: event.target.value })} />
         </label>
       </div>
+
+      <label className="field">
+        <span>交通手段</span>
+        <select value={input.transportMode} onChange={(event) => setInput({ ...input, transportMode: event.target.value as TripTransportMode })}>
+          {TRANSPORT_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </label>
 
       <div className="form-grid">
         <label className="field">

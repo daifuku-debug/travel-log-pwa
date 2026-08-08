@@ -1517,10 +1517,13 @@ a {
 .quick-visit__empty,
 .quick-visit__hint { margin: 0; color: var(--journal-muted); font-size: var(--font-size-sm); line-height: 1.6; }
 .quick-visit__form { display: grid; gap: 18px; }
-.quick-visit__form input { min-height: var(--tap-target-min); }
+.quick-visit__form input,
+.quick-visit__form select { min-height: var(--tap-target-min); }
 .quick-visit__arrival { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 12px; border-block: 1px solid var(--color-divider); padding-block: 10px; }
 .quick-visit__arrival span { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .quick-visit__arrival time { font-weight: var(--font-weight-bold); }
+.quick-transport .quick-visit__place-copy time { overflow-wrap: anywhere; }
+.bottom-sheet__header > .button { min-width: 64px; min-height: var(--tap-target-min); white-space: nowrap; }
 
 .trip-journal-section { display: grid; gap: 20px; max-width: 820px; width: 100%; margin-inline: auto; }
 .trip-journal-section__heading { display: grid; gap: 3px; }
