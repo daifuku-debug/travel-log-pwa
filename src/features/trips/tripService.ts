@@ -77,6 +77,7 @@ export interface TripTransportLegInput {
 export interface QuickTripTransportLegInput {
   fromName: string;
   toName?: string;
+  toPlaceVisitId?: EntityId;
   transportMode: TripTransportMode;
   departureAt?: string;
   memo?: string;
@@ -276,6 +277,12 @@ export async function createQuickTripTransportLeg(
       throw new Error('移動中の区間を到着済みにしてから、次の移動を記録してください。');
     }
     if (!input.fromName.trim()) throw new Error('出発地を入力してください。');
+    const destinationPlace = input.toPlaceVisitId
+      ? await repositories.placeVisits.getById(input.toPlaceVisitId)
+      : undefined;
+    if (input.toPlaceVisitId && (!destinationPlace || destinationPlace.tripId !== tripId)) {
+      throw new Error('到着先の訪問場所を確認してください。');
+    }
 
     const departure = input.departureAt ? new Date(input.departureAt) : now;
     if (Number.isNaN(departure.getTime())) throw new Error('出発日時を正しく入力してください。');
@@ -288,7 +295,8 @@ export async function createQuickTripTransportLeg(
       userId: LOCAL_USER_ID,
       tripId,
       fromName: input.fromName.trim(),
-      toName: optionalText(input.toName ?? ''),
+      toName: destinationPlace?.name ?? optionalText(input.toName ?? ''),
+      toPlaceVisitId: destinationPlace?.id,
       transportMode: input.transportMode,
       departureAt: departure.toISOString(),
       partyCount: 1,
@@ -345,6 +353,7 @@ export async function updateTripTransportLeg(legId: EntityId, input: TripTranspo
     return repositories.tripTransportLegs.save({
       ...current,
       ...buildTripTransportLegFields(input),
+      toPlaceVisitId: input.toName.trim() === current.toName?.trim() ? current.toPlaceVisitId : undefined,
       costSource: current.costSource === 'api' ? 'manual' : current.costSource,
       estimatePrecision: 'exact',
       updatedAt: new Date().toISOString(),

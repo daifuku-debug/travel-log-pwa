@@ -124,6 +124,7 @@ export function TripDetailPage() {
         <QuickPlaceVisit
           tripId={trip.id}
           places={places}
+          transportLegs={transportLegs}
           onChanged={() => setReloadKey((value) => value + 1)}
           onEdit={openPlaceEditor}
           onStartTransport={(place) => setQuickTransportSeed({ requestId: Date.now(), place })}

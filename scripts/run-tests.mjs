@@ -118,6 +118,14 @@ import {
   isTransportLegInProgress,
   validateTransportLegDateTimeInput,
 } from '../src/features/trips/transportLegDateTime.ts';
+import {
+  buildLinkedArrivalRecords,
+  buildNewPlaceArrivalRecords,
+  buildPlaceFromCompletedTransportRecords,
+  isReverseTransportArrivalCandidate,
+  isTransportDestinationUnregistered,
+  resolveTransportArrivalVisitCandidate,
+} from '../src/features/trips/tripArrivalLink.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
 import {
@@ -156,6 +164,8 @@ const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
 const quickPlaceVisit = await readFile(new URL('../src/features/trips/components/QuickPlaceVisit.tsx', import.meta.url), 'utf8');
 const quickTransportLeg = await readFile(new URL('../src/features/trips/components/QuickTransportLeg.tsx', import.meta.url), 'utf8');
+const tripArrivalLinkService = await readFile(new URL('../src/features/trips/tripArrivalLinkService.ts', import.meta.url), 'utf8');
+const tripArrivalLinkDataSource = await readFile(new URL('../src/infrastructure/localDb/tripArrivalLinkDataSource.ts', import.meta.url), 'utf8');
 const updateCastleMasterScript = await readFile(new URL('../scripts/update-castle-master.mjs', import.meta.url), 'utf8');
 const scrapbookModel = await readFile(new URL('../src/domain/models/scrapbook.ts', import.meta.url), 'utf8');
 const scrapbookService = await readFile(new URL('../src/features/scrapbooks/scrapbookService.ts', import.meta.url), 'utf8');
@@ -3727,6 +3737,118 @@ await test('クイック移動UIはモバイル操作領域と固定要素に干
   assert.match(stylesSource, /\.quick-visit__form select \{ min-height: var\(--tap-target-min\)/);
   assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.quick-visit__actions/);
   assert.doesNotMatch(quickTransportLeg, /position:\s*fixed/);
+});
+
+await test('移動到着はID一致を確定候補、単一の同名訪問を確認候補として扱う', () => {
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅' };
+  const arrivedAt = '2026-06-08T02:00:00.000Z';
+  const linked = resolveTransportArrivalVisitCandidate({
+    id: 'leg-1', tripId: 'trip-1', toName: '京都駅', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T01:00:00.000Z',
+  }, [place], arrivedAt);
+  assert.equal(linked.kind, 'linked');
+  assert.equal(linked.canRecordArrival, true);
+  const suggested = resolveTransportArrivalVisitCandidate({
+    id: 'leg-2', tripId: 'trip-1', toName: '京都駅', departureAt: '2026-06-08T01:00:00.000Z',
+  }, [place], arrivedAt);
+  assert.equal(suggested.kind, 'suggested');
+  assert.equal(suggested.place.id, place.id);
+  assert.deepEqual(resolveTransportArrivalVisitCandidate({
+    id: 'leg-3', tripId: 'trip-1', toName: '京都駅', departureAt: '2026-06-08T01:00:00.000Z',
+  }, [place, { ...place, id: 'place-2' }], arrivedAt), { kind: 'unregistered', suggestedName: '京都駅' });
+});
+
+await test('既存到着時刻は上書き候補にせず訪問の時刻矛盾も検出する', () => {
+  const arrivedAt = '2026-06-08T03:00:00.000Z';
+  const leg = { id: 'leg-1', tripId: 'trip-1', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T01:00:00.000Z' };
+  assert.equal(resolveTransportArrivalVisitCandidate(leg, [{ id: 'place-1', tripId: 'trip-1', arrivalAt: '2026-06-08T02:00:00.000Z' }], arrivedAt).canRecordArrival, false);
+  assert.equal(resolveTransportArrivalVisitCandidate(leg, [{ id: 'place-1', tripId: 'trip-1', departureAt: '2026-06-08T02:30:00.000Z' }], arrivedAt).canRecordArrival, false);
+});
+
+await test('移動と既存訪問の到着へ同一timestampを設定する', () => {
+  const arrivedAt = '2026-06-09T00:20:00.000Z';
+  const result = buildLinkedArrivalRecords({
+    id: 'leg-1', tripId: 'trip-1', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T23:45:00.000Z',
+  }, { id: 'place-1', tripId: 'trip-1' }, arrivedAt);
+  assert.equal(result.leg.arrivalAt, arrivedAt);
+  assert.equal(result.place.arrivalAt, arrivedAt);
+  assert.equal(result.place.visitedAt, arrivedAt);
+  assert.equal(result.leg.durationMinutes, 35);
+});
+
+await test('移動と訪問の同時到着は同一timestampで再実行しても冪等', () => {
+  const arrivedAt = '2026-06-09T00:20:00.000Z';
+  const first = buildLinkedArrivalRecords({
+    id: 'leg-1', tripId: 'trip-1', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T23:45:00.000Z',
+  }, { id: 'place-1', tripId: 'trip-1' }, arrivedAt);
+  const second = buildLinkedArrivalRecords(first.leg, first.place, arrivedAt);
+  assert.deepEqual(second, first);
+});
+
+await test('訪問場所の新規追加は同一Tripに同名候補がない場合だけ許可する', () => {
+  const leg = { id: 'leg-1', tripId: 'trip-1', toName: '京都駅' };
+  assert.equal(isTransportDestinationUnregistered(leg, []), true);
+  assert.equal(isTransportDestinationUnregistered(leg, [{ id: 'place-1', tripId: 'trip-1', name: ' 京都駅 ' }]), false);
+  assert.equal(isTransportDestinationUnregistered({ ...leg, toPlaceVisitId: 'place-1' }, []), false);
+  assert.equal(isTransportDestinationUnregistered(leg, [{ id: 'place-2', tripId: 'trip-2', name: '京都駅' }]), true);
+});
+
+await test('連携到着は移動出発前と訪問出発後を拒否する', () => {
+  assert.throws(() => buildLinkedArrivalRecords({
+    id: 'leg-1', tripId: 'trip-1', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T10:00:00.000Z',
+  }, { id: 'place-1', tripId: 'trip-1' }, '2026-06-08T09:00:00.000Z'), /到着日時は出発日時以降/);
+  assert.throws(() => buildLinkedArrivalRecords({
+    id: 'leg-1', tripId: 'trip-1', toPlaceVisitId: 'place-1', departureAt: '2026-06-08T08:00:00.000Z',
+  }, { id: 'place-1', tripId: 'trip-1', departureAt: '2026-06-08T08:30:00.000Z' }, '2026-06-08T09:00:00.000Z'), /訪問の出発日時より後/);
+});
+
+await test('逆方向連携は未完了かつ未紐付けの正規化済み同名だけを候補にする', () => {
+  const leg = { departureAt: '2026-06-08T08:00:00.000Z', toName: ' 京都駅 ' };
+  assert.equal(isReverseTransportArrivalCandidate(leg, '京都駅'), true);
+  assert.equal(isReverseTransportArrivalCandidate({ ...leg, toPlaceVisitId: 'place-1' }, '京都駅'), false);
+  assert.equal(isReverseTransportArrivalCandidate({ ...leg, arrivalAt: '2026-06-08T09:00:00.000Z' }, '京都駅'), false);
+  assert.equal(isReverseTransportArrivalCandidate(leg, '京都'), false);
+});
+
+await test('逆方向確認後は新規訪問IDを移動区間へ保存する', () => {
+  const arrivedAt = '2026-06-08T09:00:00.000Z';
+  const place = { id: 'place-new', tripId: 'trip-1', name: '京都駅', arrivalAt: arrivedAt };
+  const result = buildNewPlaceArrivalRecords({
+    id: 'leg-1', tripId: 'trip-1', toName: '京都駅', departureAt: '2026-06-08T08:00:00.000Z',
+  }, place, arrivedAt);
+  assert.equal(result.leg.toPlaceVisitId, place.id);
+  assert.equal(result.leg.arrivalAt, arrivedAt);
+});
+
+await test('移動だけ到着後は明示操作で同時刻の訪問場所へ紐付ける', () => {
+  const arrivedAt = '2026-06-08T09:00:00.000Z';
+  const place = { id: 'place-new', tripId: 'trip-1', name: '京都駅', arrivalAt: arrivedAt };
+  const result = buildPlaceFromCompletedTransportRecords({
+    id: 'leg-1', tripId: 'trip-1', toName: '京都駅', arrivalAt: arrivedAt,
+  }, place);
+  assert.equal(result.leg.toPlaceVisitId, place.id);
+  assert.equal(result.place.arrivalAt, arrivedAt);
+});
+
+await test('到着連携Serviceは2 Storeを同一Transactionで更新しUIは明示確認を行う', () => {
+  assert.match(tripArrivalLinkDataSource, /transaction\(\['tripTransportLegs', 'placeVisits'\], 'readwrite'\)/);
+  assert.match(tripArrivalLinkService, /arriveTransportAndPlaceNow/);
+  assert.match(tripArrivalLinkService, /createQuickPlaceVisitAndArriveTransport/);
+  assert.match(quickTransportLeg, /移動と訪問の両方に記録/);
+  assert.match(quickTransportLeg, /移動だけ記録/);
+  assert.match(quickTransportLeg, /訪問場所として追加/);
+  assert.match(quickPlaceVisit, /直前の移動も同じ時刻で到着にしますか/);
+  assert.match(quickPlaceVisit, /訪問だけ記録/);
+});
+
+await test('到着先IDはBackup v12で維持され既存データは未設定のまま読める', () => {
+  const baseLeg = {
+    id: 'leg-link', tripId: 'trip-1', date: '2026-06-08', fromName: '京都駅', toName: '清水寺',
+    transportMode: 'bus', partyCount: 1, totalCost: 0, costSource: 'manual', estimatePrecision: 'exact', sortOrder: 1,
+  };
+  const linked = normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 12, data: { tripTransportLegs: [{ ...baseLeg, toPlaceVisitId: 'place-1' }] } });
+  assert.equal(linked.data.tripTransportLegs[0].toPlaceVisitId, 'place-1');
+  const legacy = normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 12, data: { tripTransportLegs: [baseLeg] } });
+  assert.equal(legacy.data.tripTransportLegs[0].toPlaceVisitId, undefined);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {

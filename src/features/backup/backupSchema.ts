@@ -197,7 +197,12 @@ function sanitizeTripTransportLegs(value: unknown): TripTransportLeg[] {
       && Number.isFinite(leg.totalCost)
       && ['manual', 'estimated', 'api'].includes(leg.costSource)
       && ['exact', 'high', 'medium', 'rough', 'unknown'].includes(leg.estimatePrecision),
-    ),
+    ).map((leg) => ({
+      ...leg,
+      toPlaceVisitId: typeof leg.toPlaceVisitId === 'string' && leg.toPlaceVisitId.trim()
+        ? leg.toPlaceVisitId
+        : undefined,
+    })),
     (leg) => leg.id,
   );
 }

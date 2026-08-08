@@ -1,23 +1,27 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
-import type { PlaceVisit } from '../../../domain/models/trip';
+import type { PlaceVisit, TripTransportLeg } from '../../../domain/models/trip';
 import { BottomSheet, Button, InlineError, useToast } from '../../../shared/ui';
 import {
   findInProgressPlaceVisits,
   formatPlaceVisitTimeRange,
   isPlaceVisitInProgress,
 } from '../placeVisitDateTime.ts';
+import { isReverseTransportArrivalCandidate } from '../tripArrivalLink.ts';
+import { createQuickPlaceVisitAndArriveTransport } from '../tripArrivalLinkService.ts';
+import { findInProgressTransportLegs } from '../transportLegDateTime.ts';
 import { createQuickPlaceVisit, departPlaceVisitNow } from '../tripService';
 
 interface QuickPlaceVisitProps {
   tripId: string;
   places: PlaceVisit[];
+  transportLegs: TripTransportLeg[];
   onChanged: () => void;
   onEdit: (place: PlaceVisit) => void;
   onStartTransport: (place: PlaceVisit) => void;
   transportInProgress: boolean;
 }
 
-export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTransport, transportInProgress }: QuickPlaceVisitProps) {
+export function QuickPlaceVisit({ tripId, places, transportLegs, onChanged, onEdit, onStartTransport, transportInProgress }: QuickPlaceVisitProps) {
   const { showToast } = useToast();
   const formId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -25,6 +29,7 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
   const [name, setName] = useState('');
   const [arrivalAt, setArrivalAt] = useState(() => new Date());
   const [saving, setSaving] = useState(false);
+  const [linkCandidate, setLinkCandidate] = useState<TripTransportLeg>();
   const [departingId, setDepartingId] = useState<string>();
   const [error, setError] = useState('');
   const activePlaces = findInProgressPlaceVisits(places);
@@ -36,6 +41,7 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
   function openQuickEntry() {
     if (activePlaces.length > 0) return;
     setName('');
+    setLinkCandidate(undefined);
     setArrivalAt(new Date());
     setError('');
     setSheetOpen(true);
@@ -45,20 +51,36 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
     if (saving) return;
     setSheetOpen(false);
     setName('');
+    setLinkCandidate(undefined);
     setError('');
   }
 
   async function saveArrival(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+    const activeTransport = findInProgressTransportLegs(transportLegs)[0];
+    if (activeTransport && isReverseTransportArrivalCandidate(activeTransport, name)) {
+      setLinkCandidate(activeTransport);
+      return;
+    }
+    await persistArrival(false);
+  }
+
+  async function persistArrival(includeTransport: boolean) {
+    if (saving) return;
     setSaving(true);
     setError('');
     try {
-      await createQuickPlaceVisit(tripId, name, arrivalAt);
+      if (includeTransport && linkCandidate) {
+        await createQuickPlaceVisitAndArriveTransport(tripId, linkCandidate.id, name, arrivalAt);
+      } else {
+        await createQuickPlaceVisit(tripId, name, arrivalAt);
+      }
       setSheetOpen(false);
       setName('');
+      setLinkCandidate(undefined);
       onChanged();
-      showToast({ title: '到着を記録しました。', variant: 'success' });
+      showToast({ title: includeTransport ? '移動と訪問の到着を記録しました。' : '到着を記録しました。', variant: 'success' });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : '到着を記録できませんでした。');
     } finally {
@@ -149,11 +171,17 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
       <BottomSheet
         open={sheetOpen}
         onClose={closeQuickEntry}
-        title="今ここに着いた"
-        description="場所名と現在の到着時刻を記録します。"
+        title={linkCandidate ? `${name}へ到着` : '今ここに着いた'}
+        description={linkCandidate ? '直前の移動も同じ時刻で到着にしますか？' : '場所名と現在の到着時刻を記録します。'}
         initialFocusRef={nameInputRef}
         dismissible={!saving}
-        actions={(
+        actions={linkCandidate ? (
+          <div className="quick-arrival-actions">
+            <Button onClick={() => setLinkCandidate(undefined)} disabled={saving}>キャンセル</Button>
+            <Button onClick={() => persistArrival(false)} disabled={saving}>訪問だけ記録</Button>
+            <Button variant="primary" onClick={() => persistArrival(true)} loading={saving}>移動と訪問の両方に記録</Button>
+          </div>
+        ) : (
           <>
             <Button onClick={closeQuickEntry} disabled={saving}>キャンセル</Button>
             <Button variant="primary" type="submit" form={formId} loading={saving}>到着を記録</Button>
@@ -162,7 +190,7 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
       >
         <form id={formId} className="quick-visit__form" onSubmit={saveArrival}>
           {error && <InlineError message={error} />}
-          <label className="field">
+          {!linkCandidate && <label className="field">
             <span>場所名</span>
             <input
               ref={nameInputRef}
@@ -172,7 +200,13 @@ export function QuickPlaceVisit({ tripId, places, onChanged, onEdit, onStartTran
               placeholder="例: 金沢城公園"
               required
             />
-          </label>
+          </label>}
+          {linkCandidate && (
+            <div className="quick-arrival-review" aria-live="polite">
+              <p><strong>{linkCandidate.fromName} → {linkCandidate.toName}</strong></p>
+              <p>場所名が一致する未完了の移動です。確認した場合だけ、両方へ同じ到着時刻を記録します。</p>
+            </div>
+          )}
           <div className="quick-visit__arrival">
             <span>到着時刻</span>
             <time dateTime={arrivalAt.toISOString()}>{formatCurrentMoment(arrivalAt)}</time>

@@ -1522,6 +1522,11 @@ a {
 .quick-visit__arrival { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 12px; border-block: 1px solid var(--color-divider); padding-block: 10px; }
 .quick-visit__arrival span { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .quick-visit__arrival time { font-weight: var(--font-weight-bold); }
+.quick-arrival-review { display: grid; gap: 12px; }
+.quick-arrival-review p { margin: 0; color: var(--color-text-muted); line-height: 1.6; }
+.quick-arrival-review strong { color: var(--color-text); }
+.quick-arrival-actions { display: flex; width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.quick-arrival-actions .button { min-height: var(--tap-target-min); }
 .quick-transport .quick-visit__place-copy time { overflow-wrap: anywhere; }
 .bottom-sheet__header > .button { min-width: 64px; min-height: var(--tap-target-min); white-space: nowrap; }
 
@@ -1612,6 +1617,8 @@ a {
   .quick-visit__place { display: grid; }
   .quick-visit__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .quick-visit__actions .button:only-child { grid-column: 1 / -1; }
+  .quick-arrival-actions { display: grid; grid-template-columns: 1fr; }
+  .quick-arrival-actions .button { width: 100%; }
 }
 
 :focus-visible {
