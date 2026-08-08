@@ -2,32 +2,32 @@
 
 ## Last completed
 
-- 写真込みBackup Phase 1: ZIP Package Exportと自己検証
-- v12 Metadataとoriginal／thumbnail BlobをPackage v1 ZIPへ格納
-- SHA-256、Path、MIME、容量、Summaryを自己検証し、成功後だけダウンロード可能
-- 軽量JSON Backupを維持し、設定画面で完全Backupと明確に分離
-- Latest Phase Commit: `d80f975`
+- 旅行記録MVP Phase T1: 訪問場所の日時・滞在記録
+- 訪問日と任意の到着・出発時刻を、日付またぎ対応で追加・編集可能
+- 現在時刻のワンタップ入力と、旅行詳細・Timeline・TimeMachineへの精度別反映
+- 時刻なし旧データとBackup v12を維持し、`00:00`を補わない後方互換
+- Latest Phase Commit: `b777c29`
 
 ## Current state
 
 - Backup Schema Version: 12
 - IndexedDB Version: 10
-- Test count: 251
+- Test count: 258
 - Working tree: clean after this status update
-- Origin difference: `main` is 2 commits ahead of `origin/main`
+- Origin difference: `main` is 4 commits ahead of `origin/main`
 
 ## Next
 
-- 写真込みBackup Phase 2: 検証済みZIPの安全なRestore
-- 復元前Preview、一時領域、原子的な全置換、復元後Integrity Scanを実装する。
-- 今回触らない: Metadataの統合Import
-- 今回触らない: Cloudflare R2同期
-- 今回触らない: Trip削除カスケード
+- 旅行記録MVP Phase T2候補: 旅行中のクイック訪問記録導線
+- 旅行詳細の作品表示を保ちながら、現在地で訪問記録を素早く開始できる入口を整える。
+- 今回触らない: GPS自動チェックイン
+- 今回触らない: 写真込みBackup Phase 2
+- 今回触らない: 移動区間の大規模改修
 
 ## Known risks
 
-- 完全Backup ZIPのRestore、一時領域、Rollbackは未実装
-- ZIP生成結果は最終Blobとしてメモリに保持するため、大量写真時のiOS Safari負荷が残る
-- 完全Backupは非暗号化で、個人写真を含むファイルの管理をユーザーへ委ねる
-- 作成時点でMissing Blobがある場合は警告付きPackageとなり、写真自体は復元できない
+- 訪問場所の追加フォームは旅行詳細下部の編集領域にあり、旅行中の即時記録にはスクロール量が多い
+- 移動区間は訪問場所と同等の日付またぎ日時モデルをまだ持たない
+- 旧`visitedAt`だけの記録から正確な到着時刻は復元できない
+- 写真込みBackup ZIPのRestore、一時領域、Rollbackは保留中
 - Missing Original等の手動復旧、Cloudflare D1／R2同期、Trip削除カスケードは未実装
