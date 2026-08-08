@@ -126,6 +126,13 @@ import {
   isTransportDestinationUnregistered,
   resolveTransportArrivalVisitCandidate,
 } from '../src/features/trips/tripArrivalLink.ts';
+import {
+  buildQuickTravelRecordFields,
+  createQuickTravelRecordInput,
+  formatQuickTravelRecordDetail,
+  formatQuickTravelRecordTitle,
+  validateQuickTravelRecordInput,
+} from '../src/features/trips/quickTravelRecord.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
 import { buildTravelStats } from '../src/features/rpg/rpgStats.ts';
 import {
@@ -164,6 +171,8 @@ const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
 const quickPlaceVisit = await readFile(new URL('../src/features/trips/components/QuickPlaceVisit.tsx', import.meta.url), 'utf8');
 const quickTransportLeg = await readFile(new URL('../src/features/trips/components/QuickTransportLeg.tsx', import.meta.url), 'utf8');
+const quickTravelRecordSource = await readFile(new URL('../src/features/trips/components/QuickTravelRecord.tsx', import.meta.url), 'utf8');
+const quickTravelRecordServiceSource = await readFile(new URL('../src/features/trips/quickTravelRecordService.ts', import.meta.url), 'utf8');
 const tripArrivalLinkService = await readFile(new URL('../src/features/trips/tripArrivalLinkService.ts', import.meta.url), 'utf8');
 const tripArrivalLinkDataSource = await readFile(new URL('../src/infrastructure/localDb/tripArrivalLinkDataSource.ts', import.meta.url), 'utf8');
 const updateCastleMasterScript = await readFile(new URL('../scripts/update-castle-master.mjs', import.meta.url), 'utf8');
@@ -3849,6 +3858,82 @@ await test('到着先IDはBackup v12で維持され既存データは未設定�
   assert.equal(linked.data.tripTransportLegs[0].toPlaceVisitId, 'place-1');
   const legacy = normalizeBackupPayload({ app: 'travel-log-pwa', schemaVersion: 12, data: { tripTransportLegs: [baseLeg] } });
   assert.equal(legacy.data.tripTransportLegs[0].toPlaceVisitId, undefined);
+});
+
+await test('旅先クイック記録は現在日時と滞在中の場所を初期値にする', () => {
+  const input = createQuickTravelRecordInput('meal', new Date(2026, 7, 9, 12, 34), { id: 'place-1' });
+  assert.equal(input.date, '2026-08-09');
+  assert.equal(input.time, '12:34');
+  assert.equal(input.placeVisitId, 'place-1');
+  assert.equal(input.recordType, 'meal');
+});
+
+await test('旅先クイック記録は種別ごとの最小入力を検証する', () => {
+  const meal = createQuickTravelRecordInput('meal', new Date(2026, 7, 9, 12, 34));
+  assert.match(validateQuickTravelRecordInput(meal).join(' '), /店名または食事タイトル/);
+  assert.deepEqual(validateQuickTravelRecordInput({ ...meal, title: '昼ごはん' }), []);
+  const memo = createQuickTravelRecordInput('memo', new Date(2026, 7, 9, 12, 34));
+  assert.match(validateQuickTravelRecordInput(memo).join(' '), /出来事やメモ/);
+  const expense = createQuickTravelRecordInput('expense', new Date(2026, 7, 9, 12, 34));
+  assert.match(validateQuickTravelRecordInput(expense).join(' '), /出費の金額/);
+  assert.deepEqual(validateQuickTravelRecordInput({ ...expense, amount: '1200' }), []);
+});
+
+await test('旅先クイック記録は任意項目を省略し既存訪問へ安全に関連付ける', () => {
+  const input = { ...createQuickTravelRecordInput('purchase', new Date(2026, 7, 9, 13, 0)), title: 'おみやげ', amount: '' };
+  const fields = buildQuickTravelRecordFields(input, { id: 'place-1', name: '京都駅' });
+  assert.equal(fields.title, 'おみやげ');
+  assert.equal(fields.amount, undefined);
+  assert.equal(fields.placeVisitId, 'place-1');
+  assert.equal(fields.locationName, '京都駅');
+});
+
+await test('旅先クイック記録は種別、金額、場所をBackup v12で維持する', () => {
+  const normalized = normalizeBackupPayload({
+    app: 'travel-log-pwa', schemaVersion: 12, data: { manualTimelineEntries: [{
+      id: 'record-1', tripId: 'trip-1', date: '2026-08-09', startAt: '2026-08-09T03:00:00.000Z',
+      timePrecision: 'minute', sourceType: 'manual', confidence: 'exact', recordType: 'purchase',
+      title: 'おみやげ', amount: 850, shopName: '駅売店', placeVisitId: 'place-1',
+    }] },
+  });
+  const record = normalized.data.manualTimelineEntries[0];
+  assert.equal(record.recordType, 'purchase');
+  assert.equal(record.amount, 850);
+  assert.equal(record.shopName, '駅売店');
+  assert.equal(record.placeVisitId, 'place-1');
+});
+
+await test('旅先クイック記録はTimelineへ日時順で混ざる', () => {
+  const record = {
+    id: 'record-1', date: '2026-08-09', startAt: dateTimeInputToIsoDateTime('2026-08-09', '12:00'),
+    timePrecision: 'minute', sourceType: 'manual', confidence: 'exact', recordType: 'meal', title: '昼ごはん', amount: 1200,
+  };
+  assert.equal(formatQuickTravelRecordTitle(record), '昼ごはん');
+  assert.match(formatQuickTravelRecordDetail(record), /1,200円/);
+  assert.match(tripJournalTimeline, /quickRecords\.map/);
+  assert.match(tripJournalTimeline, /kind: 'record'/);
+  assert.match(tripJournalTimeline, /\.\.\.recordEntries/);
+});
+
+await test('旅先クイック記録UIは4種の入口、後編集、保存失敗保持を備える', () => {
+  assert.match(quickTravelRecordSource, /記録を追加/);
+  assert.match(quickTravelRecordSource, /QUICK_TRAVEL_RECORD_TYPES/);
+  assert.match(quickTravelRecordSource, /詳細を編集/);
+  assert.match(quickTravelRecordSource, /setError\(caughtError instanceof Error/);
+  assert.match(quickTravelRecordSource, /if \(!editor \|\| editor\.mode === 'choose' \|\| saving\) return/);
+  assert.match(quickTravelRecordServiceSource, /repositories\.manualTimelineEntries\.save/);
+  assert.match(quickTravelRecordServiceSource, /resolvePlace/);
+  assert.match(tripDetailPage, /<QuickTravelRecord/);
+  assert.match(tripDetailPage, /quickRecords=\{quickRecords\}/);
+});
+
+await test('旅先クイック記録は既存T1からT4と詳細フォームを維持する', () => {
+  assert.match(tripDetailPage, /<QuickPlaceVisit/);
+  assert.match(tripDetailPage, /<QuickTransportLeg/);
+  assert.match(tripDetailPage, /<PlaceVisitForm/);
+  assert.match(tripDetailPage, /<TransportLegForm/);
+  assert.match(stylesSource, /\.quick-record__types button \{[\s\S]*min-height: 88px/);
+  assert.doesNotMatch(quickTravelRecordSource, /position:\s*fixed/);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {

@@ -291,9 +291,27 @@ function sanitizeManualTimelineEntries(value: unknown): ManualTimelineEntry[] {
       && ['exact', 'minute', 'hour', 'day', 'range', 'unknown'].includes(entry.timePrecision)
       && ['exact', 'high', 'medium', 'low', 'unknown'].includes(entry.confidence)
       && entry.sourceType === 'manual',
-    ),
+    ).map((entry) => ({
+      ...entry,
+      recordType: ['meal', 'purchase', 'memo', 'expense'].includes(String(entry.recordType))
+        ? entry.recordType
+        : undefined,
+      title: normalizeOptionalString(entry.title),
+      amount: Number.isFinite(entry.amount) && Number(entry.amount) >= 0 ? Math.round(Number(entry.amount)) : undefined,
+      category: entry.recordType === 'expense' && ['admission', 'accommodation', 'activity', 'other'].includes(String(entry.category))
+        ? entry.category
+        : undefined,
+      shopName: entry.recordType === 'purchase' ? normalizeOptionalString(entry.shopName) : undefined,
+      placeVisitId: normalizeOptionalString(entry.placeVisitId),
+    })),
     (entry) => entry.id,
   );
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
 }
 
 function sanitizeTravelGachaDraws(value: unknown): TravelGachaDraw[] {

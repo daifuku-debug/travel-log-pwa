@@ -168,7 +168,7 @@ function TimelinePage({ detail, page, tripDetail, assetsById, showLegacyStory }:
         </ScrapbookSection>
       )}
       <ScrapbookSection eyebrow="Journey" title={page.title} className="scrapbook-viewer__timeline">
-        <TripJournalTimeline places={tripDetail.places} transportLegs={tripDetail.transportLegs} />
+        <TripJournalTimeline places={tripDetail.places} transportLegs={tripDetail.transportLegs} quickRecords={tripDetail.quickRecords} />
         <PageBlocks blocks={blocks} tripDetail={tripDetail} assetsById={assetsById} />
       </ScrapbookSection>
     </>

@@ -8,7 +8,7 @@
 
 ## 現在の主要機能
 
-- ホーム、旅行の作成・一覧・詳細・結果、訪問場所、移動区間
+- ホーム、旅行の作成・一覧・詳細・結果、訪問場所、移動区間、旅先クイック記録
 - ページ駆動型スクラップブックViewerと編集室、表紙編集、端末写真追加
 - 日本制覇マップ、コレクション、日本100名城・続日本100名城、欲しいもの
 - タイムマシン、旅ガチャ、旅行RPG
@@ -33,7 +33,7 @@
 
 ## 現在のPhase
 
-現在は、実際の旅行中に素早く使える旅行記録MVPを優先しています。Phase T1で訪問日時、Phase T2で場所名だけのクイック到着、滞在中表示、現在時刻での出発、既存詳細編集への接続を整備しました。スクラップブックPhase 5-AのMediaAssetライフサイクルと写真込みBackup ZIP Exportは完成済みで、写真込みBackup Restoreは保留中です。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
+現在は、実際の旅行中に素早く使える旅行記録MVPを優先しています。Phase T1〜T4で訪問・移動の開始、終了、到着連携を整備し、Phase T5で食事、買い物、メモ、出費のクイック記録を追加しました。スクラップブックPhase 5-AのMediaAssetライフサイクルと写真込みBackup ZIP Exportは完成済みで、写真込みBackup Restoreは保留中です。詳細は[Media Asset Spec](MEDIA_ASSET_SPEC.md)と[Roadmap](ROADMAP.md)を参照してください。
 
 ## 大きな残課題
 

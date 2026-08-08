@@ -1,4 +1,5 @@
 import type { EntityId } from '../../domain/models/common';
+import type { ManualTimelineEntry } from '../../domain/models/timeMachine.ts';
 import type { PlaceVisit, Trip, TripTransportLeg, TripTransportMode, TripType } from '../../domain/models/trip';
 import { repositories } from '../../infrastructure/repositories/repositoryFactory';
 import {
@@ -20,6 +21,7 @@ import {
   findInProgressPlaceVisits,
   validatePlaceVisitDateTimeInput,
 } from './placeVisitDateTime.ts';
+import { isQuickTravelRecord } from './quickTravelRecord.ts';
 import {
   buildTransportLegDateTimeFields,
   createTransportArrivalNowInput,
@@ -34,6 +36,7 @@ export interface TripDetail {
   trip: Trip;
   places: PlaceVisit[];
   transportLegs: TripTransportLeg[];
+  quickRecords: ManualTimelineEntry[];
   transportSummary: TripTransportSummary;
 }
 
@@ -153,15 +156,19 @@ export async function getTripDetail(tripId: EntityId): Promise<TripDetail | unde
     await bootstrapAppData();
     const trip = await repositories.trips.getById(tripId);
     if (!trip) return undefined;
-    const [places, transportLegs] = await Promise.all([
+    const [places, transportLegs, manualTimelineEntries] = await Promise.all([
       repositories.placeVisits.listByTripId(tripId),
       repositories.tripTransportLegs.listByTripId(tripId),
+      repositories.manualTimelineEntries.listByTripId(tripId),
     ]);
     const sortedTransportLegs = sortTransportLegs(transportLegs);
     return {
       trip,
       places: places.slice().sort((a, b) => String(a.arrivalAt || a.visitedAt || '').localeCompare(String(b.arrivalAt || b.visitedAt || ''))),
       transportLegs: sortedTransportLegs,
+      quickRecords: manualTimelineEntries
+        .filter(isQuickTravelRecord)
+        .sort((a, b) => String(b.startAt || b.createdAt).localeCompare(String(a.startAt || a.createdAt))),
       transportSummary: summarizeTripTransportLegs(sortedTransportLegs),
     };
   } catch (error) {

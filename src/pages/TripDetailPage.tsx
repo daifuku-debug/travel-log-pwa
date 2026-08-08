@@ -4,6 +4,7 @@ import type { PlaceVisit, Trip, TripTransportLeg } from '../domain/models/trip';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
 import { QuickPlaceVisit } from '../features/trips/components/QuickPlaceVisit';
 import { QuickTransportLeg, type QuickTransportStartSeed } from '../features/trips/components/QuickTransportLeg';
+import { QuickTravelRecord } from '../features/trips/components/QuickTravelRecord.tsx';
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
@@ -110,7 +111,7 @@ export function TripDetailPage() {
     </JournalState>
   );
 
-  const { trip, places, transportLegs } = data;
+  const { trip, places, transportLegs, quickRecords } = data;
   const placeNames = places.map((place) => place.name);
   const coverSource = media.coverSource;
 
@@ -141,6 +142,13 @@ export function TripDetailPage() {
           onEdit={openTransportEditor}
         />
 
+        <QuickTravelRecord
+          tripId={trip.id}
+          places={places}
+          records={quickRecords}
+          onChanged={() => setReloadKey((value) => value + 1)}
+        />
+
         <JournalSection id="trip-memory-title" eyebrow="Memories" title="旅の思い出" className="trip-journal-memory">
           <div className="trip-journal-memory__copy">
             <p>{trip.memo || media.highlights[0] || trip.purpose || 'この旅の思い出を、少しずつ残していきましょう。'}</p>
@@ -157,7 +165,7 @@ export function TripDetailPage() {
         </JournalSection>
 
         <JournalSection id="trip-timeline-title" eyebrow="Story" title="旅のタイムライン">
-          <TripJournalTimeline places={places} transportLegs={transportLegs} />
+          <TripJournalTimeline places={places} transportLegs={transportLegs} quickRecords={quickRecords} />
         </JournalSection>
 
         <JournalSection id="trip-route-title" eyebrow="Route" title="この日の軌跡">

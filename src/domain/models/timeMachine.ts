@@ -2,6 +2,8 @@ import type { BaseEntity, EntityId, IsoDateString, IsoDateTimeString } from './c
 
 export type TimePrecision = 'exact' | 'minute' | 'hour' | 'day' | 'range' | 'unknown';
 export type TimelineConfidence = 'exact' | 'high' | 'medium' | 'low' | 'unknown';
+export type QuickTravelRecordType = 'meal' | 'purchase' | 'memo' | 'expense';
+export type QuickExpenseCategory = 'admission' | 'accommodation' | 'activity' | 'other';
 
 export type TimelineEventType =
   | 'trip_start'
@@ -99,6 +101,12 @@ export interface ManualTimelineEntry extends BaseEntity {
   longitude?: number;
   note?: string;
   tripId?: EntityId;
+  recordType?: QuickTravelRecordType;
+  title?: string;
+  amount?: number;
+  category?: QuickExpenseCategory;
+  shopName?: string;
+  placeVisitId?: EntityId;
   sourceType: 'manual';
   confidence: TimelineConfidence;
 }

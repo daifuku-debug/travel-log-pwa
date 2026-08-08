@@ -17,6 +17,11 @@ import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
 import { inferLocationFromTimeline } from './locationInferenceService';
 import { filterTripMediaAssets } from '../../domain/media/mediaAssetUsage';
+import {
+  formatQuickTravelRecordDetail,
+  formatQuickTravelRecordTitle,
+  isQuickTravelRecord,
+} from '../trips/quickTravelRecord.ts';
 
 const LOCAL_USER_ID = 'local-user';
 const DEFAULT_TIMEZONE = 'Asia/Tokyo';
@@ -327,25 +332,28 @@ function buildScrapbookEvents(
 }
 
 function buildManualEvents(entries: ManualTimelineEntry[]): TimelineEvent[] {
-  return entries.map((entry) => createEvent({
-    id: `manual:${entry.id}`,
-    eventType: 'manual_location',
-    sourceType: 'manualTimelineEntry',
-    sourceId: entry.id,
-    title: entry.locationName || '手動メモ',
-    description: entry.note,
-    startAt: entry.startAt,
-    endAt: entry.endAt,
-    localDate: entry.date,
-    timePrecision: entry.timePrecision,
-    latitude: validCoordinate(entry.latitude) ? entry.latitude : undefined,
-    longitude: validCoordinate(entry.longitude) ? entry.longitude : undefined,
-    locationName: entry.locationName,
-    tripId: entry.tripId,
-    confidence: entry.confidence,
-    confidenceReason: 'ユーザーが手動で補完した記録です。',
-    sourcePriority: 5,
-  }));
+  return entries.map((entry) => {
+    const quickRecord = isQuickTravelRecord(entry);
+    return createEvent({
+      id: `manual:${entry.id}`,
+      eventType: quickRecord ? 'memo' : 'manual_location',
+      sourceType: 'manualTimelineEntry',
+      sourceId: entry.id,
+      title: quickRecord ? formatQuickTravelRecordTitle(entry) : entry.locationName || '手動メモ',
+      description: quickRecord ? formatQuickTravelRecordDetail(entry) : entry.note,
+      startAt: entry.startAt,
+      endAt: entry.endAt,
+      localDate: entry.date,
+      timePrecision: entry.timePrecision,
+      latitude: validCoordinate(entry.latitude) ? entry.latitude : undefined,
+      longitude: validCoordinate(entry.longitude) ? entry.longitude : undefined,
+      locationName: entry.locationName,
+      tripId: entry.tripId,
+      confidence: entry.confidence,
+      confidenceReason: 'ユーザーが手動で補完した記録です。',
+      sourcePriority: 5,
+    });
+  });
 }
 
 function buildCastleEvents(

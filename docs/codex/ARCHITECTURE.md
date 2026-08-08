@@ -88,9 +88,15 @@ Draft、Pending File、Object URLは永続参照ではありません。保存�
 - 入力は端末のローカル日時、保存はISO日時とし、表示時に端末のローカル日時へ戻します。
 - クイック到着・出発も同じ日時生成と`PlaceVisit`保存Serviceを使い、クイック導線内では同一旅行の滞在中を1件に制限します。既存の滞在を勝手に終了しません。
 
+## 旅先クイック記録
+
+- 食事、買い物、メモ、出費は既存の`ManualTimelineEntry`へ任意の種別・金額・訪問場所参照を持たせて保存します。
+- 食事・買い物用の`ScrapbookBlock`は雑誌表示の構成要素であり、旅行中の入力先として直接更新しません。
+- クイック記録Serviceは既存の`manualTimelineEntries` Repositoryを利用し、旅行詳細、Timeline、TimeMachineは同じ永続記録から表示します。
+
 ## テスト
 
-`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在264件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
+`scripts/run-tests.mjs`をNodeのTypeScript型除去機能で実行する単一テストスイートです。現在291件あり、純粋ロジック、保存・互換性、ソース構造上の契約を検証します。通常の検証コマンドは[Workflow](WORKFLOW.md)に従います。
 
 ## 主要ディレクトリ
 

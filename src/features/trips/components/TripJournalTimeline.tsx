@@ -1,3 +1,4 @@
+import type { ManualTimelineEntry } from '../../../domain/models/timeMachine.ts';
 import type { PlaceVisit, TripTransportLeg } from '../../../domain/models/trip';
 import { getPlaceVisitDate, formatPlaceVisitTimeRange } from '../placeVisitDateTime.ts';
 import {
@@ -7,6 +8,12 @@ import {
   isTransportLegInProgress,
 } from '../transportLegDateTime.ts';
 import { TRANSPORT_MODE_LABELS } from '../tripUi.ts';
+import {
+  formatQuickTravelRecordDetail,
+  formatQuickTravelRecordMoment,
+  formatQuickTravelRecordTitle,
+  getQuickTravelRecordDate,
+} from '../quickTravelRecord.ts';
 
 interface TimelineEntry {
   id: string;
@@ -14,12 +21,12 @@ interface TimelineEntry {
   time: string;
   title: string;
   detail: string;
-  kind: 'place' | 'transport';
+  kind: 'place' | 'transport' | 'record';
 }
 
-export function TripJournalTimeline({ places, transportLegs }: { places: PlaceVisit[]; transportLegs: TripTransportLeg[] }) {
-  const entries = buildTimelineEntries(places, transportLegs);
-  if (entries.length === 0) return <p className="trip-journal-empty-copy">訪問場所や移動を追加すると、ここに旅の流れが現れます。</p>;
+export function TripJournalTimeline({ places, transportLegs, quickRecords = [] }: { places: PlaceVisit[]; transportLegs: TripTransportLeg[]; quickRecords?: ManualTimelineEntry[] }) {
+  const entries = buildTimelineEntries(places, transportLegs, quickRecords);
+  if (entries.length === 0) return <p className="trip-journal-empty-copy">訪問場所や移動、旅先の出来事を追加すると、ここに旅の流れが現れます。</p>;
 
   let previousDate = '';
   return (
@@ -40,7 +47,7 @@ export function TripJournalTimeline({ places, transportLegs }: { places: PlaceVi
   );
 }
 
-export function buildTimelineEntries(places: PlaceVisit[], transportLegs: TripTransportLeg[]): TimelineEntry[] {
+export function buildTimelineEntries(places: PlaceVisit[], transportLegs: TripTransportLeg[], quickRecords: ManualTimelineEntry[] = []): TimelineEntry[] {
   const placeEntries = places.map((place) => ({
     id: place.id,
     date: getPlaceVisitDate(place),
@@ -57,7 +64,18 @@ export function buildTimelineEntries(places: PlaceVisit[], transportLegs: TripTr
     detail: [TRANSPORT_MODE_LABELS[leg.transportMode], isTransportLegInProgress(leg) ? '移動中' : '', leg.durationMinutes ? `約${leg.durationMinutes}分` : '', leg.memo || ''].filter(Boolean).join(' ・ '),
     kind: 'transport' as const,
   }));
-  return [...placeEntries, ...legEntries].sort((a, b) => `${a.date} ${sortTime(a.time)}`.localeCompare(`${b.date} ${sortTime(b.time)}`));
+  const recordEntries = quickRecords.map((record) => ({
+    id: record.id,
+    date: getQuickTravelRecordDate(record),
+    time: formatQuickTravelRecordMoment(record),
+    title: formatQuickTravelRecordTitle(record),
+    detail: formatQuickTravelRecordDetail(record),
+    kind: 'record' as const,
+  }));
+  return [...placeEntries, ...legEntries, ...recordEntries].sort((a, b) => {
+    const chronological = `${a.date} ${sortTime(a.time)}`.localeCompare(`${b.date} ${sortTime(b.time)}`);
+    return chronological || a.id.localeCompare(b.id);
+  });
 }
 
 function formatDayLabel(date: string): string {
