@@ -5,6 +5,7 @@
 | Phase | 状態 | 到達点 |
 |---|---|---|
 | 旅行記録MVP Phase T1 | 完了 | 訪問日、到着・出発時刻、日付またぎ、現在時刻入力、旅行詳細・Timeline反映 |
+| 旅行記録MVP Phase T2 | 完了 | クイック到着、滞在中表示、現在時刻での出発、詳細編集への接続 |
 | Phase 5-A.2.3-B | 完了 | 端末写真の検証、一時プレビュー、旅行写真としての保存、表紙Draft適用 |
 | Phase 5-A.2.3-C | 完了 | `trip`／`cover-only`用途、所有Scrapbook、保存先選択、表示除外 |
 | Phase 5-A.2.3-D-B0 | 完了 | original／thumbnail Blobの2キー直接削除と補償削除の安全化 |

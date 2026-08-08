@@ -6,6 +6,8 @@ import {
   isValidTimeInputValue,
   isoDateTimeToDateInput,
   isoDateTimeToTimeInput,
+  toDateInputValue,
+  toTimeInputValue,
 } from '../../shared/date/dateUtils.ts';
 
 export interface PlaceVisitDateTimeInput {
@@ -13,6 +15,38 @@ export interface PlaceVisitDateTimeInput {
   arrivalTime: string;
   departureDate: string;
   departureTime: string;
+}
+
+export function createArrivalNowInput(now = new Date()): PlaceVisitDateTimeInput {
+  const visitedDate = toDateInputValue(now);
+  return {
+    visitedDate,
+    arrivalTime: toTimeInputValue(now),
+    departureDate: visitedDate,
+    departureTime: '',
+  };
+}
+
+export function createDepartureNowInput(now = new Date()): Pick<
+  PlaceVisitDateTimeInput,
+  'departureDate' | 'departureTime'
+> {
+  return {
+    departureDate: toDateInputValue(now),
+    departureTime: toTimeInputValue(now),
+  };
+}
+
+export function isPlaceVisitInProgress(
+  place: Pick<PlaceVisit, 'arrivalAt' | 'departureAt'>,
+): boolean {
+  return Boolean(place.arrivalAt && !place.departureAt);
+}
+
+export function findInProgressPlaceVisits<T extends Pick<PlaceVisit, 'arrivalAt' | 'departureAt'>>(
+  places: T[],
+): T[] {
+  return places.filter(isPlaceVisitInProgress);
 }
 
 export function validatePlaceVisitDateTimeInput(input: PlaceVisitDateTimeInput): string[] {

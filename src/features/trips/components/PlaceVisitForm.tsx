@@ -4,10 +4,9 @@ import { listCastleOptions, type CastleOption } from '../../castles/castleServic
 import {
   isoDateTimeToDateInput,
   isoDateTimeToTimeInput,
-  toDateInputValue,
-  toTimeInputValue,
 } from '../../../shared/date/dateUtils';
 import { useAsyncData } from '../../../shared/hooks/useAsyncData';
+import { createArrivalNowInput, createDepartureNowInput } from '../placeVisitDateTime.ts';
 import { type PlaceVisitInput, validatePlaceVisitInput } from '../tripService';
 
 interface PlaceVisitFormProps {
@@ -197,23 +196,21 @@ function createInitialInput(place?: PlaceVisit, defaultVisitedDate = ''): PlaceV
 }
 
 function setArrivalToNow(setInput: Dispatch<SetStateAction<PlaceVisitInput>>) {
-  const now = new Date();
-  const visitedDate = toDateInputValue(now);
+  const nowInput = createArrivalNowInput();
   setInput((current) => ({
     ...current,
-    visitedDate,
-    arrivalTime: toTimeInputValue(now),
+    visitedDate: nowInput.visitedDate,
+    arrivalTime: nowInput.arrivalTime,
     departureDate: !current.departureDate || current.departureDate === current.visitedDate
-      ? visitedDate
+      ? nowInput.departureDate
       : current.departureDate,
   }));
 }
 
 function setDepartureToNow(setInput: Dispatch<SetStateAction<PlaceVisitInput>>) {
-  const now = new Date();
+  const nowInput = createDepartureNowInput();
   setInput((current) => ({
     ...current,
-    departureDate: toDateInputValue(now),
-    departureTime: toTimeInputValue(now),
+    ...nowInput,
   }));
 }

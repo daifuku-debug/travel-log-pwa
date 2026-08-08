@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../domain/models/trip';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
+import { QuickPlaceVisit } from '../features/trips/components/QuickPlaceVisit';
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
@@ -38,6 +39,7 @@ export function TripDetailPage() {
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
   const [deleting, setDeleting] = useState(false);
+  const placeEditorRef = useRef<HTMLDetailsElement>(null);
   const media = useTripJournalMedia(tripId);
   const { data, error, loading } = useAsyncData(
     () => (tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
@@ -82,6 +84,11 @@ export function TripDetailPage() {
     setDeleting(false);
   }
 
+  function openPlaceEditor(place: PlaceVisit) {
+    setEditingPlace(place);
+    requestAnimationFrame(() => placeEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   if (loading) return <JournalState title="旅行詳細" description="旅の記録を読み込んでいます。"><LoadingState variant="skeleton" message="旅行詳細を読み込み中..." /></JournalState>;
   if (error) return <JournalState title="旅行詳細" description="旅の記録を確認します。"><ErrorState error={error} /></JournalState>;
   if (!data) return (
@@ -100,6 +107,13 @@ export function TripDetailPage() {
       <div className="trip-journal__surface">
         {actionError && <InlineError message={actionError} />}
         <TripSummary data={data} />
+
+        <QuickPlaceVisit
+          tripId={trip.id}
+          places={places}
+          onChanged={() => setReloadKey((value) => value + 1)}
+          onEdit={openPlaceEditor}
+        />
 
         <JournalSection id="trip-memory-title" eyebrow="Memories" title="旅の思い出" className="trip-journal-memory">
           <div className="trip-journal-memory__copy">
@@ -134,6 +148,8 @@ export function TripDetailPage() {
           editingPlace={editingPlace}
           editingTransportLeg={editingTransportLeg}
           setEditingPlace={setEditingPlace}
+          onEditPlace={openPlaceEditor}
+          placeEditorRef={placeEditorRef}
           setEditingTransportLeg={setEditingTransportLeg}
           setPendingDelete={setPendingDelete}
           runAction={runAction}
@@ -238,13 +254,15 @@ function TripKeepsakes({ data, photoCount }: { data: TripDetail; photoCount: num
 }
 
 function TripJournalEditor({
-  data, tripId, editingPlace, editingTransportLeg, setEditingPlace, setEditingTransportLeg, setPendingDelete, runAction,
+  data, tripId, editingPlace, editingTransportLeg, setEditingPlace, onEditPlace, placeEditorRef, setEditingTransportLeg, setPendingDelete, runAction,
 }: {
   data: TripDetail;
   tripId?: string;
   editingPlace?: PlaceVisit;
   editingTransportLeg?: TripTransportLeg;
   setEditingPlace: (place?: PlaceVisit) => void;
+  onEditPlace: (place: PlaceVisit) => void;
+  placeEditorRef: RefObject<HTMLDetailsElement | null>;
   setEditingTransportLeg: (leg?: TripTransportLeg) => void;
   setPendingDelete: (value?: PendingDelete) => void;
   runAction: (action: () => Promise<void>, fallback: string) => Promise<void>;
@@ -257,10 +275,10 @@ function TripJournalEditor({
         <Link to={`/trips/${data.trip.id}/scrapbook`}>写真と文章を編集 <span aria-hidden="true">→</span></Link>
       </nav>
 
-      <details className="trip-journal-editor__panel" open={Boolean(editingPlace) || undefined}>
+      <details id="trip-place-editor" ref={placeEditorRef} className="trip-journal-editor__panel" open={Boolean(editingPlace) || undefined}>
         <summary>訪問場所を追加・編集 <span>{data.places.length}件</span></summary>
         <div className="trip-journal-editor__body">
-          {data.places.map((place) => <RecordEditorRow key={place.id} title={place.name} meta={formatPlaceVisitRecordMeta(place)} onEdit={() => setEditingPlace(place)} onDelete={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })} />)}
+          {data.places.map((place) => <RecordEditorRow key={place.id} title={place.name} meta={formatPlaceVisitRecordMeta(place)} onEdit={() => onEditPlace(place)} onDelete={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })} />)}
           <PlaceVisitForm
             key={editingPlace?.id ?? 'new-place'} place={editingPlace} defaultVisitedDate={data.trip.startDate}
             submitLabel={editingPlace ? '場所を更新' : '場所を追加'} onCancel={editingPlace ? () => setEditingPlace(undefined) : undefined}

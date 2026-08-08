@@ -4,6 +4,8 @@ import { repositories } from '../../infrastructure/repositories/repositoryFactor
 import {
   compareDateInputValuesDesc,
   isValidDateInputValue,
+  isoDateTimeToDateInput,
+  isoDateTimeToTimeInput,
 } from '../../shared/date/dateUtils';
 import { toAppError } from '../../shared/errors';
 import { createId } from '../../shared/id';
@@ -11,7 +13,13 @@ import { bootstrapAppData } from '../bootstrap/bootstrapService';
 import { linkCastleVisitFromTripPlace, removeTripRelationFromCastle } from '../castles/castleService';
 import { grantPlaceVisitExperience, grantTripCompletionExperience, refreshRpgProgress } from '../rpg/rpgProgressService';
 import { createTripResultIfNeeded } from '../rpg/tripResultService';
-import { buildPlaceVisitDateTimeFields, validatePlaceVisitDateTimeInput } from './placeVisitDateTime.ts';
+import {
+  buildPlaceVisitDateTimeFields,
+  createArrivalNowInput,
+  createDepartureNowInput,
+  findInProgressPlaceVisits,
+  validatePlaceVisitDateTimeInput,
+} from './placeVisitDateTime.ts';
 
 const LOCAL_USER_ID = 'local-user';
 
@@ -296,6 +304,29 @@ export async function createPlaceVisit(tripId: EntityId, input: PlaceVisitInput)
   }
 }
 
+export async function createQuickPlaceVisit(
+  tripId: EntityId,
+  name: string,
+  now = new Date(),
+): Promise<PlaceVisit> {
+  try {
+    await bootstrapAppData();
+    const currentPlaces = await repositories.placeVisits.listByTripId(tripId);
+    if (findInProgressPlaceVisits(currentPlaces).length > 0) {
+      throw new Error('滞在中の場所を出発してから、次の場所を記録してください。');
+    }
+    return await createPlaceVisit(tripId, {
+      name,
+      address: '',
+      ...createArrivalNowInput(now),
+      memo: '',
+      castleId: '',
+    });
+  } catch (error) {
+    throw toAppError(error, '現在地の記録に失敗しました');
+  }
+}
+
 export async function updatePlaceVisit(placeId: EntityId, input: PlaceVisitInput): Promise<PlaceVisit> {
   try {
     await bootstrapAppData();
@@ -319,6 +350,31 @@ export async function updatePlaceVisit(placeId: EntityId, input: PlaceVisitInput
     return saved;
   } catch (error) {
     throw toAppError(error, '訪問場所の更新に失敗しました');
+  }
+}
+
+export async function departPlaceVisitNow(
+  placeId: EntityId,
+  now = new Date(),
+): Promise<PlaceVisit> {
+  try {
+    await bootstrapAppData();
+    const current = await repositories.placeVisits.getById(placeId);
+    if (!current) throw new Error('訪問場所が見つかりません。');
+    if (current.departureAt) return current;
+    if (!current.arrivalAt) throw new Error('到着時刻がないため、詳細編集から出発時刻を記録してください。');
+
+    return await updatePlaceVisit(placeId, {
+      name: current.name,
+      address: current.address ?? '',
+      visitedDate: isoDateTimeToDateInput(current.arrivalAt),
+      arrivalTime: isoDateTimeToTimeInput(current.arrivalAt),
+      ...createDepartureNowInput(now),
+      memo: current.memo ?? '',
+      castleId: current.castleId ?? '',
+    });
+  } catch (error) {
+    throw toAppError(error, '出発時刻の記録に失敗しました');
   }
 }
 

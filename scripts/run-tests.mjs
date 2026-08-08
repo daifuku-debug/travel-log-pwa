@@ -98,8 +98,12 @@ import {
 } from '../src/shared/date/dateUtils.ts';
 import {
   buildPlaceVisitDateTimeFields,
+  createArrivalNowInput,
+  createDepartureNowInput,
+  findInProgressPlaceVisits,
   formatPlaceVisitTimeRange,
   getPlaceVisitDate,
+  isPlaceVisitInProgress,
   validatePlaceVisitDateTimeInput,
 } from '../src/features/trips/placeVisitDateTime.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
@@ -138,6 +142,7 @@ const castleService = await readFile(new URL('../src/features/castles/castleServ
 const castlePage = await readFile(new URL('../src/pages/CastleCollectionPage.tsx', import.meta.url), 'utf8');
 const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.url), 'utf8');
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
+const quickPlaceVisit = await readFile(new URL('../src/features/trips/components/QuickPlaceVisit.tsx', import.meta.url), 'utf8');
 const updateCastleMasterScript = await readFile(new URL('../scripts/update-castle-master.mjs', import.meta.url), 'utf8');
 const scrapbookModel = await readFile(new URL('../src/domain/models/scrapbook.ts', import.meta.url), 'utf8');
 const scrapbookService = await readFile(new URL('../src/features/scrapbooks/scrapbookService.ts', import.meta.url), 'utf8');
@@ -3543,6 +3548,74 @@ await test('TimeMachineは訪問の到着・出発をrangeとして扱い旧訪�
   assert.match(timeMachineService, /endAt,/);
   assert.match(timeMachineService, /timePrecision: startAt && endAt \? 'range'/);
   assert.match(timeMachineService, /dateSource = place\.arrivalAt \?\? place\.departureAt \?\? place\.visitedAt/);
+});
+
+await test('クイック訪問はT1と同じ現在日時入力を到着・出発へ利用する', () => {
+  const now = new Date(2026, 5, 8, 9, 15);
+  assert.deepEqual(createArrivalNowInput(now), {
+    visitedDate: '2026-06-08',
+    arrivalTime: '09:15',
+    departureDate: '2026-06-08',
+    departureTime: '',
+  });
+  assert.deepEqual(createDepartureNowInput(now), {
+    departureDate: '2026-06-08',
+    departureTime: '09:15',
+  });
+  assert.match(placeVisitForm, /createArrivalNowInput/);
+  assert.match(placeVisitForm, /createDepartureNowInput/);
+});
+
+await test('到着だけの訪問を滞在中として判定し出発済みと区別する', () => {
+  const active = { id: 'active', arrivalAt: '2026-06-08T00:15:00.000Z' };
+  const finished = { id: 'finished', arrivalAt: active.arrivalAt, departureAt: '2026-06-08T01:00:00.000Z' };
+  const legacy = { id: 'legacy' };
+  assert.equal(isPlaceVisitInProgress(active), true);
+  assert.equal(isPlaceVisitInProgress(finished), false);
+  assert.equal(isPlaceVisitInProgress(legacy), false);
+  assert.deepEqual(findInProgressPlaceVisits([finished, active, legacy]), [active]);
+});
+
+await test('クイック到着Serviceは最小入力で既存保存処理を使い同時滞在を防ぐ', () => {
+  assert.match(tripService, /export async function createQuickPlaceVisit/);
+  assert.match(tripService, /findInProgressPlaceVisits\(currentPlaces\)/);
+  assert.match(tripService, /滞在中の場所を出発してから/);
+  assert.match(tripService, /return await createPlaceVisit\(tripId/);
+  assert.match(tripService, /\.\.\.createArrivalNowInput\(now\)/);
+});
+
+await test('クイック出発Serviceは二重実行を安全に扱い既存編集Validationを通す', () => {
+  assert.match(tripService, /export async function departPlaceVisitNow/);
+  assert.match(tripService, /if \(current\.departureAt\) return current/);
+  assert.match(tripService, /if \(!current\.arrivalAt\)/);
+  assert.match(tripService, /return await updatePlaceVisit\(placeId/);
+  assert.match(tripService, /\.\.\.createDepartureNowInput\(now\)/);
+});
+
+await test('クイック訪問UIは到着・滞在中・出発・詳細編集を段階表示する', () => {
+  assert.match(quickPlaceVisit, /今ここに着いた/);
+  assert.match(quickPlaceVisit, /<BottomSheet/);
+  assert.match(quickPlaceVisit, /場所名/);
+  assert.match(quickPlaceVisit, /滞在中/);
+  assert.match(quickPlaceVisit, /滞在終了/);
+  assert.match(quickPlaceVisit, /今出発/);
+  assert.match(quickPlaceVisit, /詳細を編集/);
+  assert.match(quickPlaceVisit, /loading=\{departingId === place\.id\}/);
+});
+
+await test('クイック訪問は保存後に旅行詳細を再読込し既存詳細フォームを維持する', () => {
+  assert.match(tripDetailPage, /<QuickPlaceVisit/);
+  assert.match(tripDetailPage, /onChanged=\{\(\) => setReloadKey/);
+  assert.match(tripDetailPage, /placeEditorRef/);
+  assert.match(tripDetailPage, /<PlaceVisitForm/);
+  assert.match(quickPlaceVisit, /setError\(caughtError instanceof Error/);
+  assert.match(quickPlaceVisit, /dismissible=\{!saving\}/);
+});
+
+await test('クイック訪問UIはモバイル操作領域と固定要素に干渉しない流れを持つ', () => {
+  assert.match(stylesSource, /\.quick-visit__actions \.button \{ min-height: var\(--tap-target-min\)/);
+  assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.quick-visit__heading/);
+  assert.doesNotMatch(stylesSource.match(/\.quick-visit[\s\S]*?@media \(max-width: 560px\)/)?.[0] ?? '', /position:\s*fixed/);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {
