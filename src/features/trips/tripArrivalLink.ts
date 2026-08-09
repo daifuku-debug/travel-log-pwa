@@ -79,6 +79,26 @@ export function buildLinkedArrivalRecords(
   };
 }
 
+export function buildExplicitLinkedArrivalRecords(
+  leg: TripTransportLeg,
+  place: PlaceVisit,
+  arrivedAt: string,
+): LinkedArrivalRecords {
+  assertValidArrivalTimestamp(arrivedAt);
+  if (leg.tripId !== place.tripId) throw new Error('同じ旅行の移動と訪問だけを連携できます。');
+  if (leg.toPlaceVisitId && leg.toPlaceVisitId !== place.id) {
+    throw new Error('移動区間の到着先が変更されています。');
+  }
+  if (leg.arrivalAt) throw new Error('この移動にはすでに到着時刻があります。');
+  if (!leg.departureAt || arrivedAt < leg.departureAt) throw new Error('到着日時は出発日時以降にしてください。');
+  if (place.arrivalAt) throw new Error('この訪問場所にはすでに到着時刻があります。');
+  if (place.departureAt && arrivedAt > place.departureAt) throw new Error('訪問の出発日時より後には到着を記録できません。');
+  return {
+    leg: applyTransportArrival({ ...leg, toName: place.name, toPlaceVisitId: place.id }, arrivedAt),
+    place: applyPlaceArrival(place, arrivedAt),
+  };
+}
+
 export function buildNewPlaceArrivalRecords(
   leg: TripTransportLeg,
   place: PlaceVisit,
@@ -93,6 +113,22 @@ export function buildNewPlaceArrivalRecords(
 
   return {
     leg: applyTransportArrival({ ...leg, toPlaceVisitId: place.id }, arrivedAt),
+    place,
+  };
+}
+
+export function buildExplicitNewPlaceArrivalRecords(
+  leg: TripTransportLeg,
+  place: PlaceVisit,
+  arrivedAt: string,
+): LinkedArrivalRecords {
+  assertValidArrivalTimestamp(arrivedAt);
+  if (leg.tripId !== place.tripId) throw new Error('同じ旅行の移動と訪問だけを連携できます。');
+  if (leg.arrivalAt) throw new Error('この移動にはすでに到着時刻があります。');
+  if (leg.toPlaceVisitId) throw new Error('移動区間にはすでに訪問場所が設定されています。');
+  if (!leg.departureAt || arrivedAt < leg.departureAt) throw new Error('到着日時は出発日時以降にしてください。');
+  return {
+    leg: applyTransportArrival({ ...leg, toName: place.name, toPlaceVisitId: place.id }, arrivedAt),
     place,
   };
 }

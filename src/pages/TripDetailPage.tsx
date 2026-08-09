@@ -2,18 +2,13 @@ import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../domain/models/trip';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
-import { QuickPlaceVisit } from '../features/trips/components/QuickPlaceVisit';
-import { QuickTransportLeg, type QuickTransportStartSeed } from '../features/trips/components/QuickTransportLeg';
+import { CurrentTripActivity } from '../features/trips/components/CurrentTripActivity.tsx';
 import { QuickTravelRecord } from '../features/trips/components/QuickTravelRecord.tsx';
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
 import { formatPlaceVisitRecordMeta } from '../features/trips/placeVisitDateTime.ts';
-import {
-  findInProgressTransportLegs,
-  formatTransportLegTimeRange,
-  formatTransportLegTitle,
-} from '../features/trips/transportLegDateTime.ts';
+import { formatTransportLegTimeRange, formatTransportLegTitle } from '../features/trips/transportLegDateTime.ts';
 import {
   createPlaceVisit,
   createTripTransportLeg,
@@ -43,7 +38,6 @@ export function TripDetailPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [editingPlace, setEditingPlace] = useState<PlaceVisit>();
   const [editingTransportLeg, setEditingTransportLeg] = useState<TripTransportLeg>();
-  const [quickTransportSeed, setQuickTransportSeed] = useState<QuickTransportStartSeed>();
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
   const [deleting, setDeleting] = useState(false);
@@ -122,24 +116,13 @@ export function TripDetailPage() {
         {actionError && <InlineError message={actionError} />}
         <TripSummary data={data} />
 
-        <QuickPlaceVisit
+        <CurrentTripActivity
           tripId={trip.id}
           places={places}
           transportLegs={transportLegs}
           onChanged={() => setReloadKey((value) => value + 1)}
-          onEdit={openPlaceEditor}
-          onStartTransport={(place) => setQuickTransportSeed({ requestId: Date.now(), place })}
-          transportInProgress={findInProgressTransportLegs(transportLegs).length > 0}
-        />
-
-        <QuickTransportLeg
-          tripId={trip.id}
-          places={places}
-          transportLegs={transportLegs}
-          startSeed={quickTransportSeed}
-          onStartSeedConsumed={() => setQuickTransportSeed(undefined)}
-          onChanged={() => setReloadKey((value) => value + 1)}
-          onEdit={openTransportEditor}
+          onEditPlace={openPlaceEditor}
+          onEditTransport={openTransportEditor}
         />
 
         <QuickTravelRecord

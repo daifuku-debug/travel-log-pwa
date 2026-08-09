@@ -120,12 +120,15 @@ import {
 } from '../src/features/trips/transportLegDateTime.ts';
 import {
   buildLinkedArrivalRecords,
+  buildExplicitLinkedArrivalRecords,
+  buildExplicitNewPlaceArrivalRecords,
   buildNewPlaceArrivalRecords,
   buildPlaceFromCompletedTransportRecords,
   isReverseTransportArrivalCandidate,
   isTransportDestinationUnregistered,
   resolveTransportArrivalVisitCandidate,
 } from '../src/features/trips/tripArrivalLink.ts';
+import { buildDepartureAndTransportRecords, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
 import {
   buildQuickTravelRecordFields,
   createQuickTravelRecordInput,
@@ -171,6 +174,8 @@ const castleDocs = await readFile(new URL('../docs/castle-data.md', import.meta.
 const placeVisitForm = await readFile(new URL('../src/features/trips/components/PlaceVisitForm.tsx', import.meta.url), 'utf8');
 const quickPlaceVisit = await readFile(new URL('../src/features/trips/components/QuickPlaceVisit.tsx', import.meta.url), 'utf8');
 const quickTransportLeg = await readFile(new URL('../src/features/trips/components/QuickTransportLeg.tsx', import.meta.url), 'utf8');
+const currentTripActivitySource = await readFile(new URL('../src/features/trips/components/CurrentTripActivity.tsx', import.meta.url), 'utf8');
+const currentTripActivityServiceSource = await readFile(new URL('../src/features/trips/currentTripActivityService.ts', import.meta.url), 'utf8');
 const quickTravelRecordSource = await readFile(new URL('../src/features/trips/components/QuickTravelRecord.tsx', import.meta.url), 'utf8');
 const quickTravelRecordServiceSource = await readFile(new URL('../src/features/trips/quickTravelRecordService.ts', import.meta.url), 'utf8');
 const tripArrivalLinkService = await readFile(new URL('../src/features/trips/tripArrivalLinkService.ts', import.meta.url), 'utf8');
@@ -3636,7 +3641,7 @@ await test('クイック訪問UIは到着・滞在中・出発・詳細編集を
 });
 
 await test('クイック訪問は保存後に旅行詳細を再読込し既存詳細フォームを維持する', () => {
-  assert.match(tripDetailPage, /<QuickPlaceVisit/);
+  assert.match(tripDetailPage, /<CurrentTripActivity/);
   assert.match(tripDetailPage, /onChanged=\{\(\) => setReloadKey/);
   assert.match(tripDetailPage, /placeEditorRef/);
   assert.match(tripDetailPage, /<PlaceVisitForm/);
@@ -3718,8 +3723,8 @@ await test('クイック移動UIは開始・移動中・到着・詳細編集を
 await test('訪問の出発からクイック移動へつながり既存詳細フォームも維持する', () => {
   assert.match(quickPlaceVisit, /移動を記録/);
   assert.match(quickPlaceVisit, /onStartTransport\(place\)/);
-  assert.match(tripDetailPage, /<QuickTransportLeg/);
-  assert.match(tripDetailPage, /quickTransportSeed/);
+  assert.match(tripDetailPage, /<CurrentTripActivity/);
+  assert.match(currentTripActivitySource, /startTransportFromPlace/);
   assert.match(tripDetailPage, /<TransportLegForm/);
   assert.match(transportLegForm, /到着日/);
   assert.match(transportLegForm, /getTransportLegArrivalDate/);
@@ -3928,12 +3933,119 @@ await test('旅先クイック記録UIは4種の入口、後編集、保存失�
 });
 
 await test('旅先クイック記録は既存T1からT4と詳細フォームを維持する', () => {
-  assert.match(tripDetailPage, /<QuickPlaceVisit/);
-  assert.match(tripDetailPage, /<QuickTransportLeg/);
+  assert.match(tripDetailPage, /<CurrentTripActivity/);
   assert.match(tripDetailPage, /<PlaceVisitForm/);
   assert.match(tripDetailPage, /<TransportLegForm/);
   assert.match(stylesSource, /\.quick-record__types button \{[\s\S]*min-height: 88px/);
   assert.doesNotMatch(quickTravelRecordSource, /position:\s*fixed/);
+});
+
+await test('現在行動はidle・staying・movingを排他的に判定する', () => {
+  const place = { id: 'place-1', arrivalAt: '2026-08-10T01:00:00.000Z' };
+  const leg = { id: 'leg-1', departureAt: '2026-08-10T02:00:00.000Z' };
+  assert.deepEqual(resolveCurrentTripActivity([], []), { kind: 'idle' });
+  assert.deepEqual(resolveCurrentTripActivity([place], []), { kind: 'staying', place });
+  assert.deepEqual(resolveCurrentTripActivity([], [leg]), { kind: 'moving', leg });
+});
+
+await test('完了済みと論理削除済みの記録は現在行動に含めない', () => {
+  const finishedPlace = { id: 'place-finished', arrivalAt: '2026-08-10T01:00:00.000Z', departureAt: '2026-08-10T02:00:00.000Z' };
+  const deletedLeg = { id: 'leg-deleted', departureAt: '2026-08-10T02:00:00.000Z', deletedAt: '2026-08-10T03:00:00.000Z' };
+  assert.deepEqual(resolveCurrentTripActivity([finishedPlace], [deletedLeg]), { kind: 'idle' });
+});
+
+await test('滞在と移動の同時進行や複数進行はconflictとして更新を止める', () => {
+  const places = [{ id: 'place-1', arrivalAt: '2026-08-10T01:00:00.000Z' }];
+  const legs = [{ id: 'leg-1', departureAt: '2026-08-10T02:00:00.000Z' }];
+  assert.equal(resolveCurrentTripActivity(places, legs).kind, 'conflict');
+  assert.equal(resolveCurrentTripActivity([...places, { ...places[0], id: 'place-2' }], []).kind, 'conflict');
+});
+
+await test('滞在終了と移動開始は同一timestampを共有する', () => {
+  const timestamp = '2026-08-10T03:00:00.000Z';
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅', arrivalAt: '2026-08-10T01:00:00.000Z' };
+  const leg = { id: 'leg-1', tripId: 'trip-1', fromName: '京都駅', departureAt: timestamp };
+  const result = buildDepartureAndTransportRecords(place, [], leg);
+  assert.equal(result.place.departureAt, timestamp);
+  assert.equal(result.leg.departureAt, timestamp);
+});
+
+await test('滞在終了と移動開始は移動中区間がある場合に拒否する', () => {
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅', arrivalAt: '2026-08-10T01:00:00.000Z' };
+  const leg = { id: 'leg-new', tripId: 'trip-1', fromName: '京都駅', departureAt: '2026-08-10T03:00:00.000Z' };
+  assert.throws(() => buildDepartureAndTransportRecords(place, [{ id: 'leg-active', departureAt: '2026-08-10T02:00:00.000Z' }], leg), /移動中/);
+});
+
+await test('滞在終了と移動開始は到着より前の出発を拒否する', () => {
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅', arrivalAt: '2026-08-10T04:00:00.000Z' };
+  const leg = { id: 'leg-new', tripId: 'trip-1', fromName: '京都駅', departureAt: '2026-08-10T03:00:00.000Z' };
+  assert.throws(() => buildDepartureAndTransportRecords(place, [], leg), /出発日時は到着日時以降/);
+});
+
+await test('明示した新規到着先は移動と同一timestampで作成できる', () => {
+  const arrivedAt = '2026-08-10T04:00:00.000Z';
+  const result = buildExplicitNewPlaceArrivalRecords(
+    { id: 'leg-1', tripId: 'trip-1', fromName: '京都駅', departureAt: '2026-08-10T03:00:00.000Z' },
+    { id: 'place-2', tripId: 'trip-1', name: '清水寺', arrivalAt: arrivedAt },
+    arrivedAt,
+  );
+  assert.equal(result.leg.arrivalAt, arrivedAt);
+  assert.equal(result.leg.toPlaceVisitId, 'place-2');
+  assert.equal(result.place.arrivalAt, arrivedAt);
+});
+
+await test('明示選択した既存訪問場所は名前推測なしで安全に連携する', () => {
+  const arrivedAt = '2026-08-10T04:00:00.000Z';
+  const result = buildExplicitLinkedArrivalRecords(
+    { id: 'leg-1', tripId: 'trip-1', fromName: '京都駅', toName: '目的地未定', departureAt: '2026-08-10T03:00:00.000Z' },
+    { id: 'place-2', tripId: 'trip-1', name: '清水寺' },
+    arrivedAt,
+  );
+  assert.equal(result.leg.toPlaceVisitId, 'place-2');
+  assert.equal(result.leg.toName, '清水寺');
+  assert.equal(result.place.arrivalAt, arrivedAt);
+});
+
+await test('現在行動UIは状態ごとに主操作を一つだけ提示する', () => {
+  assert.match(currentTripActivitySource, /activity\.kind === 'idle'.*ここに到着/s);
+  assert.match(currentTripActivitySource, /activity\.kind === 'staying'.*ここを出発/s);
+  assert.match(currentTripActivitySource, /activity\.kind === 'moving'.*>到着</s);
+  assert.doesNotMatch(tripDetailPage, /<QuickPlaceVisit|<QuickTransportLeg/);
+});
+
+await test('現在行動UIは完了済み履歴を再表示せず詳細編集を維持する', () => {
+  assert.doesNotMatch(currentTripActivitySource, /recentTimedPlace|recentLeg|滞在終了|移動終了/);
+  assert.match(currentTripActivitySource, /onEditPlace/);
+  assert.match(currentTripActivitySource, /onEditTransport/);
+  assert.match(tripDetailPage, /<PlaceVisitForm/);
+  assert.match(tripDetailPage, /<TransportLegForm/);
+});
+
+await test('滞在終了と移動開始は2 Storeの同一Transactionで保存する', () => {
+  assert.match(tripArrivalLinkDataSource, /departPlaceAndCreateTransportAtomically/);
+  assert.match(tripArrivalLinkDataSource, /transaction\(\['placeVisits', 'tripTransportLegs'\], 'readwrite'\)/);
+  assert.match(currentTripActivityServiceSource, /departPlaceAndCreateTransportAtomically/);
+});
+
+await test('現在行動UIは既存場所・新規場所・移動のみの到着を明示選択する', () => {
+  assert.match(currentTripActivitySource, /移動だけ終了/);
+  assert.match(currentTripActivitySource, /登録済みの場所へ到着/);
+  assert.match(currentTripActivitySource, /新しい訪問場所を追加/);
+  assert.match(currentTripActivitySource, /arriveTransportAndExistingPlaceNow/);
+  assert.match(currentTripActivitySource, /createExplicitPlaceVisitAndArriveTransport/);
+  assert.match(currentTripActivitySource, /arriveTripTransportLegNow/);
+});
+
+await test('現在行動の矛盾状態は警告と詳細編集だけを表示する', () => {
+  assert.match(currentTripActivitySource, /activity\.kind === 'conflict'/);
+  assert.match(currentTripActivitySource, /自動更新せず/);
+  assert.match(currentTripActivitySource, /role="alert"/);
+});
+
+await test('現在行動UIはモバイル操作領域と既存Bottom Sheetを利用する', () => {
+  assert.match(currentTripActivitySource, /<BottomSheet/);
+  assert.match(stylesSource, /\.current-activity__choices label \{[\s\S]*min-height: var\(--tap-target-min\)/);
+  assert.doesNotMatch(currentTripActivitySource, /position:\s*fixed/);
 });
 
 await test('スクラップブックは閲覧と編集を分け、写真と空状態を安全に表示する', () => {

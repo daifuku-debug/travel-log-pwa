@@ -12,6 +12,8 @@ import { grantPlaceVisitExperience, refreshRpgProgress } from '../rpg/rpgProgres
 import { findInProgressPlaceVisits } from './placeVisitDateTime.ts';
 import {
   buildLinkedArrivalRecords,
+  buildExplicitLinkedArrivalRecords,
+  buildExplicitNewPlaceArrivalRecords,
   buildNewPlaceArrivalRecords,
   buildPlaceFromCompletedTransportRecords,
   isTransportDestinationUnregistered,
@@ -32,6 +34,52 @@ export async function arriveTransportAndPlaceNow(
       placeId,
       (leg, place) => buildLinkedArrivalRecords(leg, place, arrivedAt),
     );
+  } catch (error) {
+    throw toAppError(error, error instanceof Error ? error.message : '移動と訪問の到着を記録できませんでした。');
+  }
+}
+
+export async function arriveTransportAndExistingPlaceNow(
+  legId: EntityId,
+  placeId: EntityId,
+  now = new Date(),
+): Promise<{ leg: TripTransportLeg; place: PlaceVisit }> {
+  try {
+    await bootstrapAppData();
+    const arrivedAt = assertUsableNow(now);
+    return await updateTripArrivalAtomically(
+      legId,
+      placeId,
+      (leg, place) => buildExplicitLinkedArrivalRecords(leg, place, arrivedAt),
+    );
+  } catch (error) {
+    throw toAppError(error, error instanceof Error ? error.message : '移動と訪問の到着を記録できませんでした。');
+  }
+}
+
+export async function createExplicitPlaceVisitAndArriveTransport(
+  tripId: EntityId,
+  legId: EntityId,
+  name: string,
+  now = new Date(),
+): Promise<{ leg: TripTransportLeg; place: PlaceVisit }> {
+  try {
+    await bootstrapAppData();
+    const arrivedAt = assertUsableNow(now);
+    const currentPlaces = await repositories.placeVisits.listByTripId(tripId);
+    if (findInProgressPlaceVisits(currentPlaces).length > 0) {
+      throw new Error('滞在中の場所を出発してから、次の場所を記録してください。');
+    }
+    if (!name.trim()) throw new Error('場所名を入力してください。');
+    const place = createArrivalPlace(tripId, name, arrivedAt);
+    const result = await createPlaceAndUpdateTransportAtomically(
+      legId,
+      place,
+      (leg, candidate) => buildExplicitNewPlaceArrivalRecords(leg, candidate, arrivedAt),
+    );
+    await grantPlaceVisitExperience(result.place.id, tripId, result.place.name);
+    await refreshRpgProgress();
+    return result;
   } catch (error) {
     throw toAppError(error, error instanceof Error ? error.message : '移動と訪問の到着を記録できませんでした。');
   }
