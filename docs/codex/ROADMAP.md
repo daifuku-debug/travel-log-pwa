@@ -9,6 +9,7 @@
 | 旅行記録MVP Phase T3 | 完了 | クイック移動開始、移動中表示、現在時刻での到着、日付またぎ、Timeline・詳細編集への接続 |
 | 旅行記録MVP Phase T4 | 完了 | 訪問到着と移動到着を明示確認、同一時刻、同一Transactionで連携 |
 | 旅行記録MVP Phase T5 | 完了 | 食事、買い物、メモ、出費を現在日時でクイック記録し、後編集・Timeline表示へ接続 |
+| 旅行記録MVP Phase T5.5 | 完了 | 訪問と移動の現在状態を「いま」へ統合し、状態ごとの主操作と明示連携を一本化 |
 | Phase 5-A.2.3-B | 完了 | 端末写真の検証、一時プレビュー、旅行写真としての保存、表紙Draft適用 |
 | Phase 5-A.2.3-C | 完了 | `trip`／`cover-only`用途、所有Scrapbook、保存先選択、表示除外 |
 | Phase 5-A.2.3-D-B0 | 完了 | original／thumbnail Blobの2キー直接削除と補償削除の安全化 |
