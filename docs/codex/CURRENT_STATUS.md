@@ -2,32 +2,31 @@
 
 ## Last completed
 
-- 旅行記録MVP Phase T5.5: 現在行動UIのブラウザ検証
-- GitHub Pages版で`idle`／`staying`／`moving`の実表示と状態遷移を確認
-- 393／430／768／1024pxで横overflowなし、CTA 44px以上、Bottom Navigationと末尾コンテンツの間隔を確認
-- 完了済み訪問・移動は「いま」から外れ、Timelineにのみ履歴として残ることを確認
-- Latest Phase Commit: `d5eb32b`
+- 旅行記録MVP T1-T5.5 通しUX監査
+- 到着、滞在、旅先記録、出発、移動、次の到着、日付またぎ、再読み込みを連続操作
+- P0 1件、P1 3件、P2 3件を[監査レポート](T1_T5_5_UX_AUDIT.md)へ記録
+- Latest App Commit: `66becd1`
 
 ## Current state
 
 - Backup Schema Version: 12
 - IndexedDB Version: 10
 - Test count: 305
-- Working tree: clean after this status update
-- Origin difference: `main` is 1 commit ahead of `origin/main` after this verification commit
+- Working tree: clean after the audit documentation commit
+- Origin difference: `main` is 1 documentation commit ahead of `origin/main`
 
 ## Next
 
-- 次Phase: T1〜T5.5の実旅行検証
-- 統合した「いま」から到着、出発、移動到着、旅先クイック記録を連続操作し、現場での迷いやすさを確認する。
-- 今回触らない: GPS・移動の自動検出
+- 次Phase: T1-T5.5 UX監査のP0/P1修正
+- GitHub Pagesの再読み込み復旧を最優先に、完了済み旅行のライブ操作制限と現在状態の終了フローを安全に整える。
+- 今回触らない: GPS・地図・外部API
 - 今回触らない: 写真込みBackup Phase 2
-- 今回触らない: 地図・外部API連携
+- 今回触らない: Model・DB・Backupの拡張
 
 ## Known risks
 
-- ローカル開発サーバーは内蔵ブラウザから到達できず最新GitHub Pages版で検証したが、実機のノッチ／ホームインジケータは未検証
-- 旧移動データは到着先IDがないため、統合UIではユーザーによる既存場所の明示選択が必要
-- 食事・買い物はScrapbookと自動同期せず、一般出費を含む旅行全体の費用集計も未実装
-- 写真込みBackup ZIPのRestore、一時領域、Rollbackは保留中
-- Missing Original等の手動復旧、Cloudflare D1／R2同期、Trip削除カスケードは未実装
+- GitHub Pagesのnested routeを再読み込みすると404になり、旅行中の復帰導線が途切れる
+- 完了済み・過去旅行でも現在時刻の訪問・移動を記録でき、旅行期間外データが入る
+- 滞在だけを終了できず、「ここを出発」が必ず次の移動区間を作成する
+- 詳細編集への自動スクロールが描画時機によって失敗し、保存Errorも編集位置から離れて表示される
+- 実機のノッチ／ホームインジケータと、実際の保存失敗からの復帰は未検証
