@@ -22,13 +22,15 @@
 
 ## P0
 
-### P0-1 Nested route reload returns GitHub Pages 404
+### P0-1 Nested route reload returns GitHub Pages 404 - Resolved 2026-08-12
 
 - 発生箇所: GitHub Pages上の旅行詳細など、ルート以外のURL。
 - 再現手順: 旅行詳細`/travel-log-pwa/trips/<tripId>`を開き、ブラウザを再読み込みする。
 - なぜ問題か: GitHub Pagesがアプリの`index.html`を返さず404になるため、旅行中の再読み込みや復帰で操作不能になる。保存済みデータは残るが、ユーザーはルートへ戻って旅行を開き直す必要がある。
 - 推奨修正: `createBrowserRouter`と`basename`を維持するなら、GitHub Pages用のSPA fallbackを配信工程へ追加し、直リンクと再読み込みを自動テストする。PWAのscopeと`/travel-log-pwa/`のbaseを同時に確認する。
 - 既存仕様を壊す可能性: 中。Router、GitHub Pages配信、Service Workerの組み合わせを確認する必要がある。
+- 解決内容: GitHub Pagesの`404.html`から既知Routeだけをbaseへ転送し、React起動前に元のpathname、query、hashを`replaceState`で復元する。Route判定はService Workerと共有し、asset、`api`、`cdn-cgi`はSPA fallback対象外とした。
+- 解決確認: 本番相当の静的配信でroot、旅行一覧、旅行詳細、タイムマシンの直接アクセスと再読み込み、query/hash、Back/Forwardを確認した。Service Worker実行は内蔵ブラウザの制約により構成・Build成果物までの確認。
 
 ## P1
 
@@ -88,7 +90,7 @@
 
 ## Next Top 5
 
-1. GitHub Pagesのnested route reloadをSPA fallbackで復旧する。
+1. [Resolved] GitHub Pagesのnested route reloadをSPA fallbackで復旧する。
 2. 完了済み・過去旅行の「いま」操作を安全に制限する。
 3. 「滞在だけ終了」を追加し、不要な移動区間を作らない。
 4. 詳細編集への確実なスクロール・Focus移動を実装する。

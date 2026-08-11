@@ -1,7 +1,10 @@
-const CACHE_NAME = 'travel-log-pwa-v3';
+importScripts('./spa-fallback.js');
+
+const CACHE_NAME = 'travel-log-pwa-v4';
 const BASE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [
   BASE_PATH,
+  `${BASE_PATH}spa-fallback.js`,
   `${BASE_PATH}manifest.webmanifest`,
   `${BASE_PATH}icons/icon.svg`,
   `${BASE_PATH}icons/icon-192.png`,
@@ -30,9 +33,14 @@ self.addEventListener('fetch', (event) => {
   if (requestUrl.origin !== self.location.origin) return;
 
   if (event.request.mode === 'navigate') {
+    if (!self.TravelLogSpaFallback.isAppPath(requestUrl.pathname)) return;
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
+        .then(async (response) => {
+          if (response.status === 404) {
+            return (await caches.match(BASE_PATH)) || response;
+          }
+          if (!response.ok) return response;
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(BASE_PATH, copy));
           return response;

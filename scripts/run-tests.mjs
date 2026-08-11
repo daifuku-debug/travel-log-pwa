@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { runInNewContext } from 'node:vm';
 import { BlobReader, BlobWriter, TextReader, TextWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
 
 import {
@@ -219,6 +220,12 @@ const travelGachaPage = await readFile(new URL('../src/pages/TravelGachaPage.tsx
 const localTravelGachaRepository = await readFile(new URL('../src/infrastructure/localDb/LocalTravelGachaRepository.ts', import.meta.url), 'utf8');
 const stylesSource = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const githubPages404Source = await readFile(new URL('../public/404.html', import.meta.url), 'utf8');
+const spaFallbackSource = await readFile(new URL('../public/spa-fallback.js', import.meta.url), 'utf8');
+const manifestSource = await readFile(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8');
+const spaFallbackContext = { URL, URLSearchParams };
+runInNewContext(spaFallbackSource, spaFallbackContext);
+const spaFallback = spaFallbackContext.TravelLogSpaFallback;
 const appLayoutSource = await readFile(new URL('../src/shared/layout/AppLayout.tsx', import.meta.url), 'utf8');
 const bottomNavigationSource = await readFile(new URL('../src/shared/navigation/BottomNavigation.tsx', import.meta.url), 'utf8');
 const navigationItemsSource = await readFile(new URL('../src/shared/navigation/navigationItems.tsx', import.meta.url), 'utf8');
@@ -3335,6 +3342,86 @@ await test('PWAオフライン状態でもプロフィール表示に静的追�
 await test('GitHub Pagesのベースパス配下でReact Routerが動く', async () => {
   const router = await readFile(new URL('../src/app/router.tsx', import.meta.url), 'utf8');
   assert.match(router, /basename: import\.meta\.env\.BASE_URL/);
+});
+
+await test('GitHub PagesのSPA fallbackはrootと既知Routeだけを対象にする', () => {
+  assert.equal(spaFallback.BASE_PATH, '/travel-log-pwa/');
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/'), true);
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/trips'), true);
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/trips/trip-1/scrapbook'), true);
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/time-machine'), true);
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/assets/missing.js'), false);
+  assert.equal(spaFallback.isAppPath('/travel-log-pwa/api/trips'), false);
+  assert.equal(spaFallback.isAppPath('/cdn-cgi/trace'), false);
+});
+
+await test('GitHub Pagesの404 redirectは深いURLのqueryとhashを保持する', () => {
+  const redirectUrl = spaFallback.createRedirectUrl({
+    origin: 'https://example.test',
+    pathname: '/travel-log-pwa/trips/trip-1',
+    search: '?tab=timeline&from=home',
+    hash: '#visit-2',
+  });
+  const parsed = new URL(redirectUrl);
+  assert.equal(parsed.pathname, '/travel-log-pwa/');
+  assert.equal(parsed.searchParams.get('__spa'), '/travel-log-pwa/trips/trip-1?tab=timeline&from=home#visit-2');
+});
+
+await test('GitHub Pagesのroot、asset、API 404はSPA redirectへ変換しない', () => {
+  for (const pathname of [
+    '/travel-log-pwa/',
+    '/travel-log-pwa/assets/missing.js',
+    '/travel-log-pwa/api/trips',
+    '/other-project/trips/trip-1',
+  ]) {
+    assert.equal(spaFallback.createRedirectUrl({ origin: 'https://example.test', pathname, search: '', hash: '' }), undefined);
+  }
+});
+
+await test('React起動前にSPA redirectを履歴追加なしで元URLへ復元する', () => {
+  const replacements = [];
+  const restored = spaFallback.restoreRedirectLocation({
+    origin: 'https://example.test',
+    search: '?__spa=%2Ftravel-log-pwa%2Ftrips%2Ftrip-1%3Ftab%3Dtimeline%23visit-2',
+  }, {
+    replaceState: (...args) => replacements.push(args),
+  });
+  assert.equal(restored, true);
+  assert.deepEqual(replacements, [[null, '', '/travel-log-pwa/trips/trip-1?tab=timeline#visit-2']]);
+  assert.ok(indexHtml.indexOf('restoreRedirectLocation') < indexHtml.indexOf('/src/main.tsx'));
+});
+
+await test('SPA redirectは外部URLや未知Routeを復元しない', () => {
+  const replacements = [];
+  for (const target of ['https://other.test/trips/1', '/travel-log-pwa/unknown/path']) {
+    const restored = spaFallback.restoreRedirectLocation({
+      origin: 'https://example.test',
+      search: `?__spa=${encodeURIComponent(target)}`,
+    }, {
+      replaceState: (...args) => replacements.push(args),
+    });
+    assert.equal(restored, false);
+  }
+  assert.deepEqual(replacements, []);
+});
+
+await test('GitHub Pages 404とService Workerは同じSPA Route判定を利用する', () => {
+  assert.match(githubPages404Source, /\/travel-log-pwa\/spa-fallback\.js/);
+  assert.match(githubPages404Source, /createRedirectUrl/);
+  assert.match(githubPages404Source, /location\.replace/);
+  assert.match(sw, /importScripts\('\.\/spa-fallback\.js'\)/);
+  assert.match(sw, /TravelLogSpaFallback\.isAppPath/);
+  assert.match(sw, /response\.status === 404/);
+  assert.match(sw, /caches\.match\(BASE_PATH\)/);
+  assert.match(sw, /if \(!response\.ok\) return response/);
+});
+
+await test('PWA起動とオフラインShellにSPA fallbackを含める', () => {
+  const manifest = JSON.parse(manifestSource);
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.scope, './');
+  assert.match(sw, /`\$\{BASE_PATH\}spa-fallback\.js`/);
+  assert.match(sw, /travel-log-pwa-v4/);
 });
 
 await test('画面単位で遅延読み込みして初期JSを軽くする', () => {
