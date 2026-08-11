@@ -1538,6 +1538,11 @@ a {
 .current-activity__choices label:has(input:checked) { border-color: var(--color-primary); background: var(--color-info-bg); }
 .current-activity__choices span { display: grid; gap: 2px; }
 .current-activity__choices small { color: var(--color-text-muted); line-height: 1.4; }
+.current-activity__departure-choices { display: grid; gap: 10px; }
+.current-activity__departure-choice { min-height: 68px; justify-content: flex-start; text-align: left; }
+.current-activity__departure-choice > span { display: grid; gap: 3px; }
+.current-activity__departure-choice strong { font-size: var(--font-size-sm); }
+.current-activity__departure-choice small { color: inherit; font-size: var(--font-size-xs); font-weight: var(--font-weight-normal); line-height: 1.45; opacity: .78; }
 .quick-record { gap: 12px; padding-block: 18px; }
 .quick-record__history { display: grid; gap: 10px; }
 .quick-record__history summary { min-height: var(--tap-target-min); cursor: pointer; color: var(--journal-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); line-height: var(--tap-target-min); }

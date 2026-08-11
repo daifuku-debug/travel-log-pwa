@@ -17,10 +17,10 @@ import { createTripResultIfNeeded } from '../rpg/tripResultService';
 import {
   buildPlaceVisitDateTimeFields,
   createArrivalNowInput,
-  createDepartureNowInput,
   findInProgressPlaceVisits,
   validatePlaceVisitDateTimeInput,
 } from './placeVisitDateTime.ts';
+import { buildStayEndRecord } from './currentTripActivity.ts';
 import { isQuickTravelRecord } from './quickTravelRecord.ts';
 import {
   buildTransportLegDateTimeFields,
@@ -469,16 +469,10 @@ export async function departPlaceVisitNow(
     if (!current) throw new Error('訪問場所が見つかりません。');
     if (current.departureAt) return current;
     if (!current.arrivalAt) throw new Error('到着時刻がないため、詳細編集から出発時刻を記録してください。');
-
-    return await updatePlaceVisit(placeId, {
-      name: current.name,
-      address: current.address ?? '',
-      visitedDate: isoDateTimeToDateInput(current.arrivalAt),
-      arrivalTime: isoDateTimeToTimeInput(current.arrivalAt),
-      ...createDepartureNowInput(now),
-      memo: current.memo ?? '',
-      castleId: current.castleId ?? '',
-    });
+    if (Number.isNaN(now.getTime())) throw new Error('出発日時を正しく指定してください。');
+    const currentLegs = await repositories.tripTransportLegs.listByTripId(current.tripId);
+    const next = buildStayEndRecord(current, currentLegs, now.toISOString());
+    return await repositories.placeVisits.save(next);
   } catch (error) {
     throw toAppError(error, '出発時刻の記録に失敗しました');
   }

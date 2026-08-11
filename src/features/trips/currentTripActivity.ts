@@ -37,3 +37,25 @@ export function buildDepartureAndTransportRecords(
     leg,
   };
 }
+
+export function buildStayEndRecord(
+  place: PlaceVisit,
+  currentLegs: TripTransportLeg[],
+  departureAt: string,
+): PlaceVisit {
+  if (place.deletedAt || !place.arrivalAt) throw new Error('滞在中の場所を確認してください。');
+  if (place.departureAt) throw new Error('この場所の出発時刻はすでに記録されています。');
+  const arrivalTime = Date.parse(place.arrivalAt);
+  const departureTime = Date.parse(departureAt);
+  if (Number.isNaN(arrivalTime) || Number.isNaN(departureTime)) throw new Error('出発日時を正しく指定してください。');
+  if (departureTime < arrivalTime) throw new Error('出発日時は到着日時以降にしてください。');
+  if (findInProgressTransportLegs(currentLegs).length > 0) {
+    throw new Error('移動中の区間があるため、滞在だけを終了できません。');
+  }
+  return {
+    ...place,
+    departureAt,
+    updatedAt: departureAt,
+    syncStatus: 'pending',
+  };
+}

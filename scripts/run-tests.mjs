@@ -129,7 +129,7 @@ import {
   isTransportDestinationUnregistered,
   resolveTransportArrivalVisitCandidate,
 } from '../src/features/trips/tripArrivalLink.ts';
-import { buildDepartureAndTransportRecords, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
+import { buildDepartureAndTransportRecords, buildStayEndRecord, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
 import { parseTripDetailEditorTarget, setTripDetailEditorTarget } from '../src/features/trips/tripDetailEditor.ts';
 import { resolveTripLiveRecordingAvailability } from '../src/features/trips/tripLiveRecording.ts';
 import {
@@ -3712,12 +3712,12 @@ await test('クイック到着Serviceは最小入力で既存保存処理を使�
   assert.match(tripService, /\.\.\.createArrivalNowInput\(now\)/);
 });
 
-await test('クイック出発Serviceは二重実行を安全に扱い既存編集Validationを通す', () => {
+await test('クイック出発Serviceは二重実行を安全に扱い滞在終了Validationを通す', () => {
   assert.match(tripService, /export async function departPlaceVisitNow/);
   assert.match(tripService, /if \(current\.departureAt\) return current/);
   assert.match(tripService, /if \(!current\.arrivalAt\)/);
-  assert.match(tripService, /return await updatePlaceVisit\(placeId/);
-  assert.match(tripService, /\.\.\.createDepartureNowInput\(now\)/);
+  assert.match(tripService, /buildStayEndRecord\(current, currentLegs, now\.toISOString\(\)\)/);
+  assert.match(tripService, /return await repositories\.placeVisits\.save\(next\)/);
 });
 
 await test('クイック訪問UIは到着・滞在中・出発・詳細編集を段階表示する', () => {
@@ -4132,6 +4132,42 @@ await test('滞在終了と移動開始は同一timestampを共有する', () =>
   const result = buildDepartureAndTransportRecords(place, [], leg);
   assert.equal(result.place.departureAt, timestamp);
   assert.equal(result.leg.departureAt, timestamp);
+});
+
+await test('滞在だけ終了はdepartureAtだけを設定し現在行動をidleへ戻す', () => {
+  const timestamp = '2026-08-10T03:00:00.000Z';
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅', arrivalAt: '2026-08-10T01:00:00.000Z' };
+  const ended = buildStayEndRecord(place, [], timestamp);
+  assert.equal(ended.departureAt, timestamp);
+  assert.equal(ended.updatedAt, timestamp);
+  assert.equal(resolveCurrentTripActivity([ended], []).kind, 'idle');
+  assert.equal(place.departureAt, undefined);
+});
+
+await test('滞在だけ終了は不正時刻・終了済み・移動中の状態を変更しない', () => {
+  const place = { id: 'place-1', tripId: 'trip-1', name: '京都駅', arrivalAt: '2026-08-10T04:00:00.000Z' };
+  assert.throws(() => buildStayEndRecord(place, [], '2026-08-10T03:00:00.000Z'), /到着日時以降/);
+  assert.throws(() => buildStayEndRecord({ ...place, departureAt: '2026-08-10T05:00:00.000Z' }, [], '2026-08-10T06:00:00.000Z'), /すでに記録/);
+  assert.throws(() => buildStayEndRecord(place, [{ id: 'leg-active', departureAt: '2026-08-10T02:00:00.000Z' }], '2026-08-10T05:00:00.000Z'), /移動中/);
+  assert.equal(place.departureAt, undefined);
+});
+
+await test('滞在だけ終了Serviceは移動を作らず保存直前に状態を検証する', () => {
+  assert.match(tripService, /export async function departPlaceVisitNow/);
+  assert.match(tripService, /repositories\.tripTransportLegs\.listByTripId\(current\.tripId\)/);
+  assert.match(tripService, /buildStayEndRecord\(current, currentLegs, now\.toISOString\(\)\)/);
+  assert.match(tripService, /repositories\.placeVisits\.save\(next\)/);
+  assert.doesNotMatch(tripService.match(/export async function departPlaceVisitNow[\s\S]*?export async function deletePlaceVisit/)?.[0] ?? '', /tripTransportLegs\.save|createQuickTripTransportLeg/);
+});
+
+await test('出発Sheetは移動開始と滞在だけ終了を分けCancelと二重実行防止を備える', () => {
+  assert.match(currentTripActivitySource, /departureStep === 'choose'/);
+  assert.match(currentTripActivitySource, /<strong>移動を開始<\/strong><small>次の場所への移動を記録します<\/small>/);
+  assert.match(currentTripActivitySource, /<strong>滞在だけ終了<\/strong><small>この場所を出た時刻だけ記録します<\/small>/);
+  assert.match(currentTripActivitySource, /departPlaceVisitNow\(activity\.place\.id, moment\)/);
+  assert.match(currentTripActivitySource, /stayEndInFlightRef\.current/);
+  assert.match(currentTripActivitySource, /<Button onClick=\{closeEditor\} disabled=\{saving\}>キャンセル<\/Button>/);
+  assert.match(currentTripActivitySource, /startTransportFromPlace/);
 });
 
 await test('滞在終了と移動開始は移動中区間がある場合に拒否する', () => {

@@ -8,7 +8,7 @@ import {
   arriveTransportAndExistingPlaceNow,
   createExplicitPlaceVisitAndArriveTransport,
 } from '../tripArrivalLinkService.ts';
-import { arriveTripTransportLegNow, createQuickPlaceVisit } from '../tripService.ts';
+import { arriveTripTransportLegNow, createQuickPlaceVisit, departPlaceVisitNow } from '../tripService.ts';
 import { formatTransportLegTimeRange, formatTransportLegTitle } from '../transportLegDateTime.ts';
 import type { TripLiveRecordingAvailability } from '../tripLiveRecording.ts';
 import { TRANSPORT_MODE_LABELS, TRANSPORT_MODE_OPTIONS } from '../tripUi.ts';
@@ -25,6 +25,7 @@ interface CurrentTripActivityProps {
 
 type EditorMode = 'idle-arrival' | 'departure' | 'transport-arrival';
 type ArrivalDestination = 'transport-only' | 'existing' | 'new';
+type DepartureStep = 'choose' | 'transport';
 
 export function CurrentTripActivity({
   tripId,
@@ -38,6 +39,8 @@ export function CurrentTripActivity({
   const { showToast } = useToast();
   const formId = useId();
   const firstInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  const departureChoiceRef = useRef<HTMLButtonElement>(null);
+  const stayEndInFlightRef = useRef(false);
   const activity = useMemo(() => resolveCurrentTripActivity(places, transportLegs), [places, transportLegs]);
   const [editorMode, setEditorMode] = useState<EditorMode>();
   const [saving, setSaving] = useState(false);
@@ -49,6 +52,7 @@ export function CurrentTripActivity({
   const [destinationPlaceId, setDestinationPlaceId] = useState('');
   const [destinationName, setDestinationName] = useState('');
   const [arrivalDestination, setArrivalDestination] = useState<ArrivalDestination>('transport-only');
+  const [departureStep, setDepartureStep] = useState<DepartureStep>('choose');
 
   if (!liveRecordingAvailability.allowed) {
     const copy = getUnavailableCopy(liveRecordingAvailability.state);
@@ -80,6 +84,7 @@ export function CurrentTripActivity({
     setDestinationPlaceId('');
     setDestinationName('');
     setArrivalDestination('transport-only');
+    setDepartureStep('choose');
     if (mode === 'transport-arrival' && activity.kind === 'moving') {
       const linked = activity.leg.toPlaceVisitId
         ? arrivalPlaceOptions.find((place) => place.id === activity.leg.toPlaceVisitId)
@@ -134,6 +139,27 @@ export function CurrentTripActivity({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function endStayOnly() {
+    if (stayEndInFlightRef.current || saving || activity.kind !== 'staying') return;
+    stayEndInFlightRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      await departPlaceVisitNow(activity.place.id, moment);
+      finishSave('滞在の終了を記録しました。');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '滞在の終了を記録できませんでした。'));
+    } finally {
+      stayEndInFlightRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  function showTransportForm() {
+    setDepartureStep('transport');
+    window.requestAnimationFrame(() => firstInputRef.current?.focus());
   }
 
   async function saveTransportArrival() {
@@ -234,18 +260,33 @@ export function CurrentTripActivity({
         open={editorMode === 'departure'}
         onClose={closeEditor}
         title="ここを出発"
-        description="滞在を終了し、同じ時刻で次の移動を始めます。"
-        initialFocusRef={firstInputRef}
+        description={departureStep === 'choose' ? 'この場所を出たあとの記録方法を選びます。' : '滞在を終了し、同じ時刻で次の移動を始めます。'}
+        initialFocusRef={departureStep === 'choose' ? departureChoiceRef : firstInputRef}
         dismissible={!saving}
-        actions={<><Button onClick={closeEditor} disabled={saving}>キャンセル</Button><Button variant="primary" type="submit" form={formId} loading={saving}>移動を開始</Button></>}
+        actions={departureStep === 'transport'
+          ? <><Button onClick={() => setDepartureStep('choose')} disabled={saving}>戻る</Button><Button variant="primary" type="submit" form={formId} loading={saving}>移動を開始</Button></>
+          : <Button onClick={closeEditor} disabled={saving}>キャンセル</Button>}
       >
-        <form id={formId} className="quick-visit__form" onSubmit={saveDeparture}>
-          {error && <InlineError message={error} />}
-          <label className="field"><span>移動手段</span><select ref={firstInputRef as React.RefObject<HTMLSelectElement>} value={transportMode} onChange={(event) => setTransportMode(event.target.value as TripTransportMode)}>{TRANSPORT_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          <label className="field"><span>到着先（任意）</span><select value={destinationPlaceId} onChange={(event) => { setDestinationPlaceId(event.target.value); if (event.target.value) setDestinationName(''); }}><option value="">あとで決める</option>{destinationOptions.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></label>
-          {!destinationPlaceId && <label className="field"><span>到着地名（任意）</span><input value={destinationName} onChange={(event) => setDestinationName(event.target.value)} maxLength={120} placeholder="未定のままでも保存できます" /></label>}
-          <Moment value={moment} label="出発時刻" />
-        </form>
+        {departureStep === 'choose' ? (
+          <div className="current-activity__departure-choices" aria-busy={saving || undefined}>
+            {error && <InlineError message={error} />}
+            <Button ref={departureChoiceRef} variant="primary" className="current-activity__departure-choice" onClick={showTransportForm} disabled={saving} fullWidth>
+              <strong>移動を開始</strong><small>次の場所への移動を記録します</small>
+            </Button>
+            <Button className="current-activity__departure-choice" onClick={endStayOnly} loading={saving} fullWidth>
+              <strong>滞在だけ終了</strong><small>この場所を出た時刻だけ記録します</small>
+            </Button>
+            <Moment value={moment} label="出発時刻" />
+          </div>
+        ) : (
+          <form id={formId} className="quick-visit__form" onSubmit={saveDeparture}>
+            {error && <InlineError message={error} />}
+            <label className="field"><span>移動手段</span><select ref={firstInputRef as React.RefObject<HTMLSelectElement>} value={transportMode} onChange={(event) => setTransportMode(event.target.value as TripTransportMode)}>{TRANSPORT_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label className="field"><span>到着先（任意）</span><select value={destinationPlaceId} onChange={(event) => { setDestinationPlaceId(event.target.value); if (event.target.value) setDestinationName(''); }}><option value="">あとで決める</option>{destinationOptions.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></label>
+            {!destinationPlaceId && <label className="field"><span>到着地名（任意）</span><input value={destinationName} onChange={(event) => setDestinationName(event.target.value)} maxLength={120} placeholder="未定のままでも保存できます" /></label>}
+            <Moment value={moment} label="出発時刻" />
+          </form>
+        )}
       </BottomSheet>
 
       <BottomSheet

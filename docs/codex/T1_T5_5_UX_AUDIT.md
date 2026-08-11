@@ -54,13 +54,15 @@
 - 解決内容: 訪問・移動・旅先記録の編集対象をEntity ID付きqueryで表し、描画完了後に対象Editorへスクロール、Focus、一時強調する共通導線へ変更した。Timelineと「いま」、既存の詳細編集一覧から同じ導線を利用し、存在しない対象は理由を表示して編集指定を解除する。
 - 解決確認: 訪問・移動・旅先記録のTimeline編集、直接URL、再読み込み、Back/Forwardを確認した。393px、430px、768px、1024pxで対象が固定表示に隠れず、44px操作領域、横overflowなし、Bottom NavigationとSafe Areaの余白、browser warning/errorなしを確認した。
 
-### P1-3 A stay cannot end without starting a transport leg
+### P1-3 A stay cannot end without starting a transport leg - Resolved 2026-08-12
 
 - 発生箇所: 滞在中の「ここを出発」Sheet。
 - 再現手順: 旅の最終地点で「ここを出発」を押す。
 - なぜ問題か: 現在の操作は必ず`startTransportFromPlace`を呼び、滞在終了と移動開始を一体で保存する。宿泊先到着後や旅の終了時にも不要な移動区間を作るか、滞在中のまま残すことになる。
 - 推奨修正: 「滞在だけ終了」と「次の移動を開始」を明示的に分ける。既存の訪問出発処理を再利用し、自動で移動を作らない。
 - 既存仕様を壊す可能性: 中。現在状態の遷移とCTA優先度を再確認する必要がある。
+- 解決内容: 「ここを出発」Sheetで「移動を開始」と「滞在だけ終了」を明示的に分けた。前者は既存の2 Store Transactionを維持し、後者は保存直前に滞在・移動状態と時刻を再検証してPlaceVisitの`departureAt`だけを保存する。
+- 解決確認: 滞在だけ終了後に`いま`がidleへ戻り、Timelineへ滞在終了時刻だけが反映され、TransportLegが作成されないことを確認した。再読み込み後のidle維持、既存の移動開始によるmoving遷移、Cancel、4幅、44px操作領域、Safe Area、横overflowなし、browser warning/errorなしも確認した。
 
 ## P2
 
@@ -96,7 +98,7 @@
 
 1. [Resolved] GitHub Pagesのnested route reloadをSPA fallbackで復旧する。
 2. [Resolved] 完了済み・過去旅行の「いま」操作を安全に制限する。
-3. 「滞在だけ終了」を追加し、不要な移動区間を作らない。
+3. [Resolved] 「滞在だけ終了」を追加し、不要な移動区間を作らない。
 4. [Resolved] 詳細編集への確実なスクロール・Focus移動を実装する。
 5. 詳細Editorの保存失敗を入力位置で表示し、再試行可能にする。
 
