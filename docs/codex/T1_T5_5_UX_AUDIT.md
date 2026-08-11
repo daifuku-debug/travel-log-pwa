@@ -34,13 +34,15 @@
 
 ## P1
 
-### P1-1 Completed or past trips still expose live "Now" recording
+### P1-1 Completed or past trips still expose live "Now" recording - Resolved 2026-08-12
 
 - 発生箇所: 旅行詳細の「いま」。
 - 再現手順: 完了済みかつ旅行日が過去の旅行を開き、「ここに到着」から現在時刻の訪問・移動を記録する。
 - なぜ問題か: 旅行期間外の現在時刻が過去旅行へ入り、Timelineと旅の状態が実態と食い違う。見出しの「いま」も誤解を招く。
 - 推奨修正: 進行中と判断できる旅行だけライブ操作を有効にし、過去・完了済み旅行では履歴編集を主にする。例外的に再開する場合は明示確認を挟む。
 - 既存仕様を壊す可能性: 中。旅行の進行中判定とタイムゾーンの既存仕様を先に確定する必要がある。
+- 解決内容: 明示statusを持たない現行Tripに合わせ、ローカル日付の開始日・終了日からライブ記録可否を返す純粋関数を追加した。進行中だけ「ここに到着」などを表示し、完了・未来・不正日程では理由表示へ切り替える。完了旅行のクイック記録は旅行最終日を初期値にした過去記録追記とし、詳細編集とTimeline閲覧は維持した。
+- 解決確認: 完了旅行の直接URL再読み込みと393px、430px、768px、1024pxで、ライブCTA非表示、過去記録追記、詳細編集、Timeline、Bottom Navigation、44px操作領域、横overflowなし、browser warning/errorなしを確認した。進行中旅行のライブCTA維持は実ブラウザ、未来・日付境界・不正旧日程は純粋ロジックの自動テストで確認した。
 
 ### P1-2 "Edit details" opens an editor outside the visible area
 
@@ -91,7 +93,7 @@
 ## Next Top 5
 
 1. [Resolved] GitHub Pagesのnested route reloadをSPA fallbackで復旧する。
-2. 完了済み・過去旅行の「いま」操作を安全に制限する。
+2. [Resolved] 完了済み・過去旅行の「いま」操作を安全に制限する。
 3. 「滞在だけ終了」を追加し、不要な移動区間を作らない。
 4. 詳細編集への確実なスクロール・Focus移動を実装する。
 5. 詳細Editorの保存失敗を入力位置で表示し、再試行可能にする。

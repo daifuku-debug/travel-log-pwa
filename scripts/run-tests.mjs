@@ -130,11 +130,14 @@ import {
   resolveTransportArrivalVisitCandidate,
 } from '../src/features/trips/tripArrivalLink.ts';
 import { buildDepartureAndTransportRecords, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
+import { resolveTripLiveRecordingAvailability } from '../src/features/trips/tripLiveRecording.ts';
 import {
   buildQuickTravelRecordFields,
+  createHistoricalQuickTravelRecordInput,
   createQuickTravelRecordInput,
   formatQuickTravelRecordDetail,
   formatQuickTravelRecordTitle,
+  validateQuickTravelRecordTripDate,
   validateQuickTravelRecordInput,
 } from '../src/features/trips/quickTravelRecord.ts';
 import { getConditionValue } from '../src/features/rpg/rpgCondition.ts';
@@ -4025,6 +4028,39 @@ await test('旅先クイック記録は既存T1からT4と詳細フォームを�
   assert.match(tripDetailPage, /<TransportLegForm/);
   assert.match(stylesSource, /\.quick-record__types button \{[\s\S]*min-height: 88px/);
   assert.doesNotMatch(quickTravelRecordSource, /position:\s*fixed/);
+});
+
+await test('旅行日程内だけライブ記録を許可する', () => {
+  const trip = { startDate: '2026-08-10', endDate: '2026-08-12' };
+  assert.deepEqual(resolveTripLiveRecordingAvailability(trip, new Date(2026, 7, 10, 0, 0)), { allowed: true, state: 'ongoing' });
+  assert.deepEqual(resolveTripLiveRecordingAvailability(trip, new Date(2026, 7, 12, 23, 59)), { allowed: true, state: 'ongoing' });
+  assert.deepEqual(resolveTripLiveRecordingAvailability(trip, new Date(2026, 7, 13, 0, 0)), { allowed: false, state: 'completed' });
+  assert.deepEqual(resolveTripLiveRecordingAvailability(trip, new Date(2026, 7, 9, 23, 59)), { allowed: false, state: 'upcoming' });
+});
+
+await test('不正または曖昧な旧日程はデータを変えずライブ記録を止める', () => {
+  assert.deepEqual(resolveTripLiveRecordingAvailability({ startDate: '', endDate: '' }), { allowed: false, state: 'unknown' });
+  assert.deepEqual(resolveTripLiveRecordingAvailability({ startDate: '2026-08-12', endDate: '2026-08-10' }), { allowed: false, state: 'unknown' });
+});
+
+await test('完了旅行のクイック追記は旅行最終日を明示して日程外を拒否する', () => {
+  const trip = { startDate: '2026-08-10', endDate: '2026-08-12' };
+  const input = createHistoricalQuickTravelRecordInput('memo', trip, new Date(2026, 7, 20, 9, 30));
+  assert.equal(input.date, '2026-08-12');
+  assert.equal(input.time, '09:30');
+  assert.deepEqual(validateQuickTravelRecordTripDate(input, trip), []);
+  assert.match(validateQuickTravelRecordTripDate({ date: '2026-08-13' }, trip).join(' '), /旅行日程内/);
+});
+
+await test('ライブ不可旅行は現在CTAを隠し、詳細編集とTimelineを維持する', () => {
+  assert.match(currentTripActivitySource, /if \(!liveRecordingAvailability\.allowed\)/);
+  assert.match(currentTripActivitySource, /この旅行の日程は終了しています/);
+  assert.match(quickTravelRecordSource, /過去の記録を追加/);
+  assert.match(quickTravelRecordSource, /canCreate &&/);
+  assert.match(tripDetailPage, /liveRecordingAvailability=\{liveRecordingAvailability\}/);
+  assert.match(tripDetailPage, /<TripJournalTimeline/);
+  assert.match(tripDetailPage, /<PlaceVisitForm/);
+  assert.match(tripDetailPage, /<TransportLegForm/);
 });
 
 await test('現在行動はidle・staying・movingを排他的に判定する', () => {

@@ -1,11 +1,12 @@
 import { useId, useState, type FormEvent } from 'react';
 import type { ManualTimelineEntry, QuickTravelRecordType } from '../../../domain/models/timeMachine.ts';
-import type { PlaceVisit } from '../../../domain/models/trip.ts';
+import type { PlaceVisit, Trip } from '../../../domain/models/trip.ts';
 import { BottomSheet, Button, InlineError, SelectField, TextareaField, TextInput, useToast } from '../../../shared/ui';
 import { findInProgressPlaceVisits } from '../placeVisitDateTime.ts';
 import {
   QUICK_EXPENSE_CATEGORIES,
   QUICK_TRAVEL_RECORD_TYPES,
+  createHistoricalQuickTravelRecordInput,
   createQuickTravelRecordInput,
   formatQuickTravelRecordDetail,
   formatQuickTravelRecordMoment,
@@ -15,11 +16,15 @@ import {
   quickTravelRecordToInput,
   type QuickTravelRecordInput,
   validateQuickTravelRecordInput,
+  validateQuickTravelRecordTripDate,
 } from '../quickTravelRecord.ts';
 import { createQuickTravelRecord, updateQuickTravelRecord } from '../quickTravelRecordService.ts';
+import type { TripLiveRecordingAvailability } from '../tripLiveRecording.ts';
 
 interface QuickTravelRecordProps {
   tripId: string;
+  trip: Pick<Trip, 'startDate' | 'endDate'>;
+  liveRecordingAvailability: TripLiveRecordingAvailability;
   places: PlaceVisit[];
   records: ManualTimelineEntry[];
   onChanged: () => void;
@@ -30,7 +35,7 @@ type EditorState =
   | { mode: 'create'; input: QuickTravelRecordInput }
   | { mode: 'edit'; entryId: string; input: QuickTravelRecordInput };
 
-export function QuickTravelRecord({ tripId, places, records, onChanged }: QuickTravelRecordProps) {
+export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, places, records, onChanged }: QuickTravelRecordProps) {
   const { showToast } = useToast();
   const [editor, setEditor] = useState<EditorState>();
   const [showDateTime, setShowDateTime] = useState(false);
@@ -39,16 +44,24 @@ export function QuickTravelRecord({ tripId, places, records, onChanged }: QuickT
   const formId = useId();
   const activePlace = findInProgressPlaceVisits(places)[0];
   const input = editor && editor.mode !== 'choose' ? editor.input : undefined;
+  const isHistoricalCreate = liveRecordingAvailability.state === 'completed';
+  const canCreate = liveRecordingAvailability.allowed || isHistoricalCreate;
 
   function openCreate() {
+    if (!canCreate) return;
     setError('');
-    setShowDateTime(false);
+    setShowDateTime(isHistoricalCreate);
     setEditor({ mode: 'choose' });
   }
 
   function selectType(recordType: QuickTravelRecordType) {
     setError('');
-    setEditor({ mode: 'create', input: createQuickTravelRecordInput(recordType, new Date(), activePlace) });
+    setEditor({
+      mode: 'create',
+      input: isHistoricalCreate
+        ? createHistoricalQuickTravelRecordInput(recordType, trip)
+        : createQuickTravelRecordInput(recordType, new Date(), activePlace),
+    });
   }
 
   function openEdit(entry: ManualTimelineEntry) {
@@ -71,7 +84,10 @@ export function QuickTravelRecord({ tripId, places, records, onChanged }: QuickT
   async function saveRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editor || editor.mode === 'choose' || saving) return;
-    const errors = validateQuickTravelRecordInput(editor.input);
+    const errors = [
+      ...validateQuickTravelRecordInput(editor.input),
+      ...(editor.mode === 'create' && isHistoricalCreate ? validateQuickTravelRecordTripDate(editor.input, trip) : []),
+    ];
     if (errors.length > 0) {
       setError(errors.join('\n'));
       return;
@@ -95,9 +111,9 @@ export function QuickTravelRecord({ tripId, places, records, onChanged }: QuickT
     <section className="quick-visit quick-record" aria-labelledby="quick-record-title">
       <div className="quick-visit__heading">
         <div><span>Moments</span><h2 id="quick-record-title">旅先クイック記録</h2></div>
-        <Button onClick={openCreate}>記録を追加</Button>
+        {canCreate && <Button onClick={openCreate}>{isHistoricalCreate ? '過去の記録を追加' : '記録を追加'}</Button>}
       </div>
-      <p className="quick-visit__hint">食事や買い物、その場の出来事を、いまの時刻で手早く残せます。</p>
+      <p className="quick-visit__hint">{getQuickRecordHint(liveRecordingAvailability)}</p>
       {records.length > 0 && (
         <details className="quick-record__history" open={records.length <= 3}>
           <summary>記録一覧 <span>{records.length}件</span></summary>
@@ -147,6 +163,13 @@ export function QuickTravelRecord({ tripId, places, records, onChanged }: QuickT
       </BottomSheet>
     </section>
   );
+}
+
+function getQuickRecordHint(availability: TripLiveRecordingAvailability): string {
+  if (availability.state === 'completed') return '食事や買い物など、旅の記録を日付を確認しながら追記できます。';
+  if (availability.state === 'upcoming') return '旅行が始まると、食事や買い物などを手早く記録できます。';
+  if (availability.state === 'unknown') return '旅行日程を確認すると、新しい記録を追加できます。';
+  return '食事や買い物、その場の出来事を、いまの時刻で手早く残せます。';
 }
 
 function RecordTypeChooser({ onSelect }: { onSelect: (type: QuickTravelRecordType) => void }) {

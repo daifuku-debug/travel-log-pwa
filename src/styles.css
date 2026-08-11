@@ -1530,6 +1530,7 @@ a {
 .quick-transport .quick-visit__place-copy time { overflow-wrap: anywhere; }
 .current-activity__state { display: grid; min-height: 84px; align-content: center; gap: 6px; background: var(--journal-surface); padding: 16px; }
 .current-activity__state strong { font-size: var(--font-size-sm); line-height: 1.55; }
+.current-activity__state small { color: var(--journal-muted); line-height: 1.55; }
 .current-activity__conflict { display: grid; gap: 12px; }
 .current-activity__choices { display: grid; gap: 8px; margin: 0; border: 0; padding: 0; }
 .current-activity__choices legend { margin-bottom: 6px; font-size: var(--font-size-sm); font-weight: var(--font-weight-bold); }

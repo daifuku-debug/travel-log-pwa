@@ -9,6 +9,7 @@ import { TripJournalTimeline } from '../features/trips/components/TripJournalTim
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
 import { formatPlaceVisitRecordMeta } from '../features/trips/placeVisitDateTime.ts';
 import { formatTransportLegTimeRange, formatTransportLegTitle } from '../features/trips/transportLegDateTime.ts';
+import { resolveTripLiveRecordingAvailability } from '../features/trips/tripLiveRecording.ts';
 import {
   createPlaceVisit,
   createTripTransportLeg,
@@ -108,6 +109,7 @@ export function TripDetailPage() {
   const { trip, places, transportLegs, quickRecords } = data;
   const placeNames = places.map((place) => place.name);
   const coverSource = media.coverSource;
+  const liveRecordingAvailability = resolveTripLiveRecordingAvailability(trip);
 
   return (
     <article className="trip-journal">
@@ -120,6 +122,7 @@ export function TripDetailPage() {
           tripId={trip.id}
           places={places}
           transportLegs={transportLegs}
+          liveRecordingAvailability={liveRecordingAvailability}
           onChanged={() => setReloadKey((value) => value + 1)}
           onEditPlace={openPlaceEditor}
           onEditTransport={openTransportEditor}
@@ -127,6 +130,8 @@ export function TripDetailPage() {
 
         <QuickTravelRecord
           tripId={trip.id}
+          trip={trip}
+          liveRecordingAvailability={liveRecordingAvailability}
           places={places}
           records={quickRecords}
           onChanged={() => setReloadKey((value) => value + 1)}

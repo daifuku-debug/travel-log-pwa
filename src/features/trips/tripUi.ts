@@ -1,5 +1,5 @@
-import type { Trip, TripTransportMode } from '../../domain/models/trip';
-import { toDateInputValue } from '../../shared/date/dateUtils';
+import type { Trip, TripTransportMode } from '../../domain/models/trip.ts';
+import { toDateInputValue } from '../../shared/date/dateUtils.ts';
 
 export type TripDisplayStatus = 'ongoing' | 'upcoming' | 'completed';
 export type TripListFilter = 'all' | 'upcoming' | 'completed';

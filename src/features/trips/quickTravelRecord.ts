@@ -3,7 +3,7 @@ import type {
   QuickExpenseCategory,
   QuickTravelRecordType,
 } from '../../domain/models/timeMachine.ts';
-import type { PlaceVisit } from '../../domain/models/trip.ts';
+import type { PlaceVisit, Trip } from '../../domain/models/trip.ts';
 import {
   dateTimeInputToIsoDateTime,
   isoDateTimeToDateInput,
@@ -54,6 +54,27 @@ export function createQuickTravelRecordInput(
     date: toDateInputValue(now),
     time: toTimeInputValue(now),
   };
+}
+
+export function createHistoricalQuickTravelRecordInput(
+  recordType: QuickTravelRecordType,
+  trip: Pick<Trip, 'startDate' | 'endDate'>,
+  now = new Date(),
+): QuickTravelRecordInput {
+  return {
+    ...createQuickTravelRecordInput(recordType, now),
+    date: trip.endDate,
+  };
+}
+
+export function validateQuickTravelRecordTripDate(
+  input: Pick<QuickTravelRecordInput, 'date'>,
+  trip: Pick<Trip, 'startDate' | 'endDate'>,
+): string[] {
+  if (input.date < trip.startDate || input.date > trip.endDate) {
+    return ['記録日は旅行日程内で入力してください。'];
+  }
+  return [];
 }
 
 export function quickTravelRecordToInput(entry: ManualTimelineEntry): QuickTravelRecordInput {

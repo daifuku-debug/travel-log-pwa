@@ -10,12 +10,14 @@ import {
 } from '../tripArrivalLinkService.ts';
 import { arriveTripTransportLegNow, createQuickPlaceVisit } from '../tripService.ts';
 import { formatTransportLegTimeRange, formatTransportLegTitle } from '../transportLegDateTime.ts';
+import type { TripLiveRecordingAvailability } from '../tripLiveRecording.ts';
 import { TRANSPORT_MODE_LABELS, TRANSPORT_MODE_OPTIONS } from '../tripUi.ts';
 
 interface CurrentTripActivityProps {
   tripId: string;
   places: PlaceVisit[];
   transportLegs: TripTransportLeg[];
+  liveRecordingAvailability: TripLiveRecordingAvailability;
   onChanged: () => void;
   onEditPlace: (place: PlaceVisit) => void;
   onEditTransport: (leg: TripTransportLeg) => void;
@@ -28,6 +30,7 @@ export function CurrentTripActivity({
   tripId,
   places,
   transportLegs,
+  liveRecordingAvailability,
   onChanged,
   onEditPlace,
   onEditTransport,
@@ -46,6 +49,22 @@ export function CurrentTripActivity({
   const [destinationPlaceId, setDestinationPlaceId] = useState('');
   const [destinationName, setDestinationName] = useState('');
   const [arrivalDestination, setArrivalDestination] = useState<ArrivalDestination>('transport-only');
+
+  if (!liveRecordingAvailability.allowed) {
+    const copy = getUnavailableCopy(liveRecordingAvailability.state);
+    return (
+      <section className="quick-visit current-activity" aria-labelledby="current-activity-title">
+        <div className="quick-visit__heading">
+          <div><span>Now</span><h2 id="current-activity-title">いま</h2></div>
+        </div>
+        <div className="current-activity__state current-activity__state--unavailable">
+          <span className="quick-visit__status">{copy.status}</span>
+          <strong>{copy.message}</strong>
+          <small>訪問場所や移動の内容は、下の編集メニューから確認・修正できます。</small>
+        </div>
+      </section>
+    );
+  }
 
   const idlePlaceOptions = places.filter((place) => !place.deletedAt && !place.arrivalAt && !place.departureAt);
   const destinationOptions = places.filter((place) => !place.deletedAt && place.id !== (activity.kind === 'staying' ? activity.place.id : ''));
@@ -252,6 +271,12 @@ export function CurrentTripActivity({
       </BottomSheet>
     </section>
   );
+}
+
+function getUnavailableCopy(state: TripLiveRecordingAvailability['state']): { status: string; message: string } {
+  if (state === 'completed') return { status: '完了', message: 'この旅行の日程は終了しています。' };
+  if (state === 'upcoming') return { status: '予定', message: 'この旅行はまだ始まっていません。' };
+  return { status: '日程確認', message: '旅行日程を確認してください。' };
 }
 
 function Moment({ value, label }: { value: Date; label: string }) {
