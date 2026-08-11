@@ -130,6 +130,7 @@ import {
   resolveTransportArrivalVisitCandidate,
 } from '../src/features/trips/tripArrivalLink.ts';
 import { buildDepartureAndTransportRecords, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
+import { parseTripDetailEditorTarget, setTripDetailEditorTarget } from '../src/features/trips/tripDetailEditor.ts';
 import { resolveTripLiveRecordingAvailability } from '../src/features/trips/tripLiveRecording.ts';
 import {
   buildQuickTravelRecordFields,
@@ -4061,6 +4062,46 @@ await test('ライブ不可旅行は現在CTAを隠し、詳細編集とTimeline
   assert.match(tripDetailPage, /<TripJournalTimeline/);
   assert.match(tripDetailPage, /<PlaceVisitForm/);
   assert.match(tripDetailPage, /<TransportLegForm/);
+});
+
+await test('旅行詳細の編集対象はEntity ID付きqueryで往復し他queryを維持する', () => {
+  const initial = new URLSearchParams('view=timeline');
+  const targeted = setTripDetailEditorTarget(initial, { kind: 'place', entityId: 'place-1' });
+  assert.deepEqual(parseTripDetailEditorTarget(targeted), { kind: 'place', entityId: 'place-1' });
+  assert.equal(targeted.get('view'), 'timeline');
+  assert.equal(parseTripDetailEditorTarget(new URLSearchParams('edit=place')), undefined);
+  const cleared = setTripDetailEditorTarget(targeted);
+  assert.equal(cleared.get('edit'), null);
+  assert.equal(cleared.get('entityId'), null);
+  assert.equal(cleared.get('view'), 'timeline');
+});
+
+await test('訪問と移動の詳細編集は描画後に移動・Focus・一時強調する', () => {
+  assert.match(tripDetailPage, /useSearchParams/);
+  assert.match(tripDetailPage, /window\.requestAnimationFrame/);
+  assert.match(tripDetailPage, /prefers-reduced-motion: reduce/);
+  assert.match(tripDetailPage, /scrollIntoView\(\{ behavior: reduceMotion \? 'auto' : 'smooth'/);
+  assert.match(tripDetailPage, /focus\(\{ preventScroll: true \}\)/);
+  assert.match(tripDetailPage, /tabIndex=\{-1\}/);
+  assert.match(stylesSource, /trip-journal-editor__panel--targeted/);
+  assert.match(stylesSource, /scroll-margin-top: calc\(env\(safe-area-inset-top\) \+ 16px\)/);
+});
+
+await test('Timelineは訪問・移動・旅先記録をEntity IDで編集へ渡す', () => {
+  assert.match(tripJournalTimeline, /onEditPlace\?: \(placeId: string\)/);
+  assert.match(tripJournalTimeline, /onEditTransport\?: \(legId: string\)/);
+  assert.match(tripJournalTimeline, /onEditRecord\?: \(recordId: string\)/);
+  assert.match(tripJournalTimeline, /onEdit\(entry\.id\)/);
+  assert.match(tripDetailPage, /onEditRecord=\{\(recordId\) => openEditor\('record', recordId\)\}/);
+});
+
+await test('T5記録はURL指定から既存Sheetを開き保存・キャンセルで対象を閉じる', () => {
+  assert.match(quickTravelRecordSource, /records\.find\(\(entry\) => entry\.id === editRecordId/);
+  assert.match(quickTravelRecordSource, /initialFocusRef=\{editor\?\.mode === 'edit' \? editorFormRef/);
+  assert.match(quickTravelRecordSource, /onRequestEdit\(record\.id\)/);
+  assert.match(quickTravelRecordSource, /if \(wasTargetedEdit\) onEditorClose\(\)/);
+  assert.match(quickTravelRecordSource, /editor\.mode === 'edit' && editRecordId\) onEditorClose\(\)/);
+  assert.match(tripDetailPage, /編集する記録が見つかりません/);
 });
 
 await test('現在行動はidle・staying・movingを排他的に判定する', () => {

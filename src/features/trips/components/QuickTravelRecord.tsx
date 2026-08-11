@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { ManualTimelineEntry, QuickTravelRecordType } from '../../../domain/models/timeMachine.ts';
 import type { PlaceVisit, Trip } from '../../../domain/models/trip.ts';
 import { BottomSheet, Button, InlineError, SelectField, TextareaField, TextInput, useToast } from '../../../shared/ui';
@@ -27,6 +27,9 @@ interface QuickTravelRecordProps {
   liveRecordingAvailability: TripLiveRecordingAvailability;
   places: PlaceVisit[];
   records: ManualTimelineEntry[];
+  editRecordId?: string;
+  onRequestEdit: (recordId: string) => void;
+  onEditorClose: () => void;
   onChanged: () => void;
 }
 
@@ -35,17 +38,39 @@ type EditorState =
   | { mode: 'create'; input: QuickTravelRecordInput }
   | { mode: 'edit'; entryId: string; input: QuickTravelRecordInput };
 
-export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, places, records, onChanged }: QuickTravelRecordProps) {
+export function QuickTravelRecord({
+  tripId,
+  trip,
+  liveRecordingAvailability,
+  places,
+  records,
+  editRecordId,
+  onRequestEdit,
+  onEditorClose,
+  onChanged,
+}: QuickTravelRecordProps) {
   const { showToast } = useToast();
   const [editor, setEditor] = useState<EditorState>();
   const [showDateTime, setShowDateTime] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const formId = useId();
+  const editorFormRef = useRef<HTMLFormElement>(null);
+  const [targeted, setTargeted] = useState(false);
   const activePlace = findInProgressPlaceVisits(places)[0];
   const input = editor && editor.mode !== 'choose' ? editor.input : undefined;
   const isHistoricalCreate = liveRecordingAvailability.state === 'completed';
   const canCreate = liveRecordingAvailability.allowed || isHistoricalCreate;
+
+  useEffect(() => {
+    if (!editRecordId) return;
+    const record = records.find((entry) => entry.id === editRecordId && !entry.deletedAt);
+    if (!record) return;
+    openEdit(record);
+    setTargeted(true);
+    const timer = window.setTimeout(() => setTargeted(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [editRecordId, records]);
 
   function openCreate() {
     if (!canCreate) return;
@@ -72,8 +97,11 @@ export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, pla
 
   function closeEditor() {
     if (saving) return;
+    const wasTargetedEdit = editor?.mode === 'edit' && Boolean(editRecordId);
     setEditor(undefined);
     setError('');
+    setTargeted(false);
+    if (wasTargetedEdit) onEditorClose();
   }
 
   function updateInput(patch: Partial<QuickTravelRecordInput>) {
@@ -99,6 +127,7 @@ export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, pla
       else await createQuickTravelRecord(tripId, editor.input);
       showToast({ title: editor.mode === 'edit' ? '旅先の記録を更新しました' : '旅先の記録を残しました', variant: 'success' });
       setEditor(undefined);
+      if (editor.mode === 'edit' && editRecordId) onEditorClose();
       onChanged();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : '旅先の記録を保存できませんでした。');
@@ -126,7 +155,7 @@ export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, pla
                   <time dateTime={record.startAt}>{formatRecordMoment(record)}</time>
                   {formatQuickTravelRecordDetail(record) && <small>{formatQuickTravelRecordDetail(record)}</small>}
                 </div>
-                <div className="quick-visit__actions"><Button onClick={() => openEdit(record)}>詳細を編集</Button></div>
+                <div className="quick-visit__actions"><Button onClick={() => onRequestEdit(record.id)}>詳細を編集</Button></div>
               </div>
             ))}
           </div>
@@ -139,11 +168,20 @@ export function QuickTravelRecord({ tripId, trip, liveRecordingAvailability, pla
         title={editor?.mode === 'edit' ? '旅先の記録を編集' : editor?.mode === 'create' ? `${getQuickTravelRecordTypeLabel(editor.input.recordType)}を記録` : '記録の種類を選ぶ'}
         description={editor?.mode === 'choose' ? 'いま残したい記録を選んでください。' : undefined}
         dismissible={!saving}
+        initialFocusRef={editor?.mode === 'edit' ? editorFormRef : undefined}
         actions={editor && editor.mode !== 'choose' ? <><Button onClick={closeEditor} disabled={saving}>キャンセル</Button><Button variant="primary" type="submit" form={formId} loading={saving}>{editor.mode === 'edit' ? '記録を更新' : '記録する'}</Button></> : undefined}
       >
         {editor?.mode === 'choose' && <RecordTypeChooser onSelect={selectType} />}
         {input && (
-          <form id={formId} className="quick-record__form" onSubmit={saveRecord} aria-busy={saving || undefined}>
+          <form
+            id={formId}
+            ref={editorFormRef}
+            className={`quick-record__form${targeted ? ' quick-record__form--targeted' : ''}`}
+            onSubmit={saveRecord}
+            aria-busy={saving || undefined}
+            aria-label={editor?.mode === 'edit' ? '旅先の記録の編集フォーム' : undefined}
+            tabIndex={editor?.mode === 'edit' ? -1 : undefined}
+          >
             {error && <InlineError message={error} />}
             <RecordFields input={input} updateInput={updateInput} />
             <div className="quick-record__moment">

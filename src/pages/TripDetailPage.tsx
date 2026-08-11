@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { PlaceVisit, Trip, TripTransportLeg } from '../domain/models/trip';
 import { PlaceVisitForm } from '../features/trips/components/PlaceVisitForm';
 import { CurrentTripActivity } from '../features/trips/components/CurrentTripActivity.tsx';
@@ -7,6 +7,11 @@ import { QuickTravelRecord } from '../features/trips/components/QuickTravelRecor
 import { TransportLegForm } from '../features/trips/components/TransportLegForm';
 import { TripJournalTimeline } from '../features/trips/components/TripJournalTimeline';
 import { TripJournalVisual } from '../features/trips/components/TripJournalVisual';
+import {
+  parseTripDetailEditorTarget,
+  setTripDetailEditorTarget,
+  type TripDetailEditorKind,
+} from '../features/trips/tripDetailEditor.ts';
 import { formatPlaceVisitRecordMeta } from '../features/trips/placeVisitDateTime.ts';
 import { formatTransportLegTimeRange, formatTransportLegTitle } from '../features/trips/transportLegDateTime.ts';
 import { resolveTripLiveRecordingAvailability } from '../features/trips/tripLiveRecording.ts';
@@ -36,9 +41,9 @@ type PendingDelete =
 export function TripDetailPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [reloadKey, setReloadKey] = useState(0);
-  const [editingPlace, setEditingPlace] = useState<PlaceVisit>();
-  const [editingTransportLeg, setEditingTransportLeg] = useState<TripTransportLeg>();
+  const [highlightedEditor, setHighlightedEditor] = useState<Exclude<TripDetailEditorKind, 'record'>>();
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
   const [deleting, setDeleting] = useState(false);
@@ -49,6 +54,46 @@ export function TripDetailPage() {
     () => (tripId ? getTripDetail(tripId) : Promise.resolve(undefined)),
     [tripId, reloadKey],
   );
+  const editorTarget = parseTripDetailEditorTarget(searchParams);
+  const editingPlace = editorTarget?.kind === 'place'
+    ? data?.places.find((place) => place.id === editorTarget.entityId && !place.deletedAt)
+    : undefined;
+  const editingTransportLeg = editorTarget?.kind === 'transport'
+    ? data?.transportLegs.find((leg) => leg.id === editorTarget.entityId && !leg.deletedAt)
+    : undefined;
+
+  useEffect(() => {
+    if (!data || !searchParams.has('edit')) return;
+    const exists = editorTarget?.kind === 'place'
+      ? Boolean(editingPlace)
+      : editorTarget?.kind === 'transport'
+        ? Boolean(editingTransportLeg)
+        : editorTarget?.kind === 'record'
+          ? data.quickRecords.some((record) => record.id === editorTarget.entityId && !record.deletedAt)
+          : false;
+    if (exists) return;
+    setActionError('編集する記録が見つかりません。削除された可能性があります。');
+    setSearchParams(setTripDetailEditorTarget(searchParams), { replace: true });
+  }, [data, editingPlace, editingTransportLeg, editorTarget, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!editorTarget || editorTarget.kind === 'record') return;
+    const editorKind = editorTarget.kind;
+    const target = editorKind === 'place' ? placeEditorRef.current : transportEditorRef.current;
+    if (!target) return;
+    let highlightTimer = 0;
+    const frame = window.requestAnimationFrame(() => {
+      setHighlightedEditor(editorKind);
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      target.focus({ preventScroll: true });
+      highlightTimer = window.setTimeout(() => setHighlightedEditor(undefined), 1600);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [editingPlace?.id, editingTransportLeg?.id, editorTarget?.entityId, editorTarget?.kind]);
 
   async function runAction(action: () => Promise<void>, fallback: string) {
     setActionError('');
@@ -88,14 +133,13 @@ export function TripDetailPage() {
     setDeleting(false);
   }
 
-  function openPlaceEditor(place: PlaceVisit) {
-    setEditingPlace(place);
-    requestAnimationFrame(() => placeEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  function openEditor(kind: TripDetailEditorKind, entityId: string) {
+    setActionError('');
+    setSearchParams(setTripDetailEditorTarget(searchParams, { kind, entityId }));
   }
 
-  function openTransportEditor(leg: TripTransportLeg) {
-    setEditingTransportLeg(leg);
-    requestAnimationFrame(() => transportEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  function closeEditor() {
+    setSearchParams(setTripDetailEditorTarget(searchParams), { replace: true });
   }
 
   if (loading) return <JournalState title="旅行詳細" description="旅の記録を読み込んでいます。"><LoadingState variant="skeleton" message="旅行詳細を読み込み中..." /></JournalState>;
@@ -124,8 +168,8 @@ export function TripDetailPage() {
           transportLegs={transportLegs}
           liveRecordingAvailability={liveRecordingAvailability}
           onChanged={() => setReloadKey((value) => value + 1)}
-          onEditPlace={openPlaceEditor}
-          onEditTransport={openTransportEditor}
+          onEditPlace={(place) => openEditor('place', place.id)}
+          onEditTransport={(leg) => openEditor('transport', leg.id)}
         />
 
         <QuickTravelRecord
@@ -134,6 +178,9 @@ export function TripDetailPage() {
           liveRecordingAvailability={liveRecordingAvailability}
           places={places}
           records={quickRecords}
+          editRecordId={editorTarget?.kind === 'record' ? editorTarget.entityId : undefined}
+          onRequestEdit={(recordId) => openEditor('record', recordId)}
+          onEditorClose={closeEditor}
           onChanged={() => setReloadKey((value) => value + 1)}
         />
 
@@ -153,7 +200,14 @@ export function TripDetailPage() {
         </JournalSection>
 
         <JournalSection id="trip-timeline-title" eyebrow="Story" title="旅のタイムライン">
-          <TripJournalTimeline places={places} transportLegs={transportLegs} quickRecords={quickRecords} />
+          <TripJournalTimeline
+            places={places}
+            transportLegs={transportLegs}
+            quickRecords={quickRecords}
+            onEditPlace={(placeId) => openEditor('place', placeId)}
+            onEditTransport={(legId) => openEditor('transport', legId)}
+            onEditRecord={(recordId) => openEditor('record', recordId)}
+          />
         </JournalSection>
 
         <JournalSection id="trip-route-title" eyebrow="Route" title="この日の軌跡">
@@ -169,11 +223,12 @@ export function TripDetailPage() {
           tripId={tripId}
           editingPlace={editingPlace}
           editingTransportLeg={editingTransportLeg}
-          setEditingPlace={setEditingPlace}
-          onEditPlace={openPlaceEditor}
+          onCloseEditor={closeEditor}
+          onEditPlace={(place) => openEditor('place', place.id)}
+          onEditTransport={(leg) => openEditor('transport', leg.id)}
           placeEditorRef={placeEditorRef}
           transportEditorRef={transportEditorRef}
-          setEditingTransportLeg={setEditingTransportLeg}
+          highlightedEditor={highlightedEditor}
           setPendingDelete={setPendingDelete}
           runAction={runAction}
         />
@@ -277,17 +332,18 @@ function TripKeepsakes({ data, photoCount }: { data: TripDetail; photoCount: num
 }
 
 function TripJournalEditor({
-  data, tripId, editingPlace, editingTransportLeg, setEditingPlace, onEditPlace, placeEditorRef, transportEditorRef, setEditingTransportLeg, setPendingDelete, runAction,
+  data, tripId, editingPlace, editingTransportLeg, onCloseEditor, onEditPlace, onEditTransport, placeEditorRef, transportEditorRef, highlightedEditor, setPendingDelete, runAction,
 }: {
   data: TripDetail;
   tripId?: string;
   editingPlace?: PlaceVisit;
   editingTransportLeg?: TripTransportLeg;
-  setEditingPlace: (place?: PlaceVisit) => void;
+  onCloseEditor: () => void;
   onEditPlace: (place: PlaceVisit) => void;
+  onEditTransport: (leg: TripTransportLeg) => void;
   placeEditorRef: RefObject<HTMLDetailsElement | null>;
   transportEditorRef: RefObject<HTMLDetailsElement | null>;
-  setEditingTransportLeg: (leg?: TripTransportLeg) => void;
+  highlightedEditor?: Exclude<TripDetailEditorKind, 'record'>;
   setPendingDelete: (value?: PendingDelete) => void;
   runAction: (action: () => Promise<void>, fallback: string) => Promise<void>;
 }) {
@@ -299,38 +355,52 @@ function TripJournalEditor({
         <Link to={`/trips/${data.trip.id}/scrapbook`}>写真と文章を編集 <span aria-hidden="true">→</span></Link>
       </nav>
 
-      <details id="trip-place-editor" ref={placeEditorRef} className="trip-journal-editor__panel" open={Boolean(editingPlace) || undefined}>
+      <details
+        id="trip-place-editor"
+        ref={placeEditorRef}
+        className={`trip-journal-editor__panel${highlightedEditor === 'place' ? ' trip-journal-editor__panel--targeted' : ''}`}
+        open={Boolean(editingPlace) || undefined}
+        tabIndex={-1}
+        aria-label={editingPlace ? `${editingPlace.name}の編集フォーム` : '訪問場所の編集'}
+      >
         <summary>訪問場所を追加・編集 <span>{data.places.length}件</span></summary>
         <div className="trip-journal-editor__body">
           {data.places.map((place) => <RecordEditorRow key={place.id} title={place.name} meta={formatPlaceVisitRecordMeta(place)} onEdit={() => onEditPlace(place)} onDelete={() => setPendingDelete({ kind: 'place', id: place.id, label: place.name })} />)}
           <PlaceVisitForm
             key={editingPlace?.id ?? 'new-place'} place={editingPlace} defaultVisitedDate={data.trip.startDate}
-            submitLabel={editingPlace ? '場所を更新' : '場所を追加'} onCancel={editingPlace ? () => setEditingPlace(undefined) : undefined}
+            submitLabel={editingPlace ? '場所を更新' : '場所を追加'} onCancel={editingPlace ? onCloseEditor : undefined}
             onSubmit={async (input) => {
               if (!tripId) return;
               await runAction(async () => {
                 if (editingPlace) await updatePlaceVisit(editingPlace.id, input);
                 else await createPlaceVisit(tripId, input);
-                setEditingPlace(undefined);
+                onCloseEditor();
               }, '訪問場所の保存に失敗しました。');
             }}
           />
         </div>
       </details>
 
-      <details ref={transportEditorRef} className="trip-journal-editor__panel" open={Boolean(editingTransportLeg) || undefined}>
+      <details
+        id="trip-transport-editor"
+        ref={transportEditorRef}
+        className={`trip-journal-editor__panel${highlightedEditor === 'transport' ? ' trip-journal-editor__panel--targeted' : ''}`}
+        open={Boolean(editingTransportLeg) || undefined}
+        tabIndex={-1}
+        aria-label={editingTransportLeg ? `${formatTransportLegTitle(editingTransportLeg)}の編集フォーム` : '移動区間の編集'}
+      >
         <summary>交通費・移動を追加・編集 <span>{data.transportLegs.length}区間 / {formatYen(data.transportSummary.totalCost)}</span></summary>
         <div className="trip-journal-editor__body">
-          {data.transportLegs.map((leg) => <RecordEditorRow key={leg.id} title={formatTransportLegTitle(leg)} meta={`${leg.date} / ${formatTransportLegTimeRange(leg)} / ${TRANSPORT_MODE_LABELS[leg.transportMode]} / ${formatYen(leg.totalCost)}`} onEdit={() => setEditingTransportLeg(leg)} onDelete={() => setPendingDelete({ kind: 'leg', id: leg.id, label: formatTransportLegTitle(leg) })} />)}
+          {data.transportLegs.map((leg) => <RecordEditorRow key={leg.id} title={formatTransportLegTitle(leg)} meta={`${leg.date} / ${formatTransportLegTimeRange(leg)} / ${TRANSPORT_MODE_LABELS[leg.transportMode]} / ${formatYen(leg.totalCost)}`} onEdit={() => onEditTransport(leg)} onDelete={() => setPendingDelete({ kind: 'leg', id: leg.id, label: formatTransportLegTitle(leg) })} />)}
           <TransportLegForm
             key={editingTransportLeg?.id ?? 'new-transport-leg'} leg={editingTransportLeg} defaultDate={data.trip.startDate}
-            submitLabel={editingTransportLeg ? '移動区間を更新' : '移動区間を追加'} onCancel={editingTransportLeg ? () => setEditingTransportLeg(undefined) : undefined}
+            submitLabel={editingTransportLeg ? '移動区間を更新' : '移動区間を追加'} onCancel={editingTransportLeg ? onCloseEditor : undefined}
             onSubmit={async (input) => {
               if (!tripId) return;
               await runAction(async () => {
                 if (editingTransportLeg) await updateTripTransportLeg(editingTransportLeg.id, input);
                 else await createTripTransportLeg(tripId, input);
-                setEditingTransportLeg(undefined);
+                onCloseEditor();
               }, '移動区間の保存に失敗しました。');
             }}
           />

@@ -44,13 +44,15 @@
 - 解決内容: 明示statusを持たない現行Tripに合わせ、ローカル日付の開始日・終了日からライブ記録可否を返す純粋関数を追加した。進行中だけ「ここに到着」などを表示し、完了・未来・不正日程では理由表示へ切り替える。完了旅行のクイック記録は旅行最終日を初期値にした過去記録追記とし、詳細編集とTimeline閲覧は維持した。
 - 解決確認: 完了旅行の直接URL再読み込みと393px、430px、768px、1024pxで、ライブCTA非表示、過去記録追記、詳細編集、Timeline、Bottom Navigation、44px操作領域、横overflowなし、browser warning/errorなしを確認した。進行中旅行のライブCTA維持は実ブラウザ、未来・日付境界・不正旧日程は純粋ロジックの自動テストで確認した。
 
-### P1-2 "Edit details" opens an editor outside the visible area
+### P1-2 "Edit details" opens an editor outside the visible area - Resolved 2026-08-12
 
 - 発生箇所: 「いま」の滞在中・移動中カードにある「詳細を編集」。
 - 再現手順: 旅行詳細の上部で「詳細を編集」を押す。編集フォームはページ下部で開くが、表示位置が移動しない場合がある。
 - なぜ問題か: 押しても何も起きなかったように見え、時刻修正や詳細編集へ到達しにくい。実装ではstate更新直後の単一`requestAnimationFrame`で`scrollIntoView`しており、Editorの描画確定前に実行され得る。
 - 推奨修正: Editorの描画完了を依存にしたEffectでスクロールと見出しFocusを行い、`prefers-reduced-motion`を尊重する。訪問・移動の両Editorを同じ方式にする。
 - 既存仕様を壊す可能性: 低。UI操作だけの変更で対応可能。
+- 解決内容: 訪問・移動・旅先記録の編集対象をEntity ID付きqueryで表し、描画完了後に対象Editorへスクロール、Focus、一時強調する共通導線へ変更した。Timelineと「いま」、既存の詳細編集一覧から同じ導線を利用し、存在しない対象は理由を表示して編集指定を解除する。
+- 解決確認: 訪問・移動・旅先記録のTimeline編集、直接URL、再読み込み、Back/Forwardを確認した。393px、430px、768px、1024pxで対象が固定表示に隠れず、44px操作領域、横overflowなし、Bottom NavigationとSafe Areaの余白、browser warning/errorなしを確認した。
 
 ### P1-3 A stay cannot end without starting a transport leg
 
@@ -95,7 +97,7 @@
 1. [Resolved] GitHub Pagesのnested route reloadをSPA fallbackで復旧する。
 2. [Resolved] 完了済み・過去旅行の「いま」操作を安全に制限する。
 3. 「滞在だけ終了」を追加し、不要な移動区間を作らない。
-4. 詳細編集への確実なスクロール・Focus移動を実装する。
+4. [Resolved] 詳細編集への確実なスクロール・Focus移動を実装する。
 5. 詳細Editorの保存失敗を入力位置で表示し、再試行可能にする。
 
 ## Verification Notes

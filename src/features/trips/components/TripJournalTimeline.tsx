@@ -1,5 +1,6 @@
 import type { ManualTimelineEntry } from '../../../domain/models/timeMachine.ts';
 import type { PlaceVisit, TripTransportLeg } from '../../../domain/models/trip';
+import { Button } from '../../../shared/ui';
 import { getPlaceVisitDate, formatPlaceVisitTimeRange } from '../placeVisitDateTime.ts';
 import {
   formatTransportLegTimeRange,
@@ -24,7 +25,23 @@ interface TimelineEntry {
   kind: 'place' | 'transport' | 'record';
 }
 
-export function TripJournalTimeline({ places, transportLegs, quickRecords = [] }: { places: PlaceVisit[]; transportLegs: TripTransportLeg[]; quickRecords?: ManualTimelineEntry[] }) {
+interface TripJournalTimelineProps {
+  places: PlaceVisit[];
+  transportLegs: TripTransportLeg[];
+  quickRecords?: ManualTimelineEntry[];
+  onEditPlace?: (placeId: string) => void;
+  onEditTransport?: (legId: string) => void;
+  onEditRecord?: (recordId: string) => void;
+}
+
+export function TripJournalTimeline({
+  places,
+  transportLegs,
+  quickRecords = [],
+  onEditPlace,
+  onEditTransport,
+  onEditRecord,
+}: TripJournalTimelineProps) {
   const entries = buildTimelineEntries(places, transportLegs, quickRecords);
   if (entries.length === 0) return <p className="trip-journal-empty-copy">訪問場所や移動、旅先の出来事を追加すると、ここに旅の流れが現れます。</p>;
 
@@ -33,13 +50,24 @@ export function TripJournalTimeline({ places, transportLegs, quickRecords = [] }
     <ol className="trip-journal-timeline">
       {entries.map((entry) => {
         const showDate = entry.date !== previousDate;
+        const onEdit = entry.kind === 'place'
+          ? onEditPlace
+          : entry.kind === 'transport'
+            ? onEditTransport
+            : onEditRecord;
         previousDate = entry.date;
         return (
           <li key={`${entry.kind}-${entry.id}`}>
             {showDate && <time className="trip-journal-timeline__day" dateTime={entry.date}>{formatDayLabel(entry.date)}</time>}
             <span className={`trip-journal-timeline__marker trip-journal-timeline__marker--${entry.kind}`} aria-hidden="true" />
             <div className="trip-journal-timeline__time">{entry.time}</div>
-            <div className="trip-journal-timeline__story"><strong>{entry.title}</strong>{entry.detail && <span>{entry.detail}</span>}</div>
+            <div className="trip-journal-timeline__story">
+              <div className="trip-journal-timeline__story-heading">
+                <strong>{entry.title}</strong>
+                {onEdit && <Button size="sm" onClick={() => onEdit(entry.id)} aria-label={`${entry.title}を編集`}>編集</Button>}
+              </div>
+              {entry.detail && <span>{entry.detail}</span>}
+            </div>
           </li>
         );
       })}
