@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import type { TripTransportLeg, TripTransportMode } from '../../../domain/models/trip';
 import { type TripTransportLegInput, validateTripTransportLegInput } from '../tripService';
+import { InlineError } from '../../../shared/ui';
+import { createEditorSaveErrorMessage } from '../editorSaveError.ts';
 import { TRANSPORT_MODE_OPTIONS } from '../tripUi.ts';
 import {
   getTransportLegArrivalDate,
@@ -40,6 +42,7 @@ export function TransportLegForm({
     memo: leg?.memo ?? '',
   }));
   const [errors, setErrors] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -47,11 +50,13 @@ export function TransportLegForm({
     const validationErrors = validateTripTransportLegInput(input);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
+      setSaveError('');
       return;
     }
 
     setSubmitting(true);
     setErrors([]);
+    setSaveError('');
     try {
       await onSubmit(input);
       if (!leg) {
@@ -71,17 +76,18 @@ export function TransportLegForm({
           memo: '',
         });
       }
-    } catch (error) {
-      setErrors([error instanceof Error ? error.message : '保存に失敗しました。']);
+    } catch {
+      setSaveError(createEditorSaveErrorMessage('移動区間'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form className="form form--compact" onSubmit={handleSubmit}>
+    <form className="form form--compact" onSubmit={handleSubmit} aria-busy={submitting || undefined}>
+      {saveError && <InlineError title="保存できませんでした" message={saveError} />}
       {errors.length > 0 && (
-        <div className="form-errors">
+        <div className="form-errors" role="alert">
           {errors.map((error) => <div key={error}>{error}</div>)}
         </div>
       )}
@@ -160,7 +166,7 @@ export function TransportLegForm({
 
       <div className="form-actions">
         <button className="button button--primary" type="submit" disabled={submitting}>
-          {submitting ? '保存中...' : submitLabel}
+          {submitting ? '保存中...' : saveError ? 'もう一度保存' : submitLabel}
         </button>
         {onCancel && <button className="button" type="button" onClick={onCancel}>キャンセル</button>}
       </div>

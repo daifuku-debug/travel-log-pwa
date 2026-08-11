@@ -132,6 +132,7 @@ import {
 import { buildDepartureAndTransportRecords, buildStayEndRecord, resolveCurrentTripActivity } from '../src/features/trips/currentTripActivity.ts';
 import { parseTripDetailEditorTarget, setTripDetailEditorTarget } from '../src/features/trips/tripDetailEditor.ts';
 import { resolveTripLiveRecordingAvailability } from '../src/features/trips/tripLiveRecording.ts';
+import { createEditorSaveErrorMessage } from '../src/features/trips/editorSaveError.ts';
 import {
   buildQuickTravelRecordFields,
   createHistoricalQuickTravelRecordInput,
@@ -4015,12 +4016,43 @@ await test('旅先クイック記録UIは4種の入口、後編集、保存失�
   assert.match(quickTravelRecordSource, /記録を追加/);
   assert.match(quickTravelRecordSource, /QUICK_TRAVEL_RECORD_TYPES/);
   assert.match(quickTravelRecordSource, /詳細を編集/);
-  assert.match(quickTravelRecordSource, /setError\(caughtError instanceof Error/);
+  assert.match(quickTravelRecordSource, /createEditorSaveErrorMessage\('旅先の記録'\)/);
   assert.match(quickTravelRecordSource, /if \(!editor \|\| editor\.mode === 'choose' \|\| saving\) return/);
   assert.match(quickTravelRecordServiceSource, /repositories\.manualTimelineEntries\.save/);
   assert.match(quickTravelRecordServiceSource, /resolvePlace/);
   assert.match(tripDetailPage, /<QuickTravelRecord/);
   assert.match(tripDetailPage, /quickRecords=\{quickRecords\}/);
+});
+
+await test('詳細Editorの保存失敗文は内部例外を露出せず入力保持と再試行を伝える', () => {
+  assert.equal(
+    createEditorSaveErrorMessage('訪問場所'),
+    '訪問場所を保存できませんでした。入力内容は残っています。もう一度お試しください。',
+  );
+  assert.doesNotMatch(createEditorSaveErrorMessage('移動区間'), /IndexedDB|Repository|stack/i);
+});
+
+await test('訪問と移動の詳細Editorは保存失敗をフォーム内に表示して再試行できる', () => {
+  for (const source of [placeVisitForm, transportLegForm]) {
+    assert.match(source, /<InlineError title="保存できませんでした" message=\{saveError\}/);
+    assert.match(source, /saveError \? 'もう一度保存' : submitLabel/);
+    assert.match(source, /aria-busy=\{submitting \|\| undefined\}/);
+    assert.match(source, /catch \{/);
+  }
+});
+
+await test('詳細Editor保存の失敗は親で握りつぶさず成功時だけURLを閉じる', () => {
+  assert.match(tripDetailPage, /if \(editingPlace\) await updatePlaceVisit[\s\S]*onEditorSaved\(\)/);
+  assert.match(tripDetailPage, /if \(editingTransportLeg\) await updateTripTransportLeg[\s\S]*onEditorSaved\(\)/);
+  assert.doesNotMatch(tripDetailPage, /runAction\(async \(\) => \{[\s\S]{0,240}updatePlaceVisit/);
+  assert.match(tripDetailPage, /setReloadKey[\s\S]*closeEditor\(\)/);
+});
+
+await test('旅先記録Editorも失敗時は入力を保持して同じ操作から再試行できる', () => {
+  assert.match(quickTravelRecordSource, /setError\(createEditorSaveErrorMessage\('旅先の記録'\)\)/);
+  assert.match(quickTravelRecordSource, /setSaveFailed\(true\)/);
+  assert.match(quickTravelRecordSource, /saveFailed \? 'もう一度保存'/);
+  assert.match(quickTravelRecordSource, /if \(!editor \|\| editor\.mode === 'choose' \|\| saving\) return/);
 });
 
 await test('旅先クイック記録は既存T1からT4と詳細フォームを維持する', () => {

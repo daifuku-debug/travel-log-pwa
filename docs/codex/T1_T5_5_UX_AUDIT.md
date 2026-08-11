@@ -66,13 +66,15 @@
 
 ## P2
 
-### P2-1 Detailed form save errors are separated from the form
+### P2-1 Detailed form save errors are separated from the form - Resolved 2026-08-12
 
 - 発生箇所: 旅行詳細下部の訪問・移動詳細Editor。
 - 再現手順: 詳細Editorの保存処理が失敗した状態を想定する。
 - なぜ問題か: `runAction`がErrorを捕捉し、ページ上部の`actionError`へ表示するため、長いページ下部にいるユーザーから見えない。フォーム側へ失敗が返らず、復帰方法が分かりにくい。
 - 推奨修正: Editor内でErrorを表示できる結果または再throw方針へ統一し、入力を維持したまま再試行できるようにする。
 - 既存仕様を壊す可能性: 中。既存削除など`runAction`利用箇所を分離して扱う必要がある。
+- 解決内容: 訪問・移動の保存だけをページ共通`runAction`から分離し、失敗を各Editorへ返すようにした。訪問・移動・旅先記録は共通の安全な文言をEditor内へ表示し、入力・dirty状態・Entity ID付き編集URLを維持して「もう一度保存」から再試行できる。削除処理の既存Error経路は変更していない。
+- 解決確認: TypeCheck、全328件のテスト、Buildを通過した。393px、430px、768px、1024pxで旅先記録Editorの横overflowなし、44px操作領域、Bottom Sheet操作部とBottom Navigation／Safe Areaの非干渉、browser warning/errorなしを確認した。端末DBの強制障害は行わず、Repository失敗時の例外伝播と入力保持は自動テストで確認した。
 
 ### P2-2 Moving-state primary CTA does not state that it records the current time
 

@@ -230,7 +230,11 @@ export function TripDetailPage() {
           transportEditorRef={transportEditorRef}
           highlightedEditor={highlightedEditor}
           setPendingDelete={setPendingDelete}
-          runAction={runAction}
+          onEditorSaved={() => {
+            setActionError('');
+            setReloadKey((value) => value + 1);
+            closeEditor();
+          }}
         />
       </div>
 
@@ -332,7 +336,7 @@ function TripKeepsakes({ data, photoCount }: { data: TripDetail; photoCount: num
 }
 
 function TripJournalEditor({
-  data, tripId, editingPlace, editingTransportLeg, onCloseEditor, onEditPlace, onEditTransport, placeEditorRef, transportEditorRef, highlightedEditor, setPendingDelete, runAction,
+  data, tripId, editingPlace, editingTransportLeg, onCloseEditor, onEditPlace, onEditTransport, placeEditorRef, transportEditorRef, highlightedEditor, setPendingDelete, onEditorSaved,
 }: {
   data: TripDetail;
   tripId?: string;
@@ -345,7 +349,7 @@ function TripJournalEditor({
   transportEditorRef: RefObject<HTMLDetailsElement | null>;
   highlightedEditor?: Exclude<TripDetailEditorKind, 'record'>;
   setPendingDelete: (value?: PendingDelete) => void;
-  runAction: (action: () => Promise<void>, fallback: string) => Promise<void>;
+  onEditorSaved: () => void;
 }) {
   return (
     <section className="trip-journal-editor" aria-labelledby="trip-editor-title">
@@ -370,12 +374,10 @@ function TripJournalEditor({
             key={editingPlace?.id ?? 'new-place'} place={editingPlace} defaultVisitedDate={data.trip.startDate}
             submitLabel={editingPlace ? '場所を更新' : '場所を追加'} onCancel={editingPlace ? onCloseEditor : undefined}
             onSubmit={async (input) => {
-              if (!tripId) return;
-              await runAction(async () => {
-                if (editingPlace) await updatePlaceVisit(editingPlace.id, input);
-                else await createPlaceVisit(tripId, input);
-                onCloseEditor();
-              }, '訪問場所の保存に失敗しました。');
+              if (!tripId) throw new Error('Trip ID is required.');
+              if (editingPlace) await updatePlaceVisit(editingPlace.id, input);
+              else await createPlaceVisit(tripId, input);
+              onEditorSaved();
             }}
           />
         </div>
@@ -396,12 +398,10 @@ function TripJournalEditor({
             key={editingTransportLeg?.id ?? 'new-transport-leg'} leg={editingTransportLeg} defaultDate={data.trip.startDate}
             submitLabel={editingTransportLeg ? '移動区間を更新' : '移動区間を追加'} onCancel={editingTransportLeg ? onCloseEditor : undefined}
             onSubmit={async (input) => {
-              if (!tripId) return;
-              await runAction(async () => {
-                if (editingTransportLeg) await updateTripTransportLeg(editingTransportLeg.id, input);
-                else await createTripTransportLeg(tripId, input);
-                onCloseEditor();
-              }, '移動区間の保存に失敗しました。');
+              if (!tripId) throw new Error('Trip ID is required.');
+              if (editingTransportLeg) await updateTripTransportLeg(editingTransportLeg.id, input);
+              else await createTripTransportLeg(tripId, input);
+              onEditorSaved();
             }}
           />
         </div>

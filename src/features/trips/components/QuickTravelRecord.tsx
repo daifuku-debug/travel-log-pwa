@@ -3,6 +3,7 @@ import type { ManualTimelineEntry, QuickTravelRecordType } from '../../../domain
 import type { PlaceVisit, Trip } from '../../../domain/models/trip.ts';
 import { BottomSheet, Button, InlineError, SelectField, TextareaField, TextInput, useToast } from '../../../shared/ui';
 import { findInProgressPlaceVisits } from '../placeVisitDateTime.ts';
+import { createEditorSaveErrorMessage } from '../editorSaveError.ts';
 import {
   QUICK_EXPENSE_CATEGORIES,
   QUICK_TRAVEL_RECORD_TYPES,
@@ -54,6 +55,7 @@ export function QuickTravelRecord({
   const [showDateTime, setShowDateTime] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [saveFailed, setSaveFailed] = useState(false);
   const formId = useId();
   const editorFormRef = useRef<HTMLFormElement>(null);
   const [targeted, setTargeted] = useState(false);
@@ -75,12 +77,14 @@ export function QuickTravelRecord({
   function openCreate() {
     if (!canCreate) return;
     setError('');
+    setSaveFailed(false);
     setShowDateTime(isHistoricalCreate);
     setEditor({ mode: 'choose' });
   }
 
   function selectType(recordType: QuickTravelRecordType) {
     setError('');
+    setSaveFailed(false);
     setEditor({
       mode: 'create',
       input: isHistoricalCreate
@@ -91,6 +95,7 @@ export function QuickTravelRecord({
 
   function openEdit(entry: ManualTimelineEntry) {
     setError('');
+    setSaveFailed(false);
     setShowDateTime(true);
     setEditor({ mode: 'edit', entryId: entry.id, input: quickTravelRecordToInput(entry) });
   }
@@ -100,6 +105,7 @@ export function QuickTravelRecord({
     const wasTargetedEdit = editor?.mode === 'edit' && Boolean(editRecordId);
     setEditor(undefined);
     setError('');
+    setSaveFailed(false);
     setTargeted(false);
     if (wasTargetedEdit) onEditorClose();
   }
@@ -118,10 +124,12 @@ export function QuickTravelRecord({
     ];
     if (errors.length > 0) {
       setError(errors.join('\n'));
+      setSaveFailed(false);
       return;
     }
     setSaving(true);
     setError('');
+    setSaveFailed(false);
     try {
       if (editor.mode === 'edit') await updateQuickTravelRecord(editor.entryId, editor.input);
       else await createQuickTravelRecord(tripId, editor.input);
@@ -129,8 +137,9 @@ export function QuickTravelRecord({
       setEditor(undefined);
       if (editor.mode === 'edit' && editRecordId) onEditorClose();
       onChanged();
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : '旅先の記録を保存できませんでした。');
+    } catch {
+      setError(createEditorSaveErrorMessage('旅先の記録'));
+      setSaveFailed(true);
     } finally {
       setSaving(false);
     }
@@ -169,7 +178,7 @@ export function QuickTravelRecord({
         description={editor?.mode === 'choose' ? 'いま残したい記録を選んでください。' : undefined}
         dismissible={!saving}
         initialFocusRef={editor?.mode === 'edit' ? editorFormRef : undefined}
-        actions={editor && editor.mode !== 'choose' ? <><Button onClick={closeEditor} disabled={saving}>キャンセル</Button><Button variant="primary" type="submit" form={formId} loading={saving}>{editor.mode === 'edit' ? '記録を更新' : '記録する'}</Button></> : undefined}
+        actions={editor && editor.mode !== 'choose' ? <><Button onClick={closeEditor} disabled={saving}>キャンセル</Button><Button variant="primary" type="submit" form={formId} loading={saving}>{saveFailed ? 'もう一度保存' : editor.mode === 'edit' ? '記録を更新' : '記録する'}</Button></> : undefined}
       >
         {editor?.mode === 'choose' && <RecordTypeChooser onSelect={selectType} />}
         {input && (

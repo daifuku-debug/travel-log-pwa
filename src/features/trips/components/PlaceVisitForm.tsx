@@ -6,6 +6,8 @@ import {
   isoDateTimeToTimeInput,
 } from '../../../shared/date/dateUtils';
 import { useAsyncData } from '../../../shared/hooks/useAsyncData';
+import { InlineError } from '../../../shared/ui';
+import { createEditorSaveErrorMessage } from '../editorSaveError.ts';
 import { createArrivalNowInput, createDepartureNowInput } from '../placeVisitDateTime.ts';
 import { type PlaceVisitInput, validatePlaceVisitInput } from '../tripService';
 
@@ -27,6 +29,7 @@ export function PlaceVisitForm({
   const [input, setInput] = useState<PlaceVisitInput>(() => createInitialInput(place, defaultVisitedDate));
   const { data: castleOptions } = useAsyncData<CastleOption[]>(listCastleOptions, []);
   const [errors, setErrors] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fieldIdPrefix = useId();
   const arrivalTimeId = `${fieldIdPrefix}-place-arrival-time`;
@@ -38,27 +41,30 @@ export function PlaceVisitForm({
     const validationErrors = validatePlaceVisitInput(input);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
+      setSaveError('');
       return;
     }
 
     setSubmitting(true);
     setErrors([]);
+    setSaveError('');
     try {
       await onSubmit(input);
       if (!place) {
         setInput(createInitialInput(undefined, defaultVisitedDate));
       }
-    } catch (error) {
-      setErrors([error instanceof Error ? error.message : '保存に失敗しました。']);
+    } catch {
+      setSaveError(createEditorSaveErrorMessage('訪問場所'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form className="form form--compact" onSubmit={handleSubmit}>
+    <form className="form form--compact" onSubmit={handleSubmit} aria-busy={submitting || undefined}>
+      {saveError && <InlineError title="保存できませんでした" message={saveError} />}
       {errors.length > 0 && (
-        <div className="form-errors">
+        <div className="form-errors" role="alert">
           {errors.map((error) => (
             <div key={error}>{error}</div>
           ))}
@@ -169,7 +175,7 @@ export function PlaceVisitForm({
 
       <div className="form-actions">
         <button className="button button--primary" type="submit" disabled={submitting}>
-          {submitting ? '保存中...' : submitLabel}
+          {submitting ? '保存中...' : saveError ? 'もう一度保存' : submitLabel}
         </button>
         {onCancel && (
           <button className="button" type="button" onClick={onCancel}>
